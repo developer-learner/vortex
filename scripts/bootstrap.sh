@@ -1,0 +1,142 @@
+#!/bin/bash
+# bootstrap.sh — Run once when starting a new project from this template
+#
+# Usage: ./scripts/bootstrap.sh <project-name>
+#
+# What it does:
+#   1. Renames placeholders throughout docs
+#   2. Creates AGENTS.md symlink → CLAUDE.md (OpenCode's preferred filename)
+#   3. Creates Python virtual environment
+#   4. Installs base dependencies
+#   5. Initializes git (if not already)
+#   6. Prints next steps
+#
+# NOTE (Rule 3): This installs the DEFAULT stack (FastAPI + Postgres async).
+# If this project uses a different stack (e.g. SQLite, Django, no DB), EDIT
+# the dependency list below BEFORE running. Also update ci.yml and CONVENTIONS.md.
+
+set -euo pipefail
+
+PROJECT_NAME=${1:-"my-project"}
+
+echo "🚀 Bootstrapping project: $PROJECT_NAME"
+echo ""
+
+# --- Cross-platform sed in-place (macOS/BSD needs '' arg; GNU/Linux does not) ---
+if sed --version >/dev/null 2>&1; then
+  SED_INPLACE=(sed -i)        # GNU sed (Linux, CI)
+else
+  SED_INPLACE=(sed -i '')     # BSD sed (macOS)
+fi
+
+# --- Replace placeholders in docs ---
+echo "📝 Updating docs with project name..."
+find . -type f \( -name "*.md" -o -name "*.yml" -o -name "*.yaml" \) \
+  -not -path "./.git/*" \
+  -not -path "./.venv/*" \
+  -not -name "BLUEPRINT.md" \
+  -exec "${SED_INPLACE[@]}" "s/\[PROJECT_NAME\]/$PROJECT_NAME/g" {} +
+
+# --- AGENTS.md symlink (OpenCode reads AGENTS.md; symlink keeps one source of truth) ---
+echo "🔗 Creating AGENTS.md → CLAUDE.md symlink..."
+if [ ! -f AGENTS.md ]; then
+  ln -s CLAUDE.md AGENTS.md
+  echo "   AGENTS.md symlink created"
+else
+  echo "   AGENTS.md already exists, skipping"
+fi
+
+# --- Python virtual environment ---
+echo "🐍 Creating virtual environment..."
+python3 -m venv .venv
+source .venv/bin/activate
+
+# --- Base dependencies (DEFAULT: FastAPI + SQLite. For Postgres, add
+# asyncpg + alembic. See BLUEPRINT.md Rule 3.) ---
+echo "📦 Installing base dependencies..."
+pip install --upgrade pip
+
+pip install \
+  fastapi \
+  "uvicorn[standard]" \
+  pydantic \
+  pydantic-settings \
+  python-dotenv \
+  httpx \
+  aiosqlite
+
+pip install \
+  pytest \
+  pytest-asyncio \
+  pytest-cov \
+  pytest-json-report \
+  ruff \
+  mypy \
+  respx
+
+# Save to requirements file
+pip freeze | grep -v "^-e" > requirements.txt
+echo "Requirements saved to requirements.txt"
+
+# --- .env file ---
+if [ ! -f .env ] && [ -f .env.example ]; then
+  echo "🔑 Creating .env from template..."
+  cp .env.example .env
+  echo ".env created — fill in your values before running"
+fi
+
+# --- Placeholder-completeness gate marker (D-160) ---
+# BLUEPRINT.md Step 7 becomes MECHANICAL once this marker exists: phase-gate
+# (and via it, the pre-commit hook) fails any commit that still carries a
+# placeholder token. Created BEFORE the baseline commit so it is tracked from
+# the start — the baseline commit itself is exempt (the hook is not yet
+# enabled below), which is correct: it is the skeleton baseline by design.
+# The template repo never runs bootstrap.sh, so its intentional skeleton
+# rows never trip the gate.
+: > .placeholder-gate
+echo "🏷️  Placeholder gate armed — surviving placeholder tokens now fail commits (BLUEPRINT.md Step 7)"
+
+# --- Git ---
+if [ ! -d .git ]; then
+  echo "📁 Initializing git repo..."
+  git init
+  git add .
+  git commit -m "chore: bootstrap from sw-dev-blueprint template"
+fi
+
+# --- Gate hooks for the interactive/human path (D-30) ---
+# The orchestrator runs phase-gate.sh itself; this covers direct commits.
+echo "🪝 Enabling pre-commit gate hook..."
+chmod +x .githooks/pre-commit
+git config core.hooksPath .githooks
+echo "   core.hooksPath = .githooks"
+
+# --- Birth-SHA stamp (D-33): record which template commit this child came from.
+# gh repo create --template leaves no upstream link; without this stamp, drift
+# against the template can never be computed. Do it now — it cannot be
+# reconstructed later.
+echo "🧬 Stamping template birth SHA..."
+TEMPLATE_SLUG=$(grep '^repo=' .template-version | cut -d= -f2)
+BIRTH_SHA=$(gh api "repos/$TEMPLATE_SLUG/commits/HEAD" --jq .sha 2>/dev/null || true)
+if [ -n "$BIRTH_SHA" ]; then
+  "${SED_INPLACE[@]}" "s/^ref=.*/ref=$BIRTH_SHA/" .template-version
+  echo "   born from $TEMPLATE_SLUG @ ${BIRTH_SHA:0:12}"
+else
+  echo "   ⚠️  could not reach GitHub — stamp later with: scripts/update-template.sh --stamp"
+fi
+
+echo ""
+echo "✅ Bootstrap complete!"
+echo ""
+echo "Next steps:"
+echo "  1. (Rule 3) Confirm the installed stack matches this project; adjust if not"
+echo "  2. Fill in .env with your config values"
+echo "  3. Update CLAUDE.md — project name, description, tech stack"
+echo "  4. Update docs/PRODUCT.md with your product context"
+echo "  5. Start LM Studio and load one or two non-thinking models (any of your choice)"
+echo "  6. Map roles to loaded model names in ~/.config/sw-dev-blueprint/models.env"
+echo "     (SWBP_EM_MODEL=<name>, SWBP_CODER_MODEL=<name> — see scripts/llm-call.sh)"
+echo "  7. Author the frozen spec (PRD/ERD/contracts/tests) with a frontier LLM,"
+echo "     stage it under scripts/.approved/incoming/, then scripts/refreeze.sh"
+echo "  8. Run scripts/orchestrate.sh — the shell drives EM and coder over HTTP,"
+echo "     no agent harness required (D-53)"

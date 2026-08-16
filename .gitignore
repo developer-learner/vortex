@@ -7,3 +7,13 @@ data/
 .DS_Store
 dist/
 *.egg-info/
+# control-plane runtime state
+.pipeline-state/
+.em-archive/
+.measurement/
+.cache/
+.tpm/
+.claude/
+
+# secrets + notebook cache
+.env

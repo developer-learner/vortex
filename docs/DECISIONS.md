@@ -1,0 +1,2043 @@
+# DECISIONS.md — Architectural Decision Log
+
+> Every non-obvious technical decision goes here with the reasoning.
+> This prevents the LLM from "helpfully" undoing choices you already made.
+> Format: date, decision, why, what not to suggest.
+
+---
+
+## Template
+
+```
+## YYYY-MM-DD — [Decision title]
+
+**Decision:** [What was decided]
+**Alternatives considered:** [What else was evaluated]
+**Reason:** [Why this choice was made]
+**Do not suggest:** [What the LLM should not propose as a "fix"]
+```
+
+---
+
+## Decisions
+
+## D-165 — 2026-08-15 — Brownfield adoption: snapshot-plus-go-forward model recorded; generalization deferred as a future feature
+
+**Decision:** Adopting this framework onto an existing working app is theorized (not tested) as a *snapshot-plus-go-forward* model: the legacy test suite is frozen as a hash-pinned snapshot that is explicitly NOT an independent oracle (never the acceptance gate for legacy paths), while all new behavior runs through the normal TPM → refreeze → orchestrate loop. Generalizing the framework for brownfield onboarding is deliberately deferred as a later feature — no adoption tooling is built now and no brownfield run is scheduled.
+
+**Alternatives considered:** (a) Retroactive oracle upgrade — rejected as impossible: legacy tests were authored with the implementation in view; the structural taint (the class D-162's read wall exists to prevent) cannot be retroactively removed, so the legacy suite can never satisfy INV-1's meaning. (b) Rewrite the legacy suite before first freeze — rejected as the adoption cost: effectively rebuilding the app's test story before the framework earns anything; test-by-test replacement via refreeze as features are touched is the cheaper, incremental path. (c) Freeze legacy tests as acceptance-gating oracle — rejected: the D-75 class (green suite, broken app); the suite's discrimination for legacy paths is unknown and unmeasurable post-hoc, and hash-pinning that blindness into frozen-manifest compounds it.
+
+**Reason:** The mechanical walk-through found two fatal classes and one workable-but-heavy path. Fatal: (1) non-Python/non-pytest stacks — the oracle machinery is pytest + --json-report + Python-validator bound (D-110), so the framework does not exist for other stacks without writing a new oracle adapter; (2) treating the legacy suite as the acceptance oracle. Workable (Python/pytest apps): reverse-construct the frozen spec (PRD/ERD/contracts.json, inventory enumerating every file EM/coder may touch); write contracts to match what legacy tests actually import or rewrite them (INV-4 at first freeze rejects implementation-internal imports); satisfy D-151 operational preflights; accept that the gate's exemption set (tuned on testchat incidents) will hit unknown seams on an arbitrary repo. No onboarding tooling exists — new-project.sh is greenfield-only, so adoption is a hand-assembled, undocumented, untested procedure until the deferred generalization feature lands.
+
+**Do not suggest:** building brownfield tooling now (deferred by CEO 2026-08-15 as a later feature); treating the legacy snapshot as an independent oracle or as acceptance-gating for legacy paths (D-75 class); rewriting the entire legacy suite up front as an adoption prerequisite; citing this entry as evidence that adoption "works" — it is theory, unvalidated by any run, and the framework's own history shows every new seam class is discovered by incident, not design.
+
+## D-164 — 2026-08-15 — Multi-file transactional task groups sequenced behind measured oracle strength
+
+**Decision:** A bounded multi-file transactional task group (one model completion per file, the group validated/tested/committed/rolled back atomically) for migrations and cross-cutting refactors is a recognized gap and deliberately deferred: sequenced after oracle strength is measured (the D-161 freeze-cadence pass). The one-file containment that makes the local-coder floor fail cheaply is not widened first.
+
+**Alternatives considered:** (a) Build the group now — rejected: it widens the blast radius per completion before the oracle can be shown to catch the wider blast. (b) Reject the gap forever — rejected: migrations and cross-cutting refactors are real, unserved task shapes. (c) Multi-file without group atomicity — rejected: partial groups re-introduce the half-applied class refreeze's transactionality (D-151) exists to prevent.
+
+**Reason:** Rule 9 (gate strength ∝ blast radius) cuts both ways — widening the lane before measuring the oracle that must catch the wider blast inverts the sequence the green-suite/broken-app incidents (D-75's reason) teach.
+
+**Do not suggest:** widening the coder lane to multi-file while the frozen suite's discrimination is unmeasured; reading this deferral as approval of one-file as dogma (it is the current safe default, not a universal); building the group with per-file commits instead of group atomicity (the D-151 class).
+
+## D-163 — 2026-08-15 — Comparative evaluation deferred until independent oracle authorship exists
+
+**Decision:** A comparative benchmark (this pipeline vs. Spec Kit + a frontier agent vs. a plain Codex/Claude Code workflow, scored on hidden acceptance tests) is deferred, gated on solving independent evaluation: the hidden tests must be authored by someone other than the TPM seat. Not ranked as next work. The existing external-review commissioning pattern (REVIEW.md; the 2026-08 remediation review) is the template for that independent author — the constraint is commissioning, not engineering.
+
+**Alternatives considered:** (a) Run now with TPM-authored hidden tests on both arms — rejected: it measures oracle-authoring skill, not pipeline efficacy — self-certification. (b) Independent review for the blueprint arm only — rejected: same validity failure, asymmetric. (c) Skip the benchmark permanently — rejected: the pipeline's internal claims are evidence-backed while its comparative claim stays narrative.
+
+**Reason:** Every internal gate claim in this repo has mechanical evidence; the market-superiority claim has none. A benchmark that cannot distinguish "the pipeline wins" from "the TPM writes better tests" would fail the repo's own Rule 6 standard at benchmark scale.
+
+**Do not suggest:** running the eval with TPM-authored hidden tests and reporting "pipeline wins" (the rubber-ruler failure at benchmark scale); commissioning the eval before D-162 lands (an eval run on a tainted oracle inherits the taint); treating the eval's deferral as evidence against the pipeline's value (deferral is validity-gated, not verdict-gated).
+
+## D-162 — 2026-08-15 — TPM read wall to become structural: materialized view, not a settings allowlist
+
+> Amended by the 2026-08-15 implementation commit: the materialized view shipped — `scripts/tpm-view.sh` builds `.tpm/view/` (spec artifacts + frozen tests + sanitized escalations + TPM-ROLE.md, outbox symlinked to `.tpm/outbox`), `scripts/tpm-agent.sh --view` roots the agent there with `scripts/tpm-view-settings.json`; src/ is physically absent. Three selftests pin the behavior.
+
+**Decision:** INV-1's read side becomes structural via a materialized TPM view — a directory containing only the spec artifacts `spec_artifacts.py` describes, the frozen tests, and sanitized escalation evidence, with the agent rooted there so implementation bytes are physically absent — not by tightening `tpm-agent-settings.json`. Until the view exists, the read wall remains harness-enforced policy (the softness `tpm-agent.sh`'s own header admits), and claims of structurality are wrong.
+
+**Alternatives considered:** (a) Settings allowlist only (deny `Read(./.git/**)`, `Read(./project-trail/**)`, `Read(./.pipeline-state/**)`) — rejected as the fix: still harness-enforced policy, same softness class; the practical leak channels are human-readable evidence files, and a policy list binds only as long as the harness has no gap (the conductor-lane-breach class, project-trail/2026-07-04). (b) Run the agent inside the test sandbox with src/ unmounted — viable but heavier than needed; the materialized view reuses the pack machinery that already excludes src/ and tests/ from TPM briefs by construction. (c) Leave as-is — rejected: REVIEW.md HIGH-2 names this exact hole, and its fix remains open.
+
+**Reason:** Every other load-bearing invariant got the structural treatment (committed hooks, hash-pinned manifests, sandbox mounts, a coder with no filesystem at all); INV-1's read side is the last one enforced by a promise. A TPM that reads src/ fails softly: the suite freezes green-tinted, INV-1 is violated without any crash, and everything downstream reports healthy.
+
+**Do not suggest:** declaring the read wall structural after a settings-file edit (a tighter policy is not a boundary); building the view without sanitizing escalation evidence (project-trail/.pipeline-state quotes of implementation are the practical channel, ahead of `.git` blobs); demoting the D-38 chat air gap below fallback status before the view exists.
+
+## D-161 — 2026-08-15 — Oracle-strength gap recorded as open: the frozen suite's discrimination is unverified (D-75 continuation)
+
+> Amended by the 2026-08-15 docs-wording commit: the Rule 5 correction below landed — BLUEPRINT.md's Rule 5 heading/table row, CLAUDE.md's guidance bullet, and new-project.sh's child CLAUDE.md template now read "binding automated completion evidence"; REVIEW.md and historical entries untouched.
+
+**Decision:** Record as an open, load-bearing gap. INV-1 hardening (D-155) guarantees the TPM did not see the implementation; it says nothing about whether the frozen suite discriminates against plausible wrong implementations. D-75 already observes each new delta's tests failing against the pre-implementation tree at freeze time (red-before-green, warn-only); nothing verifies the existing suite's discrimination, and nothing maps the suite to the spec's clauses. The per-run mutation check remains rejected — D-75 alternatives (a) stands (orders of magnitude more compute for the same signal; flags noise on healthy tests). The sanctioned shape of any future fix is a freeze-cadence, one-shot, report-only mutation pass against the frozen suite — not implemented now. Rule 5's "Tests are ground truth" (BLUEPRINT.md) is an overclaim against the D-44 reality — acceptance is the live CEO check; the suite is binding automated completion evidence. The wording correction landed the same day (see the amendment
+note above).
+
+**Alternatives considered:** (a) Per-run mutation testing — rejected at D-75, carried forward verbatim; not re-litigated here. (b) Building the freeze-cadence pass now — rejected: a measurement of a tainted oracle would certify it; the pass is only meaningful once the TPM read wall is structural (the materialized-view item), and recording the gap first gives any future pass a named baseline to beat. (c) Spec-clause coverage mapping — real machinery nobody has built; separate future item. (d) Leaving the gap only in REVIEW.md — rejected: it is the single load-bearing assumption of the post-D-53 design, and REVIEW.md's own banner marks its findings stale; the authoritative record must carry it.
+
+**Reason:** Everything downstream optimizes against the frozen suite; a green-but-toothless suite does not fail loudly, it silently certifies wrong code as done (the v6/M5 mock family and M16's hit-counter — the incident class D-75's reason documents). D-155 closed INV-1's provenance side on 2026-08-15; without this entry the ledger reads "INV-1 fully addressed" — true for who-pinned-it, false for does-it-discriminate. Independence without strength is a clean-provenance rubber ruler.
+
+**Do not suggest:** re-proposing mutation-per-run (D-75 stands); building the freeze-cadence pass before the TPM read wall is structural (a tainted oracle certifies itself); relocating this gap back to REVIEW.md (historical by design); reading this entry as license to skip D-44's CEO-checkable milestone acceptance (the suite cannot replace the live check).
+
+## D-160 — 2026-08-15 — Placeholder gate mechanized: bootstrap arms .placeholder-gate; phase-gate enforces Step 7
+
+**Decision:** BLUEPRINT.md Step 7's placeholder grep is no longer judgment-only. `bootstrap.sh` creates `.placeholder-gate` before its baseline commit (which is exempt — the hook is not yet enabled when bootstrap commits the skeleton baseline), and from then on `phase-gate.sh manifest` — the mode the pre-commit hook and the orchestrator pre-flight both run — fails any commit whose tree still carries a Step-7 hit (same command, same exclusions: md/json, markdown links filtered, DECISIONS.md/BLUEPRINT.md exempt). The template repo itself never runs bootstrap.sh, so its intentional skeleton rows can never trip the gate; a derived repo is on the enforced side from its first bootstrap. Four selftests pin the behavior: dormant without marker, blocks hits when armed, passes clean when armed, ignores markdown links.
+
+**Alternatives considered:** (a) Leaving Step 7 procedural — rejected (2026-08-15 PM ruling): the meta-rule treats an unmechanized rule as a suggestion, and the re-verification explicitly called the missing fail-closed mechanism. (b) Unconditional enforcement in phase-gate — rejected: the template repo's own commits would fail on its skeletons; the marker is the discriminator. (c) Wiring into bootstrap's fill step only — rejected: bootstrap runs at Step 4, before fill; enforcement belongs at the commit door.
+
+**Reason:** A third-party re-verification confirmed the gate existed but could not find a mechanical failure path for unfilled slots; the repo's own correction-log meta-rule (a rule that cannot be enforced mechanically is a suggestion) demands the gate fail on its own.
+
+**Do not suggest:** exempting skeleton files from the gate (they are the Step-6 fill contract — a derived repo must fill them); deleting `.placeholder-gate` from a child to quiet the gate (silent fail-open; the marker is the enforcement switch); adding the marker to the template manifest (it is a marker, not control-plane logic, and the template repo never carries one).
+
+## D-159 — 2026-08-15 — README file tree completed; placeholder gate re-verified
+
+**Decision:** `README.md`'s file tree now lists all 11 `docs/` files (BROWSER-ORACLE-DESIGN, CEO-PLAYBOOK, CONDUCTOR-ROLE, DEV-VM-SETUP, SANDBOX-VALIDATION were missing — DEV-VM-SETUP is referenced by the README itself). A third-party re-verification of the remediation batches independently confirmed the D-153 placeholder gate: it exists as BLUEPRINT.md Step 7 (a real fail-and-return gate with the hardened regex, markdown-link filter, and the two documented verbatim-record exceptions), and a live run against the template repo is clean except the Step-6 skeleton rows and the two exceptions — the gate's purpose is a derived repo after fill, and the template's skeletons are its fill targets by design.
+
+**Alternatives considered:** (a) Adding CURRENT.md to the gate's exclusion list after a session note quoted a token class — rejected: exclusions are for intentional bracket content; the prose was reworded instead, and a derived repo's CURRENT.md should be gate-clean. (b) Mechanizing the gate (a script that exits nonzero on hits, wired into bootstrap/phase-gate) — held as a stop-and-ask: adding a new fail behavior to an existing gate is a Rule 3 change pending PM ruling.
+
+**Reason:** The D-153 sweep covered QUICKSTART/.env.example/plan.schema but missed README's file tree; the re-verification caught it, and the same pass confirmed the gate was not lost in the hardening.
+
+**Do not suggest:** removing the skeleton rows from the template to make the template repo gate-clean (they are the fill contract Step 6 targets); adding per-file exclusions beyond DECISIONS.md/BLUEPRINT.md (the maintained-list anti-pattern the 2026-06-04 correction log rejected); rewording the gate command.
+
+## D-158 — 2026-08-15 — Manifest covers the full script inventory: bootstrap.sh and new-project.sh join the template manifest
+
+**Decision:** `scripts/.manifest-template` now lists `scripts/bootstrap.sh` and `scripts/new-project.sh` (the only two `scripts/` files absent from it), so the manifest-drift guard covers the complete control-plane script inventory. Both scripts edit the control plane (bootstrap sets `core.hooksPath`; new-project rewrites placeholders across the template), and neither was drift-checked — a drifted copy in a child would have gone uncaught by the manifest gate. `regen-manifest.sh` preserves the file list, so the coverage gap had to be closed by adding the two lines, then regenerating (64 entries).
+
+**Alternatives considered:** (a) Leaving them out and documenting the exception — rejected: the review flagged the gap as drift-invisible, and the correction-log rule (2026-06-30) treats a vanished control-plane file as a signal, which presumes the manifest lists everything that matters. (b) Adding a separate auxiliary manifest — rejected: one manifest, one gate.
+
+**Reason:** The completeness check against the on-disk `scripts/` inventory showed exactly two absent files; both are setup/onboarding scripts that a child invokes by hand at bootstrapping time, so a stale copy is the first thing a new environment would run.
+
+**Do not suggest:** excluding them because they are "one-time" scripts (bootstrap is exactly what a fresh child runs — its drift surface is the bootstrapping gate itself); adding them to `.manifest-project` instead (they are template-owned; template sync and drift must cover them).
+
+## D-157 — 2026-08-15 — LOW batch: parser truncation, fence-strip tolerance, lock race, REMOVED quoting, LLM host override
+
+**Decision:** Five LOW-class fixes plus one refuted finding. (1) The coder `=== FILE:` extraction in orchestrate.sh now captures content GREEDILY (`(.*)\n=== END FILE ===$` instead of lazy `(.*?)`): a file whose content legitimately contains a `=== END FILE ===` line was truncated at the first marker; greedy backtracking takes the LAST sentinel. (2) llm-call.sh's markdown fence-strip is prose-tolerant but count-guarded: exactly two fence lines anywhere in the reply (the old anchored `^...$` missed "Here is the plan:"-wrapped replies), never a global strip — a reply whose content legitimately contains fences (count ≥ 4) is untouched (the D-59 think-tag class). (3) The mkdir-fallback lock's mkdir→pid-write window is closed: a lock with no pid yet is treated as busy-and-unverifiable (fail-closed die) instead of being reclaimed as stale — a second run can no longer delete a live, still-initializing lock. (4) refreeze.sh's `$REMOVED_FILES` loops are line-based (`while IFS= read -r f` with the house empty-line guard) instead of word-splitting: a valid staged entry like `tests/My File.py` passes the shape whitelist but word-splits at apply into `rm -f tests/My` + `rm -f File.py` — deleting the wrong paths. (5) new-project.sh's LLM endpoints are `LLM_HOST`-overridable (port already was), matching orchestrate's SANDBOX_LLM_HOST pattern. REFUTED: the review's "remove tracked docs/.pm-last-review" — verified `0c9984b` is a valid ancestor (117 commits of review range, PM-advanced on 2026-08-02); it is Rule 1's documented mechanical backstop, PM-owned, and stays.
+
+**Alternatives considered:** (a) Anchored fence-strip kept (safe but blind to prose-wrapped replies) vs. unconditional search-strip (corrupts content containing fences) — count==2 guards the safe middle. (b) `git diff --quiet`-style guards for REMOVED quoting — n/a; the read-loop is the direct fix, matching the existing line-119 house idiom. (c) Deleting .pm-last-review per the review — rejected after verification: its fallback (`git rev-list --max-parents=0`) only covers a fresh checkout, and Rule 1 reports derive from it.
+
+**Reason:** Each fix closes a real edge the reviews named; the refuted finding shows the artifact is load-bearing, not stale.
+
+**Do not suggest:** A global fence-strip in llm-call.sh; reverting the REMOVED loops to word-splitting; deleting docs/.pm-last-review or treating the marker as conductor-writable (PM-owned); removing the empty-line guards from the read-loops (a `<<<` herestring yields one empty iteration).
+
+## D-156 — 2026-08-15 — mypy pinned in the sandbox image so the mypy-green cache cannot go stale
+
+**Decision:** `Containerfile` now installs `mypy==2.3.1` instead of an unpinned `mypy`. The mypy-green cache key (orchestrate.sh's fingerprint) already hashes `Containerfile`, `requirements*.txt` and `sandbox-run.sh` — so an unpinned mypy was the one path where the resolved version could change without invalidating the fingerprint, silently serving a stale green after an image rebuild. The pin closes that path; any future version change is now a Containerfile change, which invalidates the cache.
+
+**Alternatives considered:** (a) Capturing `mypy --version` inside the fingerprint — rejected: the version only exists inside the sandbox, so every cache-hit run would pay an extra container boot to fetch it, defeating the cache's purpose. (b) A version-annotated marker file — same problem: the host has no version source to compare against without a boot. (c) Leaving it unpinned and documenting the risk — rejected: the review's LOW-7 named exactly this silent-stale-green; a one-word pin is cheaper than the risk.
+
+**Reason:** The fingerprint design is sound (source/config/toolchain surface hashed); it only lacked the toolchain's version, which belongs in the image definition per the repo's reproducibility ethos. The pin forces a real type-check on the next image rebuild (cache invalidated by the Containerfile hash change), so nothing skips silently.
+
+## D-155 — 2026-08-15 — INV-1 cross-check scans the disk for pytest-collectible files, closing the gitignore blind spot
+
+**Decision:** `phase-gate.sh`'s unpinned-test cross-check now adds a `find` scan for pytest-collectible files (`test_*.py`, `*_test.py`, `conftest.py`, excluding `__pycache__`) to its `git ls-files`-based list. A hand-added `tests/test_*.py` matching an existing ignore rule was invisible to the git-visible scan (tracked + `--exclude-standard` untracked) yet would still be collected and run by the frozen suite — unpinned, hash-unguarded, invisible to the ledger. Non-collectible helpers (e.g. `tests/helpers/gen_data.py`) are deliberately not scanned — pytest never runs them, so INV-1 has nothing to pin.
+
+**Alternatives considered:** (a) Scanning all `*.py` on disk — rejected: it would flag non-collectible helper files the suite never executes, a false positive that could brick a child whose tests/ legitimately carries ignored generated modules. (b) Relying on `git ls-files --others` — that IS the hole; `--exclude-standard` hides ignored files by design.
+
+**Reason:** The review's LOW-4 named the exact bypass (an ignored `tests/test_foo.py` runs unpinned); the collectible-scope disk scan closes it without inventing new obligations.
+
+## D-154 — 2026-08-15 — Fail-open pass: curl -f on the LLM preflight, gh auth named in CI health, [plan]/[task] commits stop swallowing real failures
+
+**Decision:** Three fail-open surfaces closed. (1) The LLM-reachability preflight now uses `curl -sf`: a server that is up but answering HTTP ≥400 (wrong base path, erroring server) previously passed the preflight and the run died deep inside the first model call with a confusing error; the document step (QUICKSTART.md's readiness table) matches. (2) `check_ci_health` probes `gh auth status` explicitly: an unauthenticated `gh` previously folded into the "returned nothing (not authenticated, no runs, or network)" bucket; it is now named as its own INCONCLUSIVE cause. (3) The orchestrator's `[plan]` and `[task]` commits are no longer `2>/dev/null || true`: each is guarded by `git status --porcelain -- <path>` so the normal "nothing to commit" case is skipped, while a real commit failure (missing git identity, hook rejection — the 2026-07-16 scratch-rung class D-151 fixed in refreeze.sh) now fails the run. The stale identity-preflight message claiming "failures are deliberately swallowed" was updated to match.
+
+**Alternatives considered:** (a) Leaving the swallows and relying on the identity preflight that already exists — rejected: the preflight covers identity only; a hook or manifest-gate rejection was still silently eaten, so the pipeline could believe `[plan]`/`[task]` commits landed when they did not. (b) `git diff --quiet HEAD` as the guard — rejected for the task file: a brand-new untracked file shows no diff, so a coder's first-created file would be skipped forever; `status --porcelain` covers untracked + modified + staged uniformly. (c) `curl -f` only in orchestrate — the QUICKSTART table teaches the pattern and was kept in sync.
+
+**Reason:** All three were the same class the repo's own correction log flags (checks that do not run must say so, and must not be silently swallowed); each fix names the real cause or fails closed while preserving the deliberate D-85 warn-and-proceed semantics and the normal no-op commit case.
+
+## D-153 — 2026-08-15 — Placeholder gate hardened; dead doc config swept
+
+**Decision:** Four classes of stale-template surface fixed. (1) BLUEPRINT.md Step 7's placeholder grep now catches lowercase-led placeholders (`[project name]`-class), `[Type 1]`-style letter+digit tokens, and filters markdown links via a trailing `](`-pipe (placeholders are never followed by `(`); the gate text documents the two verbatim-record exceptions — a correction-log row quoting a token (CLAUDE.md's `[NAME]` row) and a project-trail handoff quoting one — which the 2026-08-07 correction-log rule keeps unchanged. (2) QUICKSTART.md Step 5 rewritten for D-121: the mechanical preflights ARE the verdict, the freeze auto-applies and commits, `--diff` is the read-only preview — the y/N approval ritual was dead prose. (3) `.env.example` lost its dead LM Studio + ANTHROPIC config (D-53: the role→model mapping lives in `~/.config/sw-dev-blueprint/models.env`, read by `llm-call.sh`); the app vars remain. (4) plan.schema.json's tests description reworded to the implemented D-119/D-130 omit rule: the validator's exact-once contract binds the plan's delta-scoped union, re-plans may omit carried node-ids, and the validator names any id still needing a mapping.
+
+**Alternatives considered:** (a) Excluding CLAUDE.md or tasks/ from the grep — rejected: both carry live placeholder surfaces (the fill-in-the-blanks table, BACKLOG template rows) the gate must verify. (b) A maintained list of known placeholders — rejected: that is the 2026-06-04 correction-log class ("never rely on a maintained list for completeness"); the gate stays shape-based. (c) Editing the historical rows — rejected: the correction-log rule says verbatim; the live docs were verified to carry no dead `.control-plane-manifest`/`architect.md` references at all.
+
+**Reason:** The external review flagged the lowercase-led blind spot and the dead docs; the gate's strict "ANY lines → placeholder survived" contract was also false for every child (verbatim records quote placeholder tokens forever). Shape-regex + documented exceptions keeps the gate mechanical without pretending zero noise.
+
+## D-152 — 2026-08-15 — Refreeze fails fast on stock macOS instead of dying mid-flow at sha256sum
+
+**Decision:** `scripts/refreeze.sh` checks the platform early: on macOS without GNU coreutils (`sha256sum` absent) it dies immediately with a pointer to docs/DEV-VM-SETUP.md; on macOS with coreutils it proceeds with a loud warning. The old behavior died at the first hash with a confusing "command not found" after the diff was already printed.
+
+**Alternatives considered:** (a) Hard die on Darwin unconditionally (orchestrate.sh's pattern) — rejected: the fixture selftest suite runs the full apply path on the macOS host by design, so a blanket die would break the 443 selftests or force a fixture-side escape hatch that weakens the guard. (b) Warning-only everywhere — rejected: stock macOS genuinely cannot run the freeze (no sha256sum), and the point is fail-fast clarity. (c) Testing for coreutils presence instead of the OS — the sha256sum check IS that test; uname supplies the message context.
+
+**Reason:** Operational freezes belong in the Linux dev VM (the same constraint orchestrate.sh hard-dies on); the host-side fixture apply path on macOS-with-coreutils is legitimate (sandbox stubbed), so the guard distinguishes the true failure mode from the workable one instead of banning both.
+
+## D-151 — 2026-08-15 — Refreeze is transactional: identity preflight + clean-lane guard + HEAD rollback on a failed commit
+
+**Decision:** `scripts/refreeze.sh` can no longer leave the tree half-applied. Three additions: (1) a git-identity preflight (fail-closed, same idiom as `orchestrate.sh`'s D-30-era hooks check) runs before any mutation in auto mode — `--diff` stays read-only and skips it; (2) a clean-lane guard before the apply: `git status --porcelain --untracked-files=no -- tests/ scripts/.approved/` must be empty (untracked `incoming/` staging is excluded by design), so a rollback can never clobber pre-existing uncommitted edits to the frozen lane; (3) the freeze commit is now wrapped — on failure it restores `tests/` + `scripts/.approved/` from HEAD (`git restore --source=HEAD --staged --worktree`), unstaging the applied delta, deleting newly created files, and reverting the VERSION bump, then exits 1 with the staging dir left intact for inspection.
+
+**Alternatives considered:** (a) Commit failure left as-is (the pre-D-151 state) — rejected: the repo's own 2026-07-16 correction log documents the class (missing git identity silently no-op'd every pipeline commit in the dev VM); refreeze is the one script that mutates before committing, so the class hit it worst — a retry would freeze as vN+1 against a tree already containing the vN delta, skipping a version and wrong-diffing. (b) Snapshot-and-restore via `cp -R` of the lane before apply — rejected: git's own index/HEAD is the correct pre-image; a byte-copy snapshot duplicates state the index already owns and can silently desync. (c) `git checkout --` instead of `git restore` — same semantics; restore is the modern, explicit `--source` form. (d) A full-tree clean check — rejected: the working tree legitimately carries untracked/ignored state during runs; only the freeze's own footprint needs to be clean.
+
+**Reason:** The apply (docs/tests install, REMOVED deletions, VERSION bump) and the commit were never one transaction, and `set -euo pipefail` made a failed commit abort *after* mutation with no recovery path. The three guards make the freeze atomic in the only direction that matters: either the delta is committed, or the lane is byte-identical to HEAD and the staging dir is intact for a clean retry.
+
+**Do not suggest:** Reintroducing a human approval prompt as "recovery" (D-121 removed the approval path by CEO ruling); widening the clean-lane guard to the whole tree (false positives on legitimate run-time state); replacing the rollback with a partial file-by-file restore list (it will rot as the freeze's file set grows); treating a failed rollback as a normal retry state (the explicit WARNING line means manual inspection first).
+
+## D-150 — 2026-08-15 — Failed plan synthesis must not clobber tasks/plan.json
+
+**Decision:** The B3 mechanical-synthesis call in `scripts/orchestrate.sh` writes to a temp file (`$STATE_DIR/synthesize-plan.$$`) and only `mv`s it over `tasks/plan.json` on success. The old form — `synth_err=$(python3 validate-plan.py --synthesize-plan ... > tasks/plan.json 2>&1)` — redirected both stdout and stderr into the plan file: on a refusal (TPM materials incomplete, the *designed* fallback path), the validator's error text replaced the prior plan that was about to feed the EM's revision loop as plan-being-revised, and `synth_err` captured nothing (both fds went to the file), so the printed "reason:" was empty too. The reason is now read back from the temp file, and the temp is cleaned in both branches.
+
+**Alternatives considered:** (a) Capture stderr via a process substitution — rejected: the repo's own correction-log meta-rule favors the simplest explicit form; a named temp file is deterministic and inspectable on failure. (b) Have validate-plan write the file itself — rejected: D-53's "shell owns all writes" is the standing rule; the shell redirects, the shell moves.
+
+**Reason:** A refused synthesis is the expected B3 exit — the EM full emission is "exception-only in the mechanical lane" by design — so this was not an edge case but the normal fallback corrupting its own input. The prior plan is context the EM revises against; destroying it silently changed what the EM was answering, with an empty reason hiding the cause.
+
+**Do not suggest:** Letting validate-plan write tasks/plan.json directly (violates D-53); suppressing the refusal reason "because the EM will see the error anyway" (the empty-reason bug hid the failure class for two review passes); removing the temp cleanup on failure (a stale $STATE_DIR file is exactly the residue this repo's hygiene rules target).
+
+## D-149 — 2026-08-14 — check-spec-delta's test_mapping pin gate family-matches node-ids (D-116/D-124)
+
+**Decision:** The `check-spec-delta.py` pin gate no longer compares `contracts.test_mapping` keys to frozen `test-nodeids` by raw string equality. Both sides are reduced to the D-116/D-124 node-id family (module-prefix + bare test name, parametrization suffix stripped via the same `_node_family` rule `validate-plan.py`'s `_id_family` uses) before membership testing, so a mapping key of either shape — `name[chromium]` or `name` — satisfies a frozen node-id of the other. The "unknown node-id" rejection still fires for a key whose family is genuinely not frozen (testchat v106 froze `test-nodeids` in bare form while `contracts.json` kept the three `[chromium]`-suffixed keys, and select-2 transport was already family-tolerant; remaining tolerance asymmetry was a latent false-positive trap at the next real freeze).
+
+**Alternatives considered:** (a) Data-side only: normalize the two frozen `test_mapping` keys in `contracts.json` to bare form — rejected as the sole fix because the collection shape flips both ways between freezes (D-116 selftests pin `_FLICKER_OLD`/`_FLICKER_NEW` in both directions), so a one-time rewrite would break again at the next environment flip; the gate, not the data, is the recurring failure mode. (b) Gate tolerance only, keeping the frozen mapping suffixed — accepted (family matching on both sides is symmetric and matches the file's own DELTA-token handling at ~line 151).
+
+**Reason:** The pin gate existed to stop a mapping key that is not a frozen node-id (M35b class — a gate cannot honor placement for a test that does not exist). Exact-match satisfied that intent when collection shape was stable, but D-116/D-124 explicitly bless `name[chromium]` and `name` as the same test, and the family-match already governs every other consumer (`_id_family` in `validate-plan.py`, the D-116 flicker guard, DELTA-token matching). A gate that rejects a key the rest of the control plane treats as identical is a self-inflicted hard block on the next behavioral freeze over an already-consistent frozen state.
+
+**Do not suggest:** reverting the pin gate to exact string equality; "repairing" the frozen `test_mapping` keys to silicon-bare form as a substitute for gate tolerance (they denote the same family); weakening the unknown-family rejection to allow arbitrary suffixed keys; deleting the two direction-pinned selftests. Cross-repo: derived projects receive the gate, the two selftests, manifest re-pins, and this ledger entry through the same propagation batch.
+
+## D-148 — 2026-08-14 — Historical PRD acceptance-criterion blocks are immutable and contiguous
+
+**Decision:** The D-136 PRD additive guard preserves each historical acceptance criterion as a complete Markdown block, not merely as an identifier. `check-prd-additive.py` recognizes AC bullet/heading starts, delimits each block at the next AC or section heading, normalizes whitespace so harmless line wrapping remains possible, and fails closed when a historical block is missing, duplicated, altered, or split by an interleaved criterion. New AC blocks remain additive and may be placed between existing complete blocks. Supersession remains an ERD-DELTA operation that retains the historical PRD block.
+
+**Alternatives considered:** (a) Continue checking only the set of AC ids — rejected because a staged PRD can retain every id while rewriting behavior or inserting a new criterion inside an old body. (b) Require raw byte identity — rejected because Markdown line wrapping does not change the criterion and full-file TPM returns may reflow prose. (c) Repair malformed records without strengthening the gate — rejected because the next full-file return could recreate the same corruption undetected.
+
+**Reason:** Testchat's standing PRD retained the names AC-160, AC-166, and AC-167 but interleaved their bodies: two new AC starts split AC-160, while the trailing bodies of AC-166 and AC-160 became part of AC-167's apparent block. The id-set guard returned green because all three names survived. D-147 now sends this complete accumulated PRD to every TPM intake, so structural corruption can directly misstate historical product behavior. Block-level preservation closes the exact seam while retaining additive authoring and whitespace-only reflow.
+
+**Do not suggest:** weakening preservation back to id presence; allowing historical body edits because the id remains; treating duplicate AC starts as harmless; making whitespace layout byte-identical; silently repairing a malformed frozen PRD outside `refreeze.sh`. Cross-repo: derived projects receive the guard and selftests through template sync, but an already-malformed project PRD must be repaired through one legitimate refreeze before installing this stricter guard.
+
+## D-147 — 2026-08-14 — Trim no-delta ERD context, but always ship the full PRD (amends D-117; corrected same day)
+
+**Decision:** `tpm-pack.sh` always emits the complete frozen `PRD.md`, whether or not an `ERD-DELTA.md` is active. A staged PRD is a complete additive replacement under D-136, and the chat TPM must see every historical AC id it is required to preserve or supersede. The no-delta optimization applies only to the standing ERD: the generated standing summary replaces full `ERD.md`, while the complete interface index and TPM-requested stage-2 contract bodies remain available. Missing summary generation or relative expansion retains D-117/D-145's loud full-ERD fallback.
+
+**Alternatives considered:** (a) Keep the PRD capsule and add on-demand PRD retrieval — rejected as premature machinery to save about 25 KB without measured context pressure; unlike contracts, no PRD section protocol or mechanical merge exists. (b) Keep the capsule with no retrieval path — rejected because it makes the D-136 additive guard impossible for a chat TPM to satisfy safely. (c) Restore both full PRD and full ERD — rejected because the ERD summary plus current delta and requested contract bodies retain a working scoped path.
+
+**Reason:** The original D-147 treated the PRD and ERD as symmetric trims. They are not: stage 2 retrieves contract bodies only, while no path can recover omitted PRD acceptance criteria. Testchat's packed PRD block fell to 576 bytes and zero AC ids while the standing PRD held 55 ids required by the additive guard. Restoring roughly 25 KB of non-scarce frontier context removes a latent hard failure; the measured ERD saving remains.
+
+**Do not suggest:** reintroducing a PRD capsule without a real PRD retrieval-and-merge mechanism backed by measured context pressure; weakening the additive guard to accommodate missing input; restoring the full standing ERD merely because the PRD is full; dropping the full-ERD fallback on summary failure. Cross-repo: derived projects receive the packer and selftests through template sync and align this corrected entry in the same propagation batch.
+
+## D-146 — 2026-08-14 — Milestone cutting optimizes the shortest safe route, not just error containment; close-out records time spent (amends D-46)
+
+**Decision:** TPM guidance (docs/TPM-ROLE.md, "Milestone sizing") is extended with a milestone-cutting rule and a PRD scope brief. Cutting is no longer framed only as error-containment vs cycle-overhead balance (small enough to fail cheaply, big enough to avoid trivia): the TPM is directed to prefer the shortest safe route to the business outcome. Choose the smallest coherent, CEO-checkable outcome (D-44) that moves the product forward; include work only when it directly delivers that outcome, is required for its correctness or safety, or is an unavoidable dependency on the outcome's critical path; defer unrelated cleanup, speculative generalization, optional polish, and future-proofing; prefer the task order that minimizes elapsed time and rework; record what was deliberately excluded. This is TPM judgment — no new gate, no numeric formula. The PRD's scope brief states briefly: intended outcome, essential scope, explicitly deferred scope, why each task is necessary, and an expected time band; close-out records the actual elapsed time and avoidable rework (the per-milestone feedback loop).
+
+**Alternatives considered:** (a) A hard gate / numeric target on milestone time or task count — rejected: variance across projects is the point of D-46, and a numeric formula would force recuts that burn the very cycles sizing exists to avoid; the operator who owns the trade-off is the TPM, not a threshold. (b) Leave TPM-ROLE.md unchanged, trusting "justify the cut briefly in the PRD" — rejected: the prior text optimized error containment but never stated the relevance/critical-path commitment, so a spec could pass "small/big" sizing while shipping speculative or out-of-scope work, and nothing required a time-band estimate or close-out measurement. (c) A separate PRD template section enforced at freeze — rejected: this is guidance for the authoring seat, not frozen-spec structure to gate; the fields are stated in TPM-ROLE.md and it is the TPM's judgment to weigh them.
+
+**Reason:** Post-ship review of time efficiency: the control plane is already substantially trimmed (20-minute anti-thrash budget; delta-mapped verdict scope instead of a 45–60-minute full suite; mechanical plan transcription replacing a 45–90-minute EM planning call; D-93 small-change bypass; parsimony-governed tests; D-46 sizing). The identified gap is that TPM guidance optimized error containment versus cycle overhead but did not explicitly require the shortest safe route to the business outcome. This decision makes that the stated primary, alongside the D-126 metrics-report defect fix (the success path passed `v$FROZEN_V`, which the reporter's `int()` rejected and `|| true` swallowed — no `metrics.tsv` row) that restores the per-milestone feedback loop.
+
+**Do not suggest:** turning the rule into a hard gate, numeric target, or frozen PRD schema; removing the close-out time/rework recording once the metrics loop returns; weighing speculative generalization as in-scope; a milestone with no CEO-checkable outcome "to keep momentum." Cross-repo: TPM-ROLE.md is not manifest-tracked, so derived projects port this guidance and the ledger verbatim in the same propagation batch as the metrics fix.
+
+## D-145 — 2026-08-14 — Context byte budgets warn on growth; generated slices may never exceed their sources
+
+**Decision:** Model-facing context has five pinned warning budgets, measured in exact UTF-8/file bytes by `scripts/context-budget.py`: TPM stage-1 bundle 88,000; standing summary 8,192; complete interface index 16,384; assembled EM package 65,536; escalation shared-context block 32,768. Absolute overruns warn on stderr and continue—the safe full-artifact fallback and a genuinely large active delta remain available. Relative expansion is a hard generator rejection: every pack-produced role, schema, standing-summary, ERD-delta, interface-index, and requested-contract-body slice must be no larger than its source artifact. A rejected slice enters the existing loud full-source fallback. `contracts-delta.py` enforces the same invariant when called outside `tpm-pack.sh`. The EM measurement is the exact saved user prompt plus its system prompt and response schema; escalation measures the exact shared block emitted once at the batch top. The product-capsule budget was retired with D-147's same-day correction because the PRD is no longer sliced.
+
+**Alternatives considered:** (a) Hard-fail every absolute overrun—rejected because a warning budget is a regression signal, while a safe fallback may intentionally be larger and must not disappear when context generation fails. (b) Measure only the whole TPM bundle—rejected because a stable total can hide one component expanding while another shrinks, and it leaves EM/escalation growth invisible. (c) Test only current testchat artifact sizes—rejected because the blueprint serves projects of different legitimate sizes; runtime warnings plus pinned synthetic boundary tests preserve the signal without baking one child's content into the template. (d) Assume minification guarantees shrinkage—rejected because an already-compact or tiny source can make generated index/scaffolding larger; compare actual bytes.
+
+**Reason:** Context trimming had point-in-time size evidence but no durable regression boundary. A later prompt, schema, interface family, or shared-context edit could silently restore whole-app load while every semantic selftest stayed green. Per-surface budgets identify which layer grew, and the no-expansion invariant makes “slice” a mechanically true claim rather than a naming convention.
+
+**Do not suggest:** suppressing an over-budget warning without either trimming the surface or deliberately revising this decision and its pinned test; converting absolute warnings into hard halts without a CEO policy decision; accepting a generated slice larger than its source because it is structurally cleaner; counting only line totals or approximate tokens when exact bytes are available; dropping the full-source fallback on slice rejection. Cross-repo: derived projects receive the tool, call-site wiring, selftests, and manifest pins through template sync and align this ledger entry in the same propagation batch.
+
+## D-144 — 2026-08-14 — Stage-1 pack names the active build inventory; contracts-delta's default never reapplies the standing slice (amends D-140/D-141)
+
+**Decision:** `scripts/contracts-delta.py` body mode, when `SWBP_CONTRACT_FILES` is absent, no longer silently defaults to the standing accumulated `contracts.files`. Its standalone inventory source is D-140-ordered: the newest modern DELTA snapshot (one carrying `inventory_files`) beside the contracts file is authoritative and may be empty (a consolidation keeps no standing pin); an all-legacy or absent snapshot retains the historical `contracts.files` behavior; a malformed modern snapshot fails closed (exit 1 → the shell falls back to the full contracts file loudly). Separately, `tpm-pack.sh` stage 1 now notes the executor's active build inventory (D-140) below the COMPLETE interface index (D-141) — a consolidation prints "none — <snapshot> is a consolidation", and an active snapshot names its files — so the next feature is authored against active scope rather than the standing or previous-milestone list.
+
+**Alternatives considered:** (a) Fix nothing — rejected: the live pack already emits the D-141 index and the EM lane already sets `SWBP_CONTRACT_FILES`, so the standing default was latent dead code, but any future caller that forgot the env would silently re-slice the accumulated surface — the exact D-140 "do not suggest" pin, with no failure. (b) Make stage-2 `--contracts-for` select files from the EM's active inventory — rejected: D-141 forbids it (author's scope, not the executor's) and the index is deliberately scope-free. (c) Delegate the standalone default to `validate-plan.py --active-inventory` — rejected: that command reads the module-level `CONTRACTS` constant, not the producer's argument, so the parser tests would diverge; the newest-snapshot rule is self-contained and can never reintroduce standing surface. (d) Show only the index with no active-inventory note — rejected on purpose: the note is what makes pack preparation truthful for the next feature (the D-140 narrow vs the accumulated complete).
+
+**Reason:** Pending item 1 of the post-ship audit — "TPM-pack contract selection still slices contracts using the previous standing inventory" — did not reproduce in the pack flow (stage-1 is the D-141 complete index, stage-2 is TPM-named, the execution lane is D-140-scoped at `orchestrate.sh` lines 658–684). The real residual was the producer's env-absent default: `contracts-delta.py` returned to `contracts.files` whenever the env was missing, which D-140's "Do not suggest" pin names directly. This amendment makes that pin structural and adds the informational active-inventory line so pack preparation shows active scope.
+
+**Do not suggest:** reverting the body-mode default to the standing `contracts.files` when a modern snapshot is available; selecting stage-2 files from the active inventory at pack time (D-141); emitting contract bodies into the index note; treating the active-inventory note as making the (still complete) index authoritative for build scope. Cross-repo: derived projects receive the code and selftests via template sync and must align this ledger entry in the same propagation batch.
+
+## D-143 — 2026-08-14 — Retire the S7 ERD-section-size advisory (D-85)
+
+**Decision:** The freeze-time S7 advisory (an ERD section exceeding 1200 chars would warn that downstream plan briefs might exceed `MAX_BRIEF_CHARS`) is retired and removed from `refreeze.sh`. Its absence is now pinned by an inverted selftest. This is the D-85 selection rule applied: a paid freeze-time advisory that has produced no behavioral change is retired rather than kept to demonstrate diligence.
+
+**Alternatives considered:** (a) Keep S7 as a soft early signal — rejected: it predicts exactly what the plan gate enforces harder (mass rejection over `MAX_BRIEF_CHARS`), so it can never act before the gate with information the gate lacks; the D-89 class was retired in the same ledger for the same "duplicated the plan gate's already-harder check" reason. (b) Lower S7's threshold to act earlier — rejected: a threshold that fires on every real freeze is noise, not signal, and the plan gate remains the enforcement point either way.
+
+**Reason:** S7 never blocked a freeze (advisory by construction) and has no documented behavioral change in its track record — the v105 consolidation freeze printed it to a verdict nobody consumed. D-56 (undeclared-externals heuristic, caught the v8/v9 class) and D-80 (D-68 debt sweep, forced the M28 v54 recut and remediation directives) are retained: both have demonstrated blast radius exceeding their runtime cost. The plan gate's `MAX_BRIEF_CHARS` rejection remains the hard, authoritative check.
+
+**Do not suggest:** reintroducing an ERD section-size advisory at freeze time; moving S7 lower/higher rather than deleting it; making the plan-gate brief check an advisory (it stays a hard halt — the EM cannot act on a soft signal); treating D-56/D-80 as equally retired without their behavioral-change evidence.
+
+## D-142 — 2026-08-14 — Reuse mypy green verdicts only for an identical typing fingerprint
+
+**Decision:** `run_tests` stores a successful mypy verdict in the current milestone's ephemeral `.pipeline-state/mypy-green/` directory, keyed by a SHA-256 fingerprint of the exact mypy target list plus every `src/**/*.py` file and the repository inputs that determine type-check behavior: mypy/config files, dependency manifests and locks, `Containerfile`, `scripts/sandbox-run.sh`, `MYPYPATH`, and `MYPY_CONFIG_FILE`. A matching marker skips only mypy; pytest still runs for every acceptance/verdict invocation. Mypy failures are never cached. Scoped and whole-tree target sets have distinct fingerprints, and any fingerprinting or marker-write failure halts rather than using an unknown result.
+
+**Alternatives considered:** (a) Run mypy once per milestone — rejected because later coder tasks may change Python sources or their dependencies. (b) Cache failures too — rejected because a retry may repair the environment or source and must receive a fresh verdict. (c) Hash only the explicitly targeted files — rejected because mypy follows imports and is also controlled by configuration, dependencies, and its sandbox image. (d) Persist the cache outside `.pipeline-state` — rejected because reuse is needed only across repeated checks in one active milestone; cross-run reuse adds stale-environment risk for little benefit.
+
+**Reason:** The orchestrator invokes the same acceptance funnel after individual tasks, retries, isolation probes, and the final regression pass. When neither the checked target set nor any typing input changed, rebuilding the sandbox and repeating mypy proves no new fact. Fingerprinting the conservative full Python source closure removes that repeated cost without weakening task-scoped checks, the final whole-tree check, or pytest execution.
+
+**Do not suggest:** reusing a green marker after any Python/config/dependency/sandbox input changes; caching a nonzero or missing mypy result; treating a scoped marker as proof for `mypy src/`; skipping pytest because mypy was cached; making the cache tracked or durable across completed milestones. Cross-repo: derived projects receive the script, selftest, and manifest pin through template sync and must align this ledger entry in the same propagation batch.
+
+## D-141 — 2026-08-14 — TPM intake is two-stage: a complete interface index first, bodies only for files named after intent
+
+**Decision:** `tpm-pack.sh` ships, as the contracts block of the stage-1 bundle, a COMPLETE compact interface index generated by `scripts/contracts-delta.py --index`: every entry point, route (method/path), schema (field NAMES only), error (status), and ui id (testid) in the accumulated spec. Entry points are plain ids (they self-pin — the module is derivable from `src.pkg.mod:obj`). The pinned families are grouped by owning file under a `by_file` map, with `(unpinned)` collating every entry whose pin is missing (so an unpinned interface is still always carried in body mode). Full contract bodies arrive only in a stage-2 follow-up (`tpm-pack.sh --contracts-for <file> [<file>...]`) for exactly the files the TPM names after hearing the new feature's intent. The standing accumulated contracts artifact is never shipped whole to the TPM lane in either stage.
+
+**Alternatives considered:** (a) Keep slicing bodies by the previous milestone's `contracts.files` — rejected: the slice was context from the prior feature, and it hid 27/35 entry points, 12/15 routes, 14/21 schemas, and 3/5 errors from the seat that authors the next contracts delta (board finding 3); (b) ship the full accumulated contracts.json — rejected outright (the accumulated artifact grows without bound; it is exactly what D-120's slice exists to keep out of context); (c) slice bodies by the CURRENT active milestone inventory — rejected: the TPM's next feature is unknown at pack time, so any file-based body selection is still stale scope; only an index is scope-free.
+
+**Reason:** The TPM cannot state which files it needs until it hears the feature intent; body selection therefore belongs after the intent statement, in the CEO relay loop. An index with pins gives complete visibility (nothing hidden, no silent drop — D-120's no-silent-drop becomes the index's completeness invariant) at ~7.2 KB on testchat v104 after the by-file compaction — grouping the pinned families under their owning-file keys writes each path once instead of on every entry, cutting the index from ~10.6 KB (a further ~32%) with zero interfaces dropped, while still covering 100% of interfaces (vs 8/35 entry points, 3/15 routes, 7/21 schemas, 2/5 errors visible to the TPM before). Bodies are on demand, so the seat authors deltas against the actual shapes of exactly the files it will touch.
+
+**Do not suggest:** restoring the previous-milestone file slice or the full accumulated artifact to stage 1; putting bodies back in the index to "save a round trip"; selecting stage-2 files from the EM's active inventory at pack time (that is the executor's scope, not the author's); removing the `(unpinned)` marker.
+
+## D-140 — 2026-08-14 — Active milestones carry exact work, per-freeze instructions, and runnable test scope
+
+**Decision:** A freeze records three independent facts in `DELTA-vN.json`: `inventory_files` is the exact build inventory snapshot and may be empty; `changed_tests` contains only living runnable tests whose executable function AST changed; `retired_tests` contains removed node-ids for invalidation only. A test function's leading docstring, comments, whitespace, and formatting are nonbehavioral and do not enter `changed_tests`. The MODULE docstring is likewise nonbehavioral: an edit confined to it scopes nothing instead of tripping the file-level fallback (the v103 class — one docstring edit re-ran five model-lifecycle tests). `refreeze.sh` also preserves the staged instruction slice as hash-pinned `ERD-DELTA-vN.md`. D-113's active milestone is the ordered union of its per-freeze inventories and instruction snapshots, not the newest `contracts.files`/`ERD-DELTA.md`. The contract-body slice, mechanical synthesis, fallback EM prompt, validation, and node-id scope all consume that same active set. An active set with no inventory, changed contracts, or runnable tests produces and validates `tasks: []`; no EM or coder is invoked.
+
+**Alternatives considered:** (a) Keep `contracts.files` non-empty and manufacture no-edit tasks — rejected because documentation-only and retirement freezes then re-plan accumulated files that have no behavioral work. (b) Keep one mutable `ERD-DELTA.md` and trust the newest freeze to restate skipped work — rejected because v100-v102 instructions disappeared when v103 overwrote the file. (c) Keep removed ids in `changed_tests` and filter only at execution — rejected because the mixed channel still pollutes planning and prompt scope. (d) Treat every test-function byte change as behavior — rejected because docstring-only edits created runnable work with no executable delta.
+
+**Reason:** The control plane's safety model already preserves every JSON DELTA since the last success, but its plan inputs did not represent the same range: the current inventory could retain historical files, the current ERD delta erased earlier instructions, and the changed-test list mixed runnable, retired, and documentation-only ids. The split makes milestone scope both smaller and more truthful. Modern freezes are self-contained through immutable snapshots. During migration, all-legacy ranges preserve their historical contracts.files behavior; mixed ranges use legacy `changed_files`/changed-contract owners without reintroducing accumulated inventory. Pre-D-140 instruction slices are recovered from the Git commit that introduced their DELTA when possible; synthetic/pre-Git legacy fixtures retain the current-file fallback, while a modern missing snapshot fails closed.
+
+**Do not suggest:** requiring a placeholder file/task for an empty milestone; feeding retired node-ids to pytest or the EM; restoring raw source-byte comparison for test functions; using only the newest ERD-DELTA in a skipped-freeze range; slicing contracts against standing `contracts.files` when the active inventory is available; silently skipping a missing modern `ERD-DELTA-vN.md`. Cross-repo: derived projects receive code/schema/selftests through template sync and must align this ledger entry in the same propagation batch.
+
+## D-139 — 2026-08-14 — TPM and milestone runs are CEO-gated at launch: inform first, ask who takes the TPM seat
+
+**Decision:** When an LLM agent concludes that a fix needs a TPM round-trip or a milestone (orchestrate) run, it SHALL inform the CEO and ask before launching — never run straight into packing a TPM bundle, starting a milestone, or assuming a TPM session is pending. When a TPM is needed, the agent SHALL ask who will take the role: the same LLM may take it (a conductor may also hold the TPM seat, by explicit CEO assignment), or another LLM may — the TPM is a seat, not a fixed external party. The default `scripts/tpm-pack.sh`/`tpm-agent.sh` paths remain valid once the CEO names the holder. No agent assumes "the TPM is someone else" or that a TPM/milestone-based fix runs automatically.
+
+**Alternatives considered:** (a) keep the existing implicit flow (agent detects TPM needed → packs bundle → relays to the presumed web-chat TPM) — rejected: exactly the assumption this session's fix hit, and the CEO directed it removed; (b) forbid agents from ever touching TPM tooling — rejected: agents are the operator channel when the CEO says so (D-40); the gate is a launch-time question, not a capability removal; (c) a mechanical launch gate in the scripts — rejected: the scripts cannot know who the CEO wants in the seat per session; the decision belongs in the conversation (D-44), and mechanical gates on conversation steps are not buildable without inventing state the repo deliberately does not track.
+
+**Reason:** The CEO ruling 2026-08-14, stated after a session where an agent diagnosed a fix as needing a TPM round-trip and immediately packed the TPM bundle and started the relay — without asking whether that route was even wanted or who would hold the TPM seat. "The TPM is someone else" is a persona assumption, not a contract; the seat is whoever the CEO assigns, which may be the same model already on the job. Launching a TPM or milestone cycle is a resource/process decision with human cost — informing first is a checkpoint (Rule 4), not ceremony.
+
+**Do not suggest:** reverting to auto-launch of TPM/milestone cycles on agent judgment; assuming the TPM seat is always a separate web-chat model; skipping the ask because "the CEO already knows"; adding a script flag to skip the inform step; treating this entry as superseded by D-39/D-49 (those define the mechanics of the seat, not who holds it per session).
+
+## D-138 — 2026-08-13 — Contract claims use the active milestone delta range, never accumulated history
+
+**Decision:** A plan task may claim a contract pinned to its own file only when that contract id appears in `changed_contract_ids` for the ACTIVE milestone range. `scripts/orchestrate.sh` already computes that authoritative range under D-113: every `DELTA-vN.json` since the last successfully completed spec, including skipped freezes and same-spec resumes. It exports those exact paths to every `validate-plan.py` invocation through newline-delimited `SWBP_ACTIVE_DELTA_FILES`; the validator unions only those files. Standalone validation, where no completion baseline exists, uses only the newest frozen delta. Greenfield remains inert because every surface is new. Unchanged cross-file contracts remain claimable as directly required interfaces; only unchanged self-owned ride-alongs are rejected.
+
+**Alternatives considered:** (a) Keep unioning every retained `DELTA-vN.json` — rejected because a contract changed once in project history then becomes permanently claimable, making the finding-2 minimality gate largely ceremonial as history grows. (b) Always use only the newest delta — rejected in orchestration because D-113 supports one active milestone spanning multiple freezes since the last success; an intermediate freeze's legitimate claim must survive. (c) Recompute the last-success baseline inside `validate-plan.py` — rejected because D-113 already owns and tests that state transition; a second baseline producer could disagree at crash/resume seams.
+
+**Reason:** The finding-2 gate said a task claims only contracts "this milestone changed," but its producer deliberately over-approximated by scanning all historical deltas. That allowed an EM fallback plan to pull old self-owned routes/schemas/errors/UI back into acceptance even though B3 synthesis correctly assigns only active changed ids. Reusing D-113's active range makes the validator and synthesis mean the same thing without sacrificing skipped-freeze recovery.
+
+**Do not suggest:** restoring the all-history union as a conservative fallback (it is over-scope, not safety); narrowing orchestration to the latest delta only (breaks skipped-freeze milestones); rejecting unchanged cross-file interface claims (they are the legitimate dependency channel); deriving a second active range inside the validator. Cross-repo: derived projects receive the scripts and selftests through template sync; their project-owned decision ledger receives D-138 during the same alignment batch.
+
+## D-137 — 2026-08-13 — Contract retirement uses explicit family-scoped tombstones; omission still carries
+
+**Decision:** A staged post-v1 `contracts.json` may retire standing contract surface only through a transient top-level `remove` object whose allowed keys are `routes`, `schemas`, `errors`, `ui`, and `entry_points`, with arrays naming exact standing ids/symbols. `scripts/contracts-merge.py` applies those tombstones before emitting the merged full artifact and strips `remove` from the output. Every tombstone must name an existing item in the stated family, appear once, and not also be staged as an update; unknown, cross-family, duplicate, and update+remove directives fail closed with the name. An omitted contract remains byte-identical carried content under D-136. The ordinary old-vs-new DELTA producer already records removed ids and entry points in `changed_contract_ids`, so retirement participates in affected-task reset and verdict scope without a second bookkeeping channel.
+
+**Alternatives considered:** (a) infer deletion from omission — rejected because omission is D-136's safe carry signal and making it destructive restores silent loss; (b) require a full returned id-array minus the retired entry — rejected because it makes the TPM reproduce accumulated surface it did not receive and cannot vouch for; (c) use one global id list — rejected because a family-scoped directive detects wrong-family names and avoids ambiguity; (d) install tombstones in the frozen full schema — rejected because `remove` is merge procedure, not standing product surface, and must disappear before every downstream gate.
+
+**Reason:** D-136 made additions and updates milestone-minimal but intentionally made omission non-destructive. Without a separate explicit retirement operation, obsolete routes, schemas, errors, UI locks, and entry points could only accumulate forever or force a risky full-file replacement. Family-scoped tombstones complete the staged-delta lifecycle while preserving D-136's central invariant: context not returned by the TPM is carried byte-identical, never silently deleted.
+
+**Do not suggest:** treating omission as deletion; accepting an unknown tombstone as an idempotent no-op (a typo would silently retain the obsolete contract); allowing one item to be both changed and removed; retaining `remove` in installed `scripts/.approved/contracts.json`; adding a second DELTA field for removals (the existing old-vs-new producer already emits removed names in `changed_contract_ids`). Cross-repo note: derived projects receive the merger/refreeze/selftests via template sync, while their project-owned TPM role and decision ledger receive this entry in the same alignment batch.
+
+## D-136 — 2026-08-12 — contracts.json refreezes as a staged merge artifact, not a full-file replacement (SHAPE A)
+
+**Decision:** contracts.json changes enter `refreeze.sh` as a STAGED MERGE ARTIFACT, not a full-file replacement. The TPM returns only changed/new entries (each carrying its `file` pin per D-120/D-124) in `scripts/.approved/incoming/contracts.json`; refreeze merges them onto the standing contracts.json and verifies mechanically: every entry the delta does NOT name changed must remain byte-identical (checksum the untouched remainder); any touched-but-unexpected entry fails closed with the id named; new entry ids must appear in the delta's changed set; entry_points derive from the merged file under the existing deterministic rule. The merge is a PRODUCER: the result still faces the full existing freeze gates (`check-spec-delta`, `check-test-surface`, pin-gate, live interface) — never an authority. The PRD gets an additive-only guard: a staged PRD must contain the standing capsule text unchanged; silent removal of historical acceptance criteria is a fail-closed error (supersessions go through ERD-DELTA as today).
+
+**Alternatives considered:** (A) this staged merge. (B) full-return + mechanical guard — the TPM must reproduce the 15 routes / 46 UI entries it never saw; converts silent loss into loud failure but does not unblock authoring; rejected. (C) restore full PRD/contracts shipment — reverses the D-116/D-117/D-120 context minimalism; rejected.
+
+**Reason:** Full-file replacement makes silent loss the default failure mode — an entry dropped or mutated off-screen ships unnoticed — and forcing the TPM to re-emit the whole standing file to avoid that reverses the D-116/D-117/D-120 minimalism by loading content it never saw and cannot vouch for (alternative B's cost, which still does not unblock authoring). The staged delta ships only what the TPM actually changed, and the mechanical merge converts the silent-loss risk into a loud fail-closed error at the exact granularity of the pins: the untouched remainder is checksummed byte-identical, an unexpected touch dies with the id named, a new id must be declared in the delta's changed set. Keeping the merge a producer — the merged file still faces every existing freeze gate — means the delta shape adds a verification, not a new authority, mirroring how `--synthesize-plan` (D-133) produces a plan that still faces the full `validate()` gate.
+
+**Do not suggest:** restoring full-file shipment (silent loss is the failure mode this replaces; the delta ships only what the TPM changed); weakening the byte-identical checksum to change-tolerant (the byte-identical remainder is what makes an off-target mutation loud); skipping the guard on `--diff` (the CEO must see the rejection at review time, not after apply — the D-134 rule); making the merge a gate-owned authority instead of a producer (it produces a merged file that still faces the full freeze gates — mirror `--synthesize-plan`'s producer-not-authority framing, D-133). Cross-repo (two-ledger note): testchat's ledger must receive D-136 in the SAME propagation batch as the code — the host lane runs `update-template.sh`; this entry only records the debt and does NOT write testchat.
+
+## D-135 — 2026-08-12 — The contracts slice hard-cuts out-of-inventory pins: no `out_of_scope` index (supersedes D-120's index)
+
+**Decision:** `scripts/contracts-delta.py` omits pinned entries whose owning file is outside this milestone's `contracts.files` inventory ENTIRELY — the one-line `out_of_scope` index D-120 specified (id + shape + pin) is removed. The slice is the in-scope contract body only: in-inventory pinned entries in full, every unpinned entry in full (the conservative always-ship-unpinned carry is unchanged), out-of-inventory pinned entries dropped, and entry_points kept only when their derived module is in the inventory. `.opencode/prompts/em.md` is corrected to match: an out-of-inventory interface still exists and is planned from the ERD-delta's integration instructions, never from an invented shape or from its absence in the slice. Enforced by `selftest_gates.py::test_contracts_delta_slices_out_of_scope_pins` (asserts `out_of_scope` absent and out-of-inventory ids/entry_points dropped) and `selftest_b4a.py`.
+
+**Alternatives considered:** (a) Keep the index (D-120's original position) — rejected: the ERD-DELTA already carries the integration instruction authoritatively (D-107), so the index is redundant standing load, and an EM that plans integration from a standing shape rather than the current delta's instruction is the invented-shape hazard D-120 itself warned about. (b) Leave the code as-is and only re-word the docs to still say "index" — rejected: the selftests pin the hard cut; the docs were the drift, not the code.
+
+**Reason:** Ledger reconciliation (2026-08-12): the index was cut in the code and pinned by selftests (the "review-cut") but never recorded as a decision, leaving D-120's entry and its *Do not suggest* clause describing behavior the shipped generator no longer has (the exact code-shipped-without-its-ledger-entry drift the 2026-08-07 correction-log rule forbids). The cut is sound: the integration knowledge D-120 wanted to preserve — an interface a milestone file calls but does not own — is authored explicitly in the ERD-DELTA's instructions, already authoritative to the EM; the one-line index duplicated that while shipping accumulated cross-milestone interface names into every slice, the full-load creep D-120 set out to remove.
+
+**Do not suggest:** Restoring the `out_of_scope` index (the ERD-delta owns out-of-inventory integration context; the index is duplicated standing load); reading D-120's "Do not suggest: dropping the `out_of_scope` index" as still binding (that clause is superseded here); hard-cutting UNPINNED entries too (the always-ship-unpinned carry is the D-120 safety property that keeps the slice degrading to more context, never less, and is retained). Cross-repo: testchat's ledger still carries the un-superseded D-120 and lacks D-133/D-134/D-135 — a ledger-alignment back-port is owed there and is NOT done by this entry (fulfilled 2026-08-12: testchat `f4e6b24` back-ports D-133/D-134/D-135 verbatim and marks D-120 superseded).
+
+## D-134 — 2026-08-11 — Freeze-time owning-file pin gate (item 1): every added or modified test function must pin its owner file before the delta can freeze
+
+**Decision:** `refreeze.sh` runs a new mechanical preflight (item 1 of the 2026-08-11 control-plane audit, closing the AC-161 hole): every test function this delta ADDS or MODIFIES — the function-granular changed term of `refreeze_delta.py` (finding-1) — must carry an explicit owning-file pin in `contracts.test_mapping` or the ERD-DELTA `## Test-to-file mapping` section, AT FREEZE TIME. The gate (`refreeze_delta.py pin-gate --old-root . --new-root <staging> [--test-mapping …] [--erd-delta …] <changed test files…>`) diffs the current tree against the staged files with the exact `function_changes` machinery the DELTA producer uses — the gated term and the recorded delta can never disagree — and dies with the unpinned families listed. Pins match at FAMILY granularity (parametrization stripped both sides), so a bare family is satisfied by a `name[chromium]` pin and vice versa. Runs in `--diff` mode too, so the CEO never reviews a delta the pipeline will reject. Grandfathered by design (S6/D-128 lesson): infra-level changes (fixtures, helpers, imports) and carried tests are NOT gated — requiring a pin for every test in a 50-test file whose fixture changed would halt every freeze on old content.
+
+**Alternatives considered:** (a) post-apply gate in the DELTA producer's `main()` — rejected: a failure after apply leaves the tree mutated and a stale DELTA file for D-75 to read; (b) gating the whole-file fallback too — rejected: the infra fallback is a conservative over-scope (an over-run, never an under-run), and the S6 incident proved a hard halt on untouched content freezes the pipeline; (c) requiring the pin owner to be a `contracts.files` member — rejected: D-78/D-107 already validate mapping→inventory and test_mapping→frozen-node-ids; the gate covers pin EXISTENCE, not those already-proved properties.
+
+**Reason:** testchat v99's AC-161 oracle was a genuinely new test riding no pin — the file-granular milestone slice emptied its task and the default verdict could pass without running it. B3 (D-133) refuses unpinned tests on the mechanical path, but the EM fallback still heuristically places unpinned tests; the audit item closes the hole at the SOURCE: a delta that adds or modifies a test without pinning it cannot freeze at all. Reusing `function_changes` means the gate is exactly as granular as the delta — nothing re-implements the diff.
+
+**Do not suggest:** extending the gate to infra-fallback whole-file scopes or carried tests (grandfathered by design — see the S6/D-128 correction-log entry for why a hard halt on old content is a pipeline freeze); weakening the gate to warn-only (the audit item is a halt: an unpinned test is a placement gap the EM cannot be trusted to infer); bypassing the gate on `--diff` (the CEO must see the rejection at review time, not after apply).
+
+## D-133 — 2026-08-11 — Mechanical plan synthesis (B3): the TPM's complete ERD-DELTA transcribes into the plan with no EM call
+
+**Decision:** `validate-plan.py --synthesize-plan DELTA.json [DELTA.json ...]` produces the full plan mechanically when — and only when — the TPM's ERD-DELTA carries a complete decomposition: a verbatim coder brief for EVERY file in `contracts.files` (`## Coder briefs (verbatim)` with `### T<n> — <file> (<label>)` blocks), a DAG statement (a `` `A` depends on `B` `` line and/or a `Task order:` chain), and an ownership pin for every milestone node-id (frozen `test_mapping` ∪ the delta's `## Test-to-file mapping` section). One deterministic task per file: brief verbatim, `contracts` = changed ids pinned to that file (D-120 pins / entry-point self-pins), `tests` = the milestone slice's pinned node-ids, `depends_on` = the DAG prose resolved to task ids. The output still faces the FULL `validate()` gate — the command is a producer, never an authority. On any missing piece it refuses (exit 1, named reasons) and `ensure_plan` falls back to the EM full emission with the reasons as context — **the EM is exception-only in the mechanical lane**. The synthesis attempt consumes no plan-revision budget and fires once per run; a synthesized plan rejected by the gate then feeds the EM's revision loop as `plan-being-revised`, giving the EM a concrete draft to fix instead of a blank slate.
+
+**Alternatives considered:** (a) always-EM emission — rejected: the EM's only authority is judgment the transcription lacks; for a complete TPM briefs package its emission is pure transcription cost (and testchat v99's AC-161 oracle showed a NEW test pinned only in the delta's mapping section silently dropped from the file-granular slice, leaving the task's tests empty — synthesis transcribes the section, closing the D-124 hole); (b) synthesis writing `tasks/plan.json` itself — rejected: the shell owns all writes (D-53); the command prints JSON to stdout; (c) a bounded always-try loop — rejected: the producer is deterministic, a retry after its own gate rejection is pointless, one attempt per run.
+
+**Reason:** Full EM emission dominated plan cost (45–90 min of the review batch) while the TPM-authored ERD-DELTA already contains the decomposition when complete. The milestone's own artifacts (testchat v99: briefs T1–T4, DAG line, mapping section) demonstrate the materials the transcription needs. Fail-closed-to-EM keeps the EM's judgment wherever the TPM data has a gap; the full gate keeps authority regardless of who authored the plan.
+
+**Do not suggest:** having the EM "review" every synthesized plan (its judgment is only for the gaps; a review pass reintroduces the cost with no new authority); emitting `regression` or status keys from synthesis (D-57/D-26 — the shell computes the bucket); trusting synthesis's refusal messages without re-reading the frozen artifacts (they describe the TPM's data, which is the single source of truth); relaxing the brief-per-file precondition so synthesis can run with a partial package (the unbriefed file would fall to a coder with no instructions — that is exactly the EM's judgment seat).
+
+## D-132 — 2026-08-10 — Route pipeline-vs-direct by size and determinism, never the bug/feature label
+
+**Decision:** Every behavior change is routed by size and determinism, not by whether it is called a bug fix or a feature:
+
+- **Direct (ad hoc — no refreeze/orchestrate):** a defined defect with a known root cause whose fix is small and deterministic — a handful of files, no new behavioral scope, no structural test changes; regression tests pin the corrected behavior. Lands as a normal commit on main.
+- **Pipeline (milestone):** any change with behavioral scope (new or changed observable behavior needing AC authoring), multi-layer/cross-file work, structural test changes (new `tests/` files, frozen-mapping churn), or work too large to hold in one read — regardless of the bug/feature label.
+- **Universal, both paths:** tests are written before the code (red before green, INV-1), and the frozen suite (or the delta's mapped oracle, D-112) is green before "done" — on the sandbox AND the host (the M29 class). A direct fix is the same bar scaled down, never a lower tier.
+- **Escapes and reconciliation:** `--no-verify` still requires CEO authorization, and the INV-1 bookkeeping lands with the fix (frozen-manifest pin, as testchat's `f569528`) or a ratify milestone (D-63) catches the spec up — the oracle is never left stale.
+
+**Alternatives considered:** (a) a sizing formula (N tasks / N files / N tests) — rejected at D-83: project-dependent and gameable; the judgment stays with the routing seat; (b) bug fixes always direct, features always pipeline — rejected: the label is packaging, not size — testchat v99 was a bug fix (quarantine visibility, hydration) that needed the pipeline and sailed green, while the model-management bundle was also a bug fix that died in it for spec-authoring defects a direct read would have caught (three freezes, then shipped direct as `7bfc622`); (c) everything through the pipeline — rejected: the ceremony (EM decomposition, task DAG, VM sandbox, coder calls) exists to keep frontier-tier spec work off the code; for a small deterministic fix it is dead weight.
+**Reason:** The 2026-08-09 ruling recorded in testchat `tasks/CURRENT.md` ("the VM + EM/coder + sandbox are for milestone feature runs ONLY, not ad-hoc bug fixes") routed on the wrong axis; this decision supersedes it. The pipeline's value, in order: tests-before-code (INV-1), ACs tied to observable outcomes (spec lint), and only then the ceremony. Routing by size/determinism keeps the invariant guarantees on every path while dropping only the ceremony that adds nothing for small deterministic work — and it avoids two quality tiers, where the low tier is where regressions breed.
+**Do not suggest:** routing by the bug/feature label; a mechanical threshold (gameable, D-83); marking a direct fix done on self-judgment — the mapped oracle or the full suite is still the only success verdict; deferring a direct fix's INV-1 bookkeeping "to the next refreeze" (the pin lands with the fix).
+
+## D-131 — 2026-08-08 — Gate-owned resolution of duplicate node-ids: the DAG votes, the EM does not
+
+> Ledger entry restored 2026-08-10: the code shipped 2026-08-08 but the
+> entry was lost with the blueprint `d2e869ac` force-push; it is restored
+> now in both ledgers (code and ledger travel together).
+
+**Decision:** A node-id mapped to more than one task is resolved gate-owned by `validate-plan.py` instead of halting — but only after the pinned relocation and the D-64 browser rule have settled every authority-driven placement, and after AUTO_PLACED is reset, so the resolution observes the final plan and its notes survive to the report. The rule: the node's acceptance point is the mapped task that runs LAST in topological order — its dependency closure contains every earlier mapped task, so it is the one mapped task after which the node is provably green. Pinned re-adds are exempt by construction (test_mapping relocation already moved pinned node-ids to their declared owner, and the D-64 sweep skips pinned ids), so anything still over-mapped is UNPINNED. A duplicate surviving the block is a genuine error and halts as before.
+**Alternatives considered:** (a) keep the halt — rejected: an over-mapped node is EM mis-placement with a provably correct answer; halting burned escalation cycles on what the DAG can compute (D-05); (b) first-claimant wins — rejected: an early task's projection can pass while a later claimant's file ownership was the real one; last-in-DAG is the only placement after which green is provable.
+**Reason:** The EM tier repeatedly fails to honor prose placement rules for backend tests (testchat v88: the storage-quarantine node was placed on BOTH the storage task and the api/threads task twice in a row despite the ERD stating one owner). Same philosophy as D-64: a deterministic placement rule is gate-owned, not EM-owned. The DAG vote can never reject a test the freeze considers well-mapped, because it matches the freeze's own "any task downstream of the node's owner" acceptance view. Selftests pin the resolution and its boundaries (`scripts/selftest/selftest_gates.py`).
+**Do not suggest:** trusting an EM prose re-placement of a duplicate (the failure class this resolution removes); resolving before pinned relocation and the D-64 sweep (it must observe the final plan); treating a duplicate that survives the block as resolvable (genuine error).
+
+## D-130 — 2026-08-08 — The milestone node-id scope is the frozen test_mapping intersection, produced once by validate-plan.py
+
+**Decision:** One producer (`milestone_scope_ids()` in `scripts/validate-plan.py`, exposed as `--milestone-scope`) computes the node-id set a delta run is about: the raw `changed_tests` intersected — on the **family** (module prefix + bare test name, parametrization-suffix-stripped) with the frozen `test_mapping` keys, plus the D-124 completeness repair (pinned ids whose owner FILE the delta staged ride even when refreeze_delta dropped them from changed_tests). Both scope consumers call it: `cmd_subtree_scope` (map_nodeids + `_hit_task_ids` invalidation) and `cmd_affected` (the task-state reset scope), and orchestrate's full-emission `NODEIDS_SCOPE` now shells out to `--milestone-scope` instead of inlining its own union. When the mapping is empty (a pre-D-124 freeze), the slice is inert — raw rides, the trim must not bite before pins exist.
+
+**Alternatives considered:** (a) intersect in orchestrate's inline union only — rejected: parity between the subtree scope and the full-emission prompt was exactly the defect (orchestrate-testchat v87: refreeze_delta's file-granular changed_tests carried 58 — the 6 pinned M35 ids plus 52 relabeled leftovers of the same test file — and both surfaces shipped all 58 to the EM and the invalidation set, re-planning two tasks on churn); one producer in the Python gate is the structural fix, and it is directly unit-testable where the heredoc was not. (b) Intersect changed_tests with the exact mapping value — rejected: node-id shape flicks between freezes (D-124: `name[chromium]` vs AST's bare `name`); an exact-string intersect would filter the milestone down to nothing on a relabel and the D-124 flip would reappear at this site.
+**Reason:** The audit (2026-08-08) isolated the class: file-granular changed_tests conflate "this file changed" with "this test belongs to this milestone"; only the TPM's frozen pins are behavioral-ownership truth. Family-matching survives both presentation shapes. `test_mapping`-containing freezes — the only ones where the trim has teeth — are the modern lane; inert fallback defeats the trim before D-124-class pins arrive (blueprint's own fixture freezes carry no mapping).
+**Do not suggest:** Slicing refreeze_delta's changed_tests at production time (the producer intentionally keeps full counts for the DELTA file's bookkeeping; D-116's file-scoping already fixed the relabel-retirement term); re-adding a divergent union inside orchestrate.sh for "it's clearer"; dropping the family-match for exact ids once "the churn settles" (the flip is a presentation of the same suite, not a past incident — D-124); making the slice a no-op when a sibling runs have a mapped file (per-delta slicing is what makes the union add up).
+
+## D-129 — 2026-08-08 — mypy is an acceptance gate in the sandbox, not a CI-only survivor
+
+**Decision:** `run_tests()` in `orchestrate.sh` runs `mypy --explicit-package-bases --cache-dir=/tmp/mypy-cache src/` in the sandbox before pytest; on a type error the acceptance fails rc=1 with `FAILING=mypy:src` and pytest never launches; on green it proceeds exactly as before. The mypy step stays in CI as well.
+**Alternatives considered:** (a) leave mypy CI-only (rejected — the post-M29 meta-rule: a gate that lives only in CI does not exist until a remote does; testchat shipped 40 spec versions with its type gate dark and went red on first push (correction log 2026-07-14); a local coder can emit a type error the suite never sees and CI catches only post-merge); (b) a standalone pre-commit check on the host (rejected — the host lacks the pinned mypy/stack and the sandbox already owns the acceptance path); (c) run mypy only at the verdict (rejected — the acceptance path is the sandbox; folding it into `run_tests()` is the single funnel, and it must fail BEFORE the coder's mapped tests, not after the fact).
+**Reason:** M29's `psutil` addition passed 153/153 in the sandbox and broke `mypy sr/` in CI only. The divergence class is "CI-only gate": a child without a remote never sees it. The sandbox is the acceptance cannon; mypy is cheap (11 files, seconds) and the stack already ships it and `types-psutil` (D-50 image-hash keying keeps them in sync). `--cache-dir=/tmp` is required: the repo mounts read-only and mypy writes `.mypy_cache` beside its targets. Fail-closed: a sandbox stack missing mypy halts the run, it does not skip.
+**Do not suggest:** Moving the check out of `run_tests()` into a later stage (per-D-77/erasure class: verdict-time only catches what the per-task run already green-lit); removing the CI step (belt-and-suspenders; CI's install set is the template's own gate); whitelisting mypy failures at freeze time to preserve the user's ability to iterate on non-type errors.
+
+---
+
+## D-128 — 2026-08-08 — Reverse-direction spec lint (S6): whole-world-mock rejection and carried-tests-vs-new-ACs citation check
+
+> **Amended 2026-08-08 (same day):** check 1 (whole-world mock) is scoped to
+> the tests THIS DELTA TOUCHES (staged changed/removed, D-116's changed-test
+> seam), not the whole merged suite. Live-suite enforcement: testchat's
+> frozen suite already carries 9 bare-Mock whole-world patterns
+> (test_models_api.py:140/166/319, test_models_service.py:159/181/190/202/
+> 214/357); a whole-suite halt would brick every refreeze until a legacy
+> cleanup landed, which no running milestone is about (D-116: a gate that
+> halts on content the delta is not about freezes the pipeline; the v82
+> class — see correction log 2026-08-08). The v58-class danger is a delta
+> that INTRODUCES the coupling, which the scoped scan still catches: 304
+> selftests pin both directions (reject staged bare mock, allow carried
+> legacy mock). Standalone invocation (no --staging/--repo-tests) still
+> sweeps the whole directory as an audit tool.
+
+**Decision:** A refreeze preflight (`scripts/check-test-direction.py`, "S6") rejects (1) any suite mock — carried or staged — that answers every URL (a URL-verb fake whose callable ignores its URL parameter, or a bare `Mock()`), and (2) any carried-forward test that cites an AC id the staged delta adds.
+**Alternatives considered:** (a) extend `check-test-surface.py` (INV-4) with the direction check; (b) a warning (doc-consistency style) instead of a gate; (c) scan only staged tests, leaving carried ones out.
+**Reason:** The v58 incident (correction log 2026-07-25) shipped a contradiction the forward lints cannot see: forward lints compare STAGED tests against LIVE ACs, but the defect was a carried-forward test that monkeypatched `httpx.get` to answer 200 for every URL — the new AC-104's spawn-refusal never ran and an unsatisfiable assertion shipped, costing an escalation cycle and the v59 refreeze. The whole-world mock encodes "everything else is ready" and silently couples subsystems, so it is structurally a test that cannot fail (the S5 defect class, in mock form). It lives in scripts/ (harness) and halts at freeze with the specific findings (D-121 has no human approval step; preflights are the whole enforcement surface). Check 2 is cheap bookkeeping: a test whose assumptions predate an AC this delta adds must be restaged with the delta or the "new" claim retired — it is attributable either way, so rejecting is a decision-forcing mechanism, not a workaround. Built as a standalone script (same shape as S5's `check-ac-postconditions.py`) so the freeze stays one lane; both halves run on the merged preview suite (current frozen + upcoming overlay) so nothing escapes through either side.
+**Do not suggest:** Demoting either half to advisory without a measured false-positive (D-115): mock-blindness is the incident class checked in; carry-citation is freeze-lane attribution. Do not move the whole-world scan to CI or a later stage — a preview-only check races the same erased-state class as the D-126 metrics sink. Adding URL-arg introspection beyond "reads its first positional parameter" is pre-hardening speculation (D-32). 
+
+---
+
+## D-127 — 2026-08-08 — The sandbox runs the frozen suite as an unprivileged user, and the constraint-2 verifier now proves it mechanically
+
+**Decision:** The sandbox executes pytest/smoke runs as the image's non-root `agent` user (UID 1000 — `USER agent` in the Containerfile, `--userns=keep-id --cap-drop=ALL --security-opt no-new-privileges` at run time), and `scripts/selftest/verify-sandbox-in-vm.sh` gains check [6]: the sandbox must report a non-root uid. A regressed image (USER root added, cap-drop dropped) now fails the constraint-2 verifier outright.
+
+**Alternatives considered:** (1) Forcing the user per-run with `--user 1000` — rejected: run-time flags sit outside the image's enforcement and the image's own `USER agent` is the load-bearing contract voters; keep-id + no-new-privileges already demote root in rootless podman. (2) Leaving only the interim host-run rule from the backlog item — rejected: a manual check fires once, after an incident; a verifier check fires on every constraint-2 run. (3) Removing the kept host-run rule — rejected: platform-gated code still needs the host perspective (the interim rule stays).
+
+**Reason:** The backlog premise was wrong on a point the M29 incident seemed to prove: the container "runs as root" — it never did; agent/1000 is baked into the template's Containerfile. M29's `psutil.net_connections()` (module-level) is macOS-vs-Linux gated (needs root on macOS, works unprivileged on Linux) — the container root story was a misreading. The real defect was that nothing PROVED the property: the verifier checked read-only mounts and network but never the process user, so a privileged sandbox could drift in silently, and the suite could pass capability-gated code that production's non-root user would fail. The check closes that gap; it also retires the "container user" half of the incident explanation permanently.
+
+**Do not suggest:** (1) running the sandbox as root "because a test needs it" — a privileged acceptance surface recreates the divergence class. (2) Dropping check [6] — the property is enforced by that line alone. (3) Moving the probe to a host-side script that doesn't run inside the container — it must assert the process that executes the tests.
+
+## D-126 — 2026-08-07 — The metrics layer: a per-milestone aggregate over the data the pipeline already writes; metrics.tsv is the D-115 admission input
+
+**Decision:** `scripts/metrics-report.py` aggregates ONLY post-teardown-durable sources — `.measurement/counters` (per-run exit rows with `rc=`, `spec=`, `elapsed=`), `.measurement/timings-<TS>.tsv` copies, `.em-archive/*/meta.txt` (spec-tagged), `.pipeline-flakes.json` (committed, D-111) — into one TSV row per milestone in `.measurement/metrics.tsv` (columns: milestone, date, feature, gate_hours, selftest_count, selftest_s, em_calls, em_waste, flakes, success_runs, retry_runs). The row is idempotent per milestone+feature (D-111 habit), scoped to one spec version across all sources, and `--evidence` prints the same numbers without writing — the measured-evidence block a D-115 retirement entry must cite. On success, the terminal rc=0 counter and timings copy are persisted before `.pipeline-state` teardown; the EXIT trap then skips that already-recorded event. After the `[success]` commit, the reporter reads the durable sink and records the aggregate automatically (`--feature v$FROZEN_V`; a report can never fail a run). D-108's lesson, applied: `.pipeline-state` is wiped by the success teardown (`rm -rf`), so the aggregate is computed after the wipe from what outlives it — never stored inside the blast radius. It is a report, never a gate: nothing in the completion path reads metrics.tsv.
+
+**Alternatives considered:** (1) A new data-capture layer inside orchestrate.sh — rejected: the substrate already exists and feature-summary.py already reads it; the complexity ratchet (review 2026-08-07) forbids a new writer where readers suffice. (2) Building the aggregation into feature-summary.py — rejected: that digest is human-facing prose scoped "since last refreeze"; metrics needs machine rows keyed per milestone, one concern per script. (3) Making D-115's admission precondition a blocking gate — rejected: retirement stays a human decision on measured evidence, not an automated one.
+
+**Reason:** The completion gate (D-112 verdict) answers "can this milestone ship?"; the metrics layer answers "how much did shipping it cost?" — per-feature gate time, EM waste, flakes, retries. D-115's admission rule ("retire on measured cost, not complexity aesthetics", D-117) stalled for lack of per-feature numbers: the substrate existed but nothing aggregated it per milestone, so retirement candidates (D-83/D-56-NOTE/D-89 were the only ones retired, on hand-measured data) had no standing evidence. With metrics.tsv, a retirement entry can cite gate-time share across ≥3 milestones, flake history, and behavioral-change evidence instead of prose. Blueprint decision of the CEO 2026-08-07 (primary purpose: shipping-pipeline verdict).
+
+**Do not suggest:** (1) wiring metrics.tsv into the completion path or any gate — it stays a report. (2) adding new writers to orchestrate.sh/refreeze.sh to produce "better" metrics — reuse the existing substrate. (3) inventing fields not derivable from the four listed sources. (4) folding metrics into feature-summary.py or vice versa — separate concerns, separate scripts.
+
+## D-122 — 2026-08-06 — A freeze must be visible to the DELTA-vN bookkeeping: claimed updates ship their bytes, invisible-only contract changes are rejected
+
+**Decision:** `scripts/check-spec-delta.py` (the D-107 delta gate, already a refreeze preflight) gains a completeness layer with two fail-closed checks. (1) If the staged ERD-DELTA.md marks a frozen test as UPDATED, the freeze must actually stage changed bytes for that test's file (byte-diff against the repo; `REMOVED` entries count) — a claim without bytes is rejected. (2) If the staged `contracts.json` changes only bookkeeping-invisible top-level keys (`files`, `test_mapping`, `smoke_checks`, `no_edit_files` — not the `entry_points`/`routes`/`schemas`/`errors`/`ui` families the DELTA-vN walk records, and not `changed_files`/staged test bytes), the freeze is rejected as unscopable. Marker matching is case-sensitive by design: mapping sections carry the `(UPDATED)` marker; historical prose ("was updated at v80") describes a prior freeze, not this one.
+
+
+
+> Ported from testchat 2026-08-07 (ledger alignment; numbered to match the testchat lineage).
+
+**Reason:** The DELTA-vN file is the orchestrator's ONLY scope source — subtree reset, verdict scope, red-check (D-31/D-112). The v82 freeze was exactly the failure class: its ERD-DELTA claimed the AC-153 tests were "(UPDATED: model selected before pressing the shortcut)" while the freeze staged no test bytes, so DELTA-v82 recorded `changed_tests: []` and the milestone's central claim was invisible to every later run; the mirror class (v77) recorded ~50 byte-identical restaged tests and re-ran finished work. A claim the bookkeeping cannot record is a lie-green risk, and an invisible-only contract change (e.g. a freeze touching only `test_mapping`) would produce `changed_contract_ids: []` — the run would reset nothing. Both are pre-flight detectable, and D-122 makes them hard errors instead of the D-86 "scopes nothing" warning. CEO-authorized 2026-08-06 after a brief ("cheap insurance against a class that already happened").
+
+**Do not suggest:** Downgrading either check to a warning (D-86 already proved the warning is ignored); relaxing the byte-diff (claimed updates must be byte-visible, not presence-visible — the v82 claim staged no bytes); case-insensitive marker matching (it would flag historical prose and every freeze would fail); carving out `smoke_checks`-only or `test_mapping`-only freezes as "metadata" (metadata IS the scope — the orchestrator lives or dies on it).
+
+## D-121 — 2026-08-06 — The refreeze lane has no human approval step: installs are gate-verdict-only
+
+**Decision:** `scripts/refreeze.sh` no longer offers ANY human-approval path. D-95's auto default — apply when every mechanical preflight is green, halt on any failure — is now the only apply mode; the `--approve <sha>` (D-42 hash-bound explicit apply) and `--interactive` (opt-in y/N) flags are removed and die on use with a pointer to the auto install. `--diff` remains as a read-only dry-run (prints the diff and DIFF-SHA, applies nothing). The audit line `auto-approved (D-121); DIFF-SHA <sha>` is printed on every install. The CEO ruling verbatim (2026-08-06): "remove ceo approval for refreeze run — the business ceo or human can't add any value there." Landed immediately before the v83 pin-freeze in testchat, so the backfill installs under the new policy. Ported to the blueprint with the back-port commit `7ff1fca` (2026-08-07).
+
+**Reason:** Every material check already ran mechanically before apply (schema structural core, D-107 spec-delta, D-120 pin gate, D-56 externals/captures, INV-4 test surface, D-78 satisfiability, staged-test parse/lint/determinism, D-75 red-before-green, M35 smoke red-check); the diff is machine-authored; and the human verdict on it was a documented rubber-stamp — five straight testchat refreezes v60–v64 on ~62KB re-touched ERDs the CEO could not judge, with the CEO delegating approval to the model as an interim on 2026-07-27. D-121 closes the loop formally: a verdict nobody consumes is not a gate, and an approval nobody can meaningfully give is not a control.
+
+**Alternatives considered:** (a) Keep `--approve`/`--interactive` but never use them (rejected — a dead flag is a lie; the lane must fail loudly if reintroduced, hence die-on-use). (b) Keep `--interactive` for rare eyeball cases (rejected — `--diff` already provides the eyeball without an apply path; the CEO ruled the human adds no value on the diff itself). (c) Move the approval to orchestrate.sh (rejected — the same rubber-stamp critique applies, and the refreeze lane is the single place frozen artifacts change, D-31).
+
+**Do not suggest:** Re-adding a y/N prompt or hash-bound `--approve` to refreeze.sh (die-on-use is the removal's regression guard); treating `--diff` as an approval gate (it is a preview only); moving the human gate into orchestrate.sh (the CEO ruling applies to the diff, wherever it is shown).
+
+## D-120 — 2026-08-06 — The EM's contracts context is the milestone slice: pinned entries for in-scope files, trimmed at plan time
+
+> **Superseded in part by D-135 (2026-08-12):** the one-line `out_of_scope` index described below — and defended in this entry's *Do not suggest* — was removed; out-of-inventory pins are now hard-cut. The pin gate and the always-ship-unpinned carry remain fully in force.
+
+**Decision:** The four plan-emission sites (greenfield, subtree re-plan, decomposition-wrong re-emit, drift re-plan) ship `contracts:${CONTRACTS_DELTA:-$APPROVED/contracts.json}` — a pre-flight-generated slice, never the full accumulated file. `contracts.schema.json` gains an optional `file` property (pattern `^src/.*\.py$`) on routes/schemas/errors items (`additionalProperties:false` retained; `entry_points` stay self-pinning by dotted-module derivation); `check-spec-delta.py` rejects any NEW or CHANGED entry without a pin at freeze time (carried-unchanged entries are exempt — nothing new is added, so nothing can be lost); `scripts/contracts-delta.py` emits pinned entries whose file is in this milestone's `contracts.files` inventory in full, plus every unpinned entry in full, and reduces pinned entries outside the inventory to a one-line `out_of_scope` index (id + shape + pin) so the EM still sees the interface exists and plans its integration from the ERD-delta rather than inventing a shape — entry_points derive to their owning module under the same rule. While NO entry carries a pin, the generator emits the full file byte-identical — the trim activates inertly the moment pins land. The DRIFT/SPEC-DEFECT consult keeps the full file (D-116: it judges the whole decomposition). The 40-entry backfill itself is TPM-seat, specified in `project-trail/2026-08-06-contracts-file-pin-proposal.md` (BACKLOG P1).
+
+
+
+> Ported from testchat 2026-08-07 (ledger alignment; numbered to match the testchat lineage).
+
+**Reason:** CEO audit directive 2026-08-06: no irrelevant full-load work — "just like we cut back on coders work from reproducing full file to just producing diff code." contracts.json is the standing accumulator (74 entries at v82, 554 lines); the EM needs bodies only for the files this milestone touches. The pin makes the trim safe and mechanical: a freeze-time gate that demands a pin for anything new or changed means the slice can never silently drop a body the EM plans against, and the conservative always-ship-unpinned rule means the slice degrades to the full file, never to less, when the TPM misses a pin. The index exists because integration context crosses file boundaries: a milestone file may call an endpoint owned by a file outside the inventory, and a hard cut would let the EM brief blind against an interface it can no longer see — the one-line entry preserves existence and shape knowledge at a fraction of the body cost. The schema + gate are conductor-lane and land in the same freeze session that consumes them; the backfill is TPM-seat because only the spec author knows which file owns each entry.
+
+**Alternatives considered:** (a) Trim by `test_mapping`/files-mapping heuristics without pins (rejected — the gate needs frozen data it can hold you to; a derived guess can silently drop a body mid-run). (b) Trim `entry_points` by membership without derivation (rejected — the file inventory is paths; dotted modules must map or they never match). (c) Author the 40 pins myself (rejected — TPM-seat, and recorded as such).
+
+**Do not suggest:** Removing the pin gate to speed freezes (a slice without the gate is a silent-drop hazard); dropping the `out_of_scope` index and hard-cutting out-of-inventory entries (integration context crosses file boundaries — the EM briefs blind against interfaces it can no longer see); trimming `entry_points` against a hand-maintained module list (derivation is deterministic); shipping the full contracts to the DRIFT/SPEC-DEFECT consult (it judges the whole decomposition, D-116); authoring the backfill pins in the conductor lane.
+
+## D-119 — 2026-08-06 — Re-plan calls get the scoped node-id list, not the full test-nodeids file
+
+**Decision:** The decomposition-wrong re-emit and the spec-drift re-plan no longer ship the full 198-id `test-nodeids` file to the EM. Both instructions now print a flat, delta-scoped list — `$(plan_mapped_ids)`, the deduplicated union of node-ids the current plan maps, in task order (the same extraction as the D-112 verdict union) — and the context drops the `test-nodeids:` block. The EM keeps its safe-omit rule, and the validator names any node-id it must still map. The greenfield plan emission (no prior plan exists to anchor a scope on) keeps the full file.
+
+
+
+> Ported from testchat 2026-08-07 (ledger alignment; numbered to match the testchat lineage).
+
+**Reason:** Carried node-ids never appear in the plan — the shell routes carried coverage itself — so the plan's own mapped union IS the delta scope. A decomp re-plan must remap exactly that set (carried mappings are preserved byte-identical per the instruction); shipping all 198 ids forces the EM to re-derive the delta boundary from a file the shell already knows. This closes the last full-load EM site after D-116: standing ERD, contracts-coder, consult, and now node-ids are all scoped; only the greenfield plan emission and the DRIFT/SPEC-DEFECT full-context branch intentionally carry full files.
+
+**Alternatives considered:** (a) Reuse `$STATE_DIR/subtree-scope.json`'s `map_nodeids` (the delta re-plan's list) — rejected: it is computed by `compute_active_delta_scope` only AFTER these calls fire, and `plan_mapped_ids` is derivable from data already on disk. (b) Ship a delta-scoped node-ids file computed from `contracts.test_mapping` — rejected: v82 has no `test_mapping`, and the plan's union is available at every re-plan site regardless of spec version.
+
+**Do not suggest:** Removing the full file from the greenfield emission (no plan yet — the EM needs the full list or the validator's must-map loop runs it blind); adding the file back to re-plan calls; renaming `plan_mapped_ids` or folding it into the verdict block (drive-verdict.sh extracts that block by marker; the helper must stay standalone).
+
+## D-118 — 2026-08-06 — Escalation bundles carry the milestone slice: the standing summary + ERD-DELTA the TPM must revise against
+
+**Decision:** `package_escalation` now appends the milestone slice to every TPM-bound bundle: the generated standing summary (the same `standing-summary.md` the EM receives, D-116) and the frozen `ERD-DELTA.md` (D-107), labeled with the spec version, in a dedicated section between the EM diagnosis and the referenced-contract/test-source section. A consolidation freeze with no delta emits a one-line note that the standing ERD is the current reference. The summary-generation fallback of the D-116 pre-flight is inherited via `STANDING_SUMMARY`.
+
+
+
+> Ported from testchat 2026-08-07 (ledger alignment; numbered to match the testchat lineage).
+
+**Reason:** The 2026-08-06 context audit found the inverse of full-load: `contract_or_test_wrong` and caps-exhausted bundles handed the TPM the task entry, the referenced contract entries, and the failing test sources — but not the delta those artifacts must be revised against. The TPM has no repo access; the bundle is its only spec window, and a verdict that says "the frozen spec is wrong" without the current-change slice forces the TPM to reconstruct the milestone from memory. The delta is the authoritative current-change slice (D-107) and the standing rules are the same minimal summary the EM consumes — adding both is a pure relevance win with no schema change.
+
+**Alternatives considered:** (a) Point the TPM at the repo in agent mode (already available via `tpm-agent.sh`, D-39 — but the primary lane is the air-gapped web chat, D-38). (b) Bundle the full standing ERD instead of the summary (rejected — exactly the accumulative crud D-116/D-117 exist to avoid). (c) Attach the delta only when the verdict is `contract_or_test_wrong` (rejected — a caps-exhausted bundle also lands in TPM hands and may need the same slice; unconditional is simpler and the cost is one file).
+
+**Do not suggest:** Dropping the milestone slice from bundles to save tokens (it is the single most load-bearing file the TPM receives); shipping the full standing ERD in bundles (the summary + delta is the correct pair); reverting to `APPROVED`-free extraction harnesses in the selftests (the bundle code reads `APPROVED` like every other orchestrator function).
+
+## D-117 — 2026-08-06 — The TPM bundle ships the milestone slice: generated standing summary + ERD-DELTA, not the accumulated standing ERD
+
+**Decision:** `tpm-pack.sh` no longer packs the full standing `ERD.md` when a delta exists. When `ERD-DELTA.md` is present, the bundle carries the TPM role doc, the contracts schema, the PRD (standing — the product definition is reference, not crud), the same generated standing summary the EM receives (D-116), `ERD-DELTA.md` (the authoritative milestone slice, D-107), and `contracts.json`. Without a delta (initial freeze, pure consolidation), the full standing ERD ships as before. Summary-generation failure falls back to the full standing ERD with a stderr warning — the bundle is a verbatim relay (D-49), so the warning stays out of it.
+
+
+
+> Ported from testchat 2026-08-07 (ledger alignment; numbered to match the testchat lineage).
+
+**Reason:** CEO audit directive 2026-08-06: "the TPM work — PRD and ERD — should be relevant to the milestone feature, not accumulative crud." The standing ERD is the accumulator (264 lines at v71 → 217 after the v78 consolidation → 252 now): every milestone's as-built detail lands in it, and every TPM session previously received all of it on top of the delta it actually revises against. The TPM's milestone work consumes exactly the delta plus the standing rules the delta supersedes or builds on — the same minimal standing slice the EM consumes — so the pack now ships that slice. PRD stays full: it is the product definition (stable, rarely touched) rather than accumulated implementation history; a PRD-DELTA mechanism remains a possible future refinement if product prose ever accumulates the way architecture prose did.
+
+**Alternatives considered:** (a) Ship full ERD + delta, unchanged (the status quo — rejected: exactly the accumulative crud the CEO named). (b) A new PRD-DELTA artifact analogous to ERD-DELTA (rejected for now: the PRD has not demonstrated the growth problem; standing product reference is legitimate context). (c) Let the TPM fetch the ERD itself in agent mode (D-39 already allows this when available — the web-chat air gap, D-38, remains the primary lane and still needs the packed bundle).
+
+**Do not suggest:** Re-adding the full standing ERD to the TPM bundle when a delta exists; moving the fallback warning into the bundle (it is a verbatim relay); shipping `src/` or `tests/` to the TPM (INV-1 oracle independence); hand-maintaining a summary file instead of generating it (the generator is deterministic and gate-pinned, D-116).
+
+## D-116 — 2026-08-06 — Context minimalism: the EM's standing ERD is a generated summary, the coder's context drops the contracts, and task consults are scoped to the task
+
+**Decision:** Three fixes to the EM/coder call contexts, per CEO audit directive 2026-08-06 ("fix all three") on where the pipeline ships irrelevant full-load context. (1) The standing `ERD.md` no longer ships to the EM in any call. `scripts/standing-summary.py` generates a standing context at pre-flight: the standing rules (model-selector invariant, file inventory, oracle mapping, smoke checks, risk notes) verbatim, with the three accumulated "As-built architecture" sections collapsed to a per-file map. Every EM call site (plan emission, subtree re-plan, drift re-plan, consult) ships `standing:<generated>` plus the authoritative `ERD-delta` (D-107) instead of the full standing ERD; generation failure falls back loudly to the full ERD, never a silent context shrink. (2) `run_coder`'s context is brief + the existing file only — the frozen `contracts.json` is no longer pasted per call; the coder brief is self-contained by rule (Rule 8: exact path, signatures, inputs/outputs, acceptance). (3) `consult_em` is scoped: a task consult ships that task's plan entry (extracted to `.pipeline-state/consult-task-<id>.json`), the standing summary, the delta, and the evidence-grepped failing test file(s) — not the full plan, standing ERD, or contracts. DRIFT and SPEC-DEFECT consults keep the full context: they judge the whole decomposition.
+
+
+
+> Ported from testchat 2026-08-07 (ledger alignment; numbered to match the testchat lineage).
+
+**Reason:** The full ERD shipped in every EM call (252 lines), the full contracts in every coder call (554 lines), and a full-spec consult per task failure — all of it context the called tier does not act on, growing the prompt with every milestone while the actionable slice stays small. The EM plans deltas against `ERD-DELTA.md`; the standing doc's only standing value is its rules and a file map of ownership. The coder's acceptance is the brief, and the brief is authored to be complete; the contracts added tokens, not signal (and had already been the source of a past contamination class — brief/contract disagreement). Consults ask a single question about a single task; shipping the whole decomposition invites the model to re-litigate what the plan already decided. The D-116 doctrine: a model call receives exactly the load its output artifact consumes; everything else is token cost with hallucination surface. Escalation bundles are untouched: the TPM has no repo access, so self-contained bundles stay the requirement there.
+
+**Alternatives considered:** (a) Let the EM lazily fetch what it needs (rejected — the EM has no tools and never will, D-53; context is the orchestrator's job). (b) Summary-only standing doc maintained by hand (rejected — maintenance drifts and humans forget; the generator is deterministic and gate-pinned). (c) Ship contracts to the coder only when the brief references a contract id (rejected — a grep for `contract` is a weak proxy, and the brief already carries everything verbatim).
+
+**Do not suggest:** Re-adding the full standing ERD or contracts to any EM/coder call; letting the model fetch context; trimming the delta or the failing-test evidence from consults (they are the actionable slice); cutting escalation bundle self-containment (TPM has no repo access); growing the standing summary back into the accumulated architecture prose.
+
+## D-112 — 2026-08-06 — Feature verdict is the delta's dependent set; the full suite is an on-demand check
+
+**Decision:** Milestone completion is no longer the full frozen suite. After all tasks are done, the verdict run re-executes exactly the union of every test node-id the plan mapped — the delta's dependent set — and green there is `[success]`. A carried-forward test is not part of milestone completion, and a red carried node can never halt a milestone or route a TPM bundle. The full frozen suite survives as an explicit on-demand/periodic regression check: `scripts/orchestrate.sh --full-suite` runs the whole suite at the verdict point, where the D-77 flake triage and the DRIFT halt apply unchanged (a genuine carried regression still reproduces in isolation and routes EM→TPM — the owning behavior is outside the delta, so the fix belongs to the spec/TPM lane, never a coder retry). In mapped scope a red verdict is drift by definition — every node was accepted per-task, so a failure is an inter-task coupling break — and keeps the existing EM consult → plan revision → TPM bundle ladder. A plan mapping zero tests (smoke-only tasks) skips the verdict run entirely: per-task acceptance is the verdict, never a vacuous full-suite run. Supersedes D-28's "feature completion = FULL frozen suite green" clause; per-task projections (D-28/D-57), the exactly-once mapping invariant, and the spec-drift routing are unchanged.
+
+
+
+> Ported from testchat 2026-08-07 (ledger alignment; numbered to match the testchat lineage).
+
+**Reason:** The full-suite verdict has cost ~45–60 min per milestone and grown with the suite, while its only real signal is coupling the static dependency analysis cannot see — and the CEO doctrine stated at M28 close-out (2026-07-19) and reaffirmed 2026-08-06: "if a feature does not touch a behavior, we do not have to test; only dependent-based testing." D-77 landed the flake-triage half of the M28 candidate; the other half — "skip the drift path if the failing test's file is not in contracts.files" — never landed, and the verdict rule itself never changed. This decision lands both: unrelated failures neither run nor halt, and the coupling backstop the full suite provided becomes an explicit, on-demand check whose failures route to the correct lane instead of blocking unrelated work. The mapped union is cheap: per-task acceptance already ran these node-ids, so the verdict is a re-verification of the projections against the finished tree.
+
+**Alternatives considered:** (a) Keep the full suite but never halt on unmapped failures (the M28 candidate verbatim) — still burns the full wall-clock every milestone for evidence nothing consumes. (b) Report-only full suite with no halt — silently converts the coupling backstop into a suggestion. (c) Drop the full suite entirely — removes the only mechanical check that crosses the analysis's blind spots (shared-file coupling, DOM-level breaks invisible to module-import analysis).
+
+**Do not suggest:** Re-adding the full suite to milestone completion; treating a red --full-suite check as a milestone failure when tasks are green (it routes to the TPM lane); marking a task done on self-judgment because the verdict scope shrank (mapped acceptance is still the oracle); running orchestrate.sh on the macOS host (D-55).
+
+## D-125 — 2026-08-04 — The frozen suite is size-governed: parsimony and retirement are spec properties, TPM guidance, not gates
+
+**Decision:** `docs/TESTING.md` gains two standing rules for the frozen suite. (1) **Parsimony:** one test per acceptance criterion is the default; a second test is justified only by exercising a different surface (unit vs API vs UI) or a distinct failure class — when a unit test and an API test would assert the same fact, one is carrying the other. (2) **Retirement:** a frozen test that has not failed for five consecutive milestones, or that no longer maps to a current acceptance criterion or locked surface, is a retirement candidate the TPM flags at the next refreeze; removal happens through the same `refreeze.sh` delta path as any other spec change, never by direct edit. Suite size is a review item at every freeze: a `tests/` diff without a corresponding PRD acceptance-criterion change is a smell. Both rules are advisory TPM guidance, deliberately not mechanical gates: per-node failure history is not tracked, so a mechanical dead-test detector has no input data, and per D-115 a check with no consumer is decoration. The mechanization path is named in TESTING.md (a failure-history ledger — the D-111 flake ledger tracks only accepted flakes, not "never failed") — adopt only if frozen-suite bloat incidents arrive. Separately: retiring D-88 (quote-brittle smoke-check preflight) and trimming `check-test-surface.py`'s selector blocklist were evaluated and **rejected**. Each is incident-purchased; D-88's entry carries an explicit anti-retirement clause ("do not suggest: demoting to advisory once 'we haven't seen a false positive in N freezes'") and its check is ~130 lines scoped to grep-family/literal-quote/new-entry patterns; the selector families map 1:1 to the 2026-07-11 audit findings (bare-tag selectors, role/text locators, raw CSS/XPath, `locator()`/`query_selector`, data-testid literals), with the blocklist backstops covering receivers the main rule cannot see.
+
+
+
+> Renumbered from D-117 on 2026-08-07 (ledger alignment): D-117 now designates the TPM-bundle-slice decision back-ported from testchat; this size-governance entry is D-125.
+
+**Reason:** The frozen suite is the only artifact class in the system with no size governance: it can only grow (removal requires a TPM round-trip through refreeze), every entry is collected/parsed/diffed on each run, and testchat's 18-file/4,287-line accretion shows the pattern. The 2026-08-04 review pass found the example suite itself proportionate (234 lines pinning a 37-line PRD, one test per criterion) but the *direction* structurally one-directional; these rules close that direction cheaply at spec time — where test authorship already lives — without adding pipeline machinery. The D-88/selector retirement proposal is recorded here because it was seriously considered and stopped at the D-record's own evidence: per D-115, retirement requires *measured* blast radius vs cost, and "the check is complex" is not evidence of false-positive cost.
+
+**Alternatives considered:** (a) A mechanical dead-test detector (failure-history ledger + freeze-time advisory) — rejected: no data source exists (the flake ledger tracks flakes, not never-failed tests), and per D-115 a new paid check needs blast radius > cost; TESTING.md names this as the escalation path if bloat incidents occur. (b) Retiring D-88 — rejected: its entry's "do not suggest" was written against exactly this proposal, and no track record exists either way (the gate is a week old). (c) Trimming selector regexes — rejected: each regex is a distinct audit finding's accident class; removing one reopens that family. (d) Enforcing suite size with a line-count cap — rejected: length is a smell, not a violation.
+
+**Do not suggest:** Mechanizing retirement before failure history exists; a line/function-count cap on `tests/` (blocks legitimately thorough suites); reviving the D-88 demotion or the selector trim without new false-positive evidence; repurposing the D-111 flake ledger to track "never failed" (that is a different ledger with a different consumer — name the consumer first).
+
+## D-124 — 2026-08-02 — A node-id relabel in a byte-identical suite must not widen the freeze delta
+
+**Decision:** `refreeze.sh`'s delta computation is extracted into `scripts/refreeze_delta.py` (a real producer with a direct unit test), and its "removed" term — `old_nodeids - new_nodeids` — is scoped to node-ids whose source FILE actually changed in this delta (`changed_files` ∪ `removed_files`). A node-id that disappears from the collected set only because collection relabeled it (pytest's parametrized `name[chromium]` when the sandbox collect succeeds vs static AST's bare `name` when it does not) no longer enters `changed_tests` while its file is byte-identical and still present. The "in changed files" term is already file-scoped and is unchanged. Genuine retirements (files in `REMOVED`) and real edits (staged byte-different files) still populate the delta exactly as before.
+
+
+
+> Renumbered from D-116 on 2026-08-07 (ledger alignment): D-116 now designates the context-minimalism decision back-ported from testchat; this relabel entry is D-124.
+
+**Reason:** testchat's v77 re-freeze staged a byte-identical suite, but collection flipped 60 node-ids from the parametrized to the bare shape. The old removed term counted all 60 as retirements, so the delta invalidated and re-ran three already-done, green tasks off a phantom scope — the frozen suite, the app, and the requirements were all unchanged; only the labels flickered. The frozen `test-nodeids` file legitimately churns shape between freezes depending on whether the sandbox collect succeeds; that instability must not translate into work. Scoping the removed term to files the delta actually touched neutralizes both flip directions (parametrized→bare and bare→parametrized) without weakening real-removal detection. The computation moved to its own module because the delta runs post-apply, past `--diff` — an inline heredoc could not be unit-tested, and the correction-log meta-rule (adapters need a real producer test) applies.
+
+**Alternatives considered:** (a) Stabilize the frozen node-id set itself so it never flips shape (always AST, or always pytest) — rejected: AST cannot see parametrization (undercounts) and pytest collect is not always available at freeze time (INV-1 tests precede their imports); the set's shape is legitimately environment-dependent, so the delta must tolerate it rather than the set being forced. (b) Compare node-ids with parametrize suffixes stripped — rejected: brittle to any future id-shape change and would also mask genuine parametrization changes in a truly edited file. (c) Leave it inline and test end-to-end only — rejected: the existing `freezable_repo` end-to-end tests cover the apply path but cannot cheaply exercise the collection flip; a direct producer test pins the guard precisely.
+
+**Do not suggest:** Re-widening the removed term to the raw `old - new` set "to be safe" (that is the defect); forcing the frozen node-id set to a single collection method; auto-editing the frozen spec to prune stale entries (the spec is human/TPM-authored — machinery surfaces, never edits it, per D-75's warn-only stance).
+
+## D-115 — 2026-08-02 — Retire non-decisional freeze advisories; admit/retire safeguards on measured blast radius
+
+**Decision:** The `refreeze.sh` freeze-time advisories D-83 (fresh-milestone note), D-56's ZERO-external NOTE, and D-89's per-file ERD prose-mass advisory are retired. `refreeze.sh` no longer prints them; `validate-plan.py` keeps only D-89's plan-gate half (the `MAX_BRIEF_CHARS` overflow hint names the ERD section size when a brief is actually rejected); `ERD-MASS` is no longer a preflight. Retiring an advisory is a doc-level amendment to the originating D-entry (D-83, D-56, D-89, D-107's "concatenates before running D-89" clause) — history stays, intent is updated. All hard gates are untouched: D-78 satisfiability, D-88 smoke quotes, D-87 static-asset, D-107 ERD-delta validation, INV-4 surface, staged-test parse+lint+determinism, D-75 red-before-green, the plan gate, and every coder/EM lane.
+
+**Reason:** The three advisories cost ~0.04-0.04s each per freeze and none ever changed a freezing behavior in twelve weeks (measured, not assumed). Each printed a verdict nobody consumed (the D-85 lesson generalized): D-83 fires only in the "same-session" case the CEO drives anyway; D-56's zero-external NOTE restates what the diff already shows; D-89's per-file mass correlated with brief size but never blocked a freeze and duplicated the plan gate's already-harder check. The advisory carve-out in D-95's auto-approval is textually unchanged — this is retirement, not promotion. New selection rule (applies from now on): a candidate freeze-time advisory is admitted only if its blast radius (a subclass defect it would plausibly catch) exceeds its runtime and false-positive costs; a paid advisory that has produced no behavioral change is retired rather than kept to demonstrate diligence.
+
+**Alternatives considered:** (a) Keep the advisories and make them toggle-able — rejected, three more code paths to test for no consumer; (b) only merge D-89's freeze and plan-gate halves into one scored gate — rejected, the plan gate is the only point where rejection happens and is the correct sole consumer; (c) move the rules to README prose so the history keeps the note while the pipeline drops it — rejected, docs still claim a script prints it and a docs-only claim is a lie (Rule 5); (d) apply the same measured-cost discipline to the retained hard gates — explicitly out of scope; gates that change what a violation does are stop-and-ask (Rule 3).
+
+**Do not suggest:** Re-adding any of the retired advisories "as a light diagnostic" — none had a consumer; converting any retired advisory into a hard gate; extending `refreeze.sh` preflight count as a delivery metric; removing a hard gate because an advisory was removed.
+
+---
+
+## D-114 — 2026-08-02 — Frozen oracle is content-scoped, tests/-confined, and Linux-sandbox-only
+
+**Decision:** Every production pytest entry point is explicitly confined to `tests/`. Refreeze classifies a staged test as changed only when it is new or byte-different from the tracked test. Pytest collection and the D-75 red-before-green check execute only through the Linux Podman sandbox; collection may use static AST when pre-implementation imports prevent sandbox collection, but generated tests never execute on macOS. If the red-check sandbox cannot produce a readable report, refreeze halts. D-90's host-execution fallback is retired. Separately, when a task has already consumed its brief-revision allowance, the orchestrator packages a TPM escalation before calling the EM; it does not require and validate a revised brief that it must discard.
+
+**Reason:** Testchat v75 collected 19 archived staging tests outside `tests/`, classified a byte-identical returned suite as 98 changed tests, and spent its final model call producing a schema-valid 2,631-character revised brief after the 2,500-character allowance was already exhausted. The artifact then failed validation before the existing escalation branch could run. These were scope and ordering defects: more machinery produced less useful evidence and added roughly 25 minutes to a run that completed no task.
+
+**Alternatives considered:** Keep bare repository-root pytest and exclude known archive paths (rejected — every new directory reopens collection); compare staged tests by path presence (rejected — whole-suite TPM returns make unchanged behavior look new); retry/compress the over-cap brief (rejected — the revision cannot be consumed); execute generated tests on the Mac when Podman is unavailable (rejected — it contradicts the VM boundary and turns TPM output into host code execution).
+
+**Do not suggest:** Restoring repository-root project pytest; treating a returned-but-identical test as changed; adding a host pytest fallback; consulting for a revised brief after its allowance is exhausted.
+
+## D-123 — 2026-08-01 — Real container builds run on packaging changes and a weekly backstop
+
+**Decision:** A project-owned `.github/workflows/container-build.yml` performs a pulled, no-cache Docker build when `Containerfile`, `.dockerignore`, `requirements.txt`, or the workflow itself changes; it also runs every Monday and on manual dispatch. After building, it starts the image and asserts that `/work` contains no source, tests, or Git metadata and that the temporary requirements manifest was removed. The blueprint and the actively maintained `testchat` child carry the workflow; other local children remain explicitly deferred because their stack adaptations are project-owned.
+
+
+
+> Renumbered from D-112 on 2026-08-07 (ledger alignment): D-112 now designates the delta-mapped verdict decision back-ported from testchat; this container-build entry is D-123.
+
+**Reason:** Static checks prove that the Dockerfile no longer says `COPY .`, but they cannot prove the base image still resolves, browser installation still works, dependencies remain installable, or the finished image has the expected filesystem shape. Building on every source commit would repeatedly pay for the accepted ~1.2 GB browser layer without testing a changed packaging input. Change-scoped plus weekly provides real integration evidence at bounded cost.
+
+**Do not suggest:** Running the expensive clean build on every source-only commit; pushing the validation image to a registry; restoring build cache to make a test named “clean build” faster; treating a successful Dockerfile parse or static grep as equivalent to a completed image build.
+
+## D-113 — 2026-08-01 — Success cleanup recovers its prior spec from durable history
+
+**Decision:** When the runtime task checkpoint is empty after intentional success cleanup—or partial state loss—`scripts/orchestrate.sh` resolves the prior milestone from the newest validated entry in `.pipeline-completions.json` instead of trusting a lone `.pipeline-state/spec_version`. That recovered version drives `SPEC_ADVANCED` before exact-match completions are restored and is retained separately as `delta_baseline_spec` for the entire in-progress milestone, so same-spec retries preserve every intervening delta in D-65 edit scope. Task reset and edit scope share one fail-closed affected-task computation over that range, and every in-process plan revision recomputes and reapplies it before the DAG continues. `completion-ledger.py latest` returns the newest successful spec (or zero for no history), accepts only canonical positive version keys, validates the entire ledger, and makes malformed history halt. A prior version newer than the frozen spec and a missing intervening delta also halt rather than guessing through incomplete history.
+
+**Reason:** D-108 correctly ordered restore before delta invalidation, but D-99's success cleanup deleted the runtime version used to arm that invalidation. The fallback silently set the missing prior version equal to the new frozen version, so `SPEC_ADVANCED=0`; a partial checkpoint could also retain only that version after losing every task marker. A one-file mechanical re-plan can preserve an affected task's exact fingerprint when test content changes under the same node-id; D-108 could then restore it as done and skip the affected-task reset. A first correction that considered only the newest delta still failed when more than one freeze elapsed after success; advancing runtime `spec_version` after the first reset then lost that wider range on retry. Separately recomputing D-65 scope could fail open, while caching it across a later decomposition revision made it stale. The full suite remained a backstop, but legitimate implementation work was misrouted into drift/escalation instead of reaching the coder.
+
+**Alternatives considered:** Persist only `spec_version` inside `.pipeline-state/` after success (rejected — success cleanup must leave no runtime checkpoint that resembles a live run); infer the version from commit subjects (rejected — the tracked ledger is schema-validated and already binds successful specs); require every re-plan to change the task fingerprint (rejected — mechanical one-file planning intentionally carries unchanged briefs and same-node test mappings); rely on the full-suite drift path (rejected — fail-closed is not the same as routing work correctly).
+
+**Do not suggest:** Trusting runtime `spec_version` when the task checkpoint is empty; using current runtime version as the edit-scope baseline after a same-spec retry; defaulting missing runtime version to the current freeze when durable history exists; accepting zero, leading-zero, or malformed ledger versions as history; considering only the newest delta when several freezes elapsed; recomputing edit scope with a fail-open branch or retaining it across a validated plan revision; restoring exact-match completions before determining whether the spec advanced; treating the final suite's eventual red verdict as proof that the task-routing defect is harmless.
+
+## D-111 — 2026-08-01 — Accepted flakes are counted by spec and recur into a TPM escalation
+
+**Decision:** D-77 flake-green occurrences are recorded in tracked `.pipeline-flakes.json` only after the milestone's full-suite success. Each node records its successful spec version and whether it passed one or two isolation attempts; rerunning the same spec replaces rather than increments the event. Before auto-green, the shell projects the new count. At `SWBP_FLAKE_ESCALATION_THRESHOLD` (default 3, positive integer), the suite remains red and the shell creates a recurring-flake TPM bundle directly, bypassing the generic EM drift consult. History is schema-validated, bounded to 50 spec events per node, and malformed history fails closed.
+
+**Reason:** D-77 and D-100 distinguish a one-off carried flake from reproducible drift within one run, but every later run forgot that evidence. The result could be an indefinitely unstable frozen test repeatedly excused as a new one-off. Spec-version counting is durable and idempotent; the threshold converts repeated evidence into the correct owner action. A flaky frozen oracle is a TPM test/spec defect, not an implementation decomposition problem an EM can repair.
+
+**Alternatives considered:** Count every retry (rejected — operator reruns would inflate history); record candidates before milestone success (rejected — failed runs are not accepted flake evidence and would dirty the tree before escalation); quarantine the test (rejected — frozen acceptance cannot silently shrink); send chronic flakes through the EM first (rejected — the shell already has the decisive test-history evidence and the EM cannot edit frozen tests).
+
+**Do not suggest:** Resetting counts at milestone boundaries; counting 0/2 isolation failures as flakes; allowing the threshold event to auto-green and merely writing a warning; letting an agent edit the ledger; using wall-clock timestamps instead of successful spec versions as the identity.
+
+## D-110 — 2026-08-01 — Test-report compatibility exercises the real pytest plugin
+
+**Decision:** The unconditional control-plane selftest job installs `pytest-json-report`. Selftests invoke a real pytest subprocess with that plugin, then feed its generated green and skipped reports through the production `run_tests` parser. Hand-built report shapes remain for adversarial cases, but they are no longer the only compatibility evidence.
+
+**Reason:** Synthetic JSON fixtures can remain green while a plugin upgrade changes field placement, outcome names, or summary structure. The parser decides whether code ships, so its adapter boundary must be tested against the actual producer. A passing report pins the positive path; the real skipped report pins the frozen-oracle rule that only ordinary passes are green.
+
+**Do not suggest:** Replacing adversarial synthetic fixtures entirely (they cheaply cover rare xfail/XPASS and corrupt-report shapes); trusting pytest's process exit alone; installing the plugin only in the application-test job while the skeleton-safe control-plane job runs the compatibility test.
+
+## D-109 — 2026-08-01 — Approval hashes exclude volatile diff timestamps
+
+**Decision:** Every refreeze deletion diff that compares a tracked artifact with `/dev/null` supplies explicit `diff --label` values. The review output still identifies the real path and `/dev/null`, but neither header contains a filesystem timestamp. The existing end-to-end `--diff` then `--approve <hash>` tests remain the mechanical contract.
+
+**Reason:** D-107 added automatic retirement of the prior `ERD-DELTA.md`. Its unified diff used `/dev/null` directly, whose displayed timestamp changes between invocations. The approval token is the SHA-256 of that text, so an unchanged staging tree could produce a different hash seconds later and reject a valid approval. A hash-bound gate must vary only when the reviewed content varies.
+
+**Do not suggest:** Removing the hash binding; retrying until two timestamps happen to match; omitting deletion content from the review diff; normalizing the hash after displaying different bytes to the reviewer.
+
+## D-108 — 2026-07-30 — Successful task completions have a durable, exact-match ledger
+
+> Amended 2026-08-01 by D-113: post-success re-freeze detection recovers the
+> prior successful spec from this ledger before restoration and delta reset.
+
+**Decision:** On a full-suite-green run, `scripts/orchestrate.sh` records every completed task in tracked `.pipeline-completions.json` before deleting `.pipeline-state/` and includes the ledger in the `[success]` commit. Each record binds the task id to its full plan-entry fingerprint, output path, and output-file SHA-256. On a later run, the shell may restore `done` markers only into an entirely empty runtime task-state and only when all three values still match; any live/partial checkpoint takes precedence. The ledger's newest successful spec replaces the runtime version erased by success cleanup (D-113); restore then runs before re-freeze invalidation, so the existing delta reset makes affected tasks pending when mapped test content changed without changing the plan entry. `SWBP_REBUILD_FROM_SCRATCH=1` bypasses restoration. The ledger retains the newest 50 successful spec versions and fails closed when malformed.
+
+**Reason:** D-99 fixed the permanent post-success halt by recognizing a covering `[success]` commit, but the success path still erased every `done` marker. The next milestone therefore knew it was safe to run yet forgot which unchanged work had already passed, contradicting D-24 resume economics and forcing needless coder calls. Git ancestry proves that cleanup was legitimate; it cannot prove that a particular current output still matches a particular completed task. The fingerprint-plus-output-hash binding supplies that missing proof without treating runtime counters, logs, retries, or escalations as durable state.
+
+**Alternatives considered:** Preserve all of `.pipeline-state/` after success (rejected — transient counters, locks, logs, and escalation artifacts would masquerade as a live run, and operator cleanup would erase the only record); infer completion from `[task]` commits (rejected — commit subjects do not bind the current plan entry or output bytes); trust only the output hash (rejected — the same bytes can sit under a materially changed brief or test mapping); store status in `tasks/plan.json` (rejected — D-26 keeps procedural state shell-owned and the validator forbids model-authored status).
+
+**Do not suggest:** Restoring a task when either its plan fingerprint or output hash differs; restoring over a non-empty crash checkpoint; moving retry/log/escalation state into the tracked ledger; bypassing delta-driven invalidation because a prior output hash still matches; making a malformed ledger silently authoritative.
+
+## D-107 — 2026-07-28 — Behavioral freezes carry a fresh, checked current-change ERD
+
+**Decision:** Every post-v1 re-freeze that changes tests, retires tests, introduces AC ids, or substantively changes contracts must stage `ERD-DELTA.md`. It has mechanically recognizable sections for changed ACs, superseded ACs, changed files, and test-to-file mapping. `scripts/check-spec-delta.py` rejects missing sections, newly introduced AC ids absent from the delta, and `contracts.changed_files` entries absent from the delta. The EM treats this file as the authoritative current-milestone slice when it explicitly supersedes standing ERD prose. A later non-behavioral freeze that refreshes `ERD.md` without a new delta is the consolidation point: it retires the prior `ERD-DELTA.md` after the completed behavior has entered standing architecture. The EM prompt also states the already-enforced D-64 Playwright final-task rule and the empty-contract-list rule verbatim.
+
+**Reason:** Testchat M32 carried the correct PRD and frozen tests from v67, but the implementation change was absent from the ERD through v70. Each retry gave the EM the same stale engineering source, so actor escalation could not repair the artifact defect. At v71, a second mismatch surfaced: `validate-plan.py` enforced D-64 while the prompt never told the EM the rule. The final implementation was six removed lines and one replacement, both coder tasks passed first try, while most elapsed work was spec and plan repair. The durable fix is a small authoritative delta plus mechanical cross-artifact coverage—not a larger model or another prose reminder.
+
+**Do not suggest:** Making the delta optional on mature projects; retaining an old delta after a docs-only freeze; asking the EM to infer which of conflicting ERD statements is newer; relying on a frontier TPM to remember cross-document propagation without a gate.
+
+## D-106 — 2026-07-28 — Control-plane Python is linted unconditionally
+
+**Decision:** The unconditional `selftest` CI job runs `ruff check --isolated --select E4,E7,E9,F scripts/` before the control-plane pytest suite. The explicit core rule set includes E741 while remaining independent of user configuration and ruff's evolving defaults. All existing E741 ambiguous single-letter variables in `check-test-surface.py` and `validate-plan.py` are renamed rather than suppressed. Application lint remains a separate project-stack step over `src/`.
+
+**Reason:** The pipeline linted TPM-authored tests at refreeze and coder-authored source per task, but never linted the Python validators that enforce both. Four E741 findings were therefore live in control-plane code while CI stayed green. The skeleton-safe selftest job already installs ruff and is the boundary that runs for every blueprint state.
+
+**Do not suggest:** Excluding gate scripts because they are “internal”; suppressing E741 globally to preserve ambiguous names; using an implicit/version-dependent rule set; relying on the project `src/` lint step, which is skipped for an unbootstrapped template.
+
+## D-105 — 2026-07-28 — Onboarding prints the runtime model-variable contract
+
+**Decision:** `bootstrap.sh` and `new-project.sh` teach the exact override names consumed by `llm-call.sh`: `SWBP_EM_MODEL` and `SWBP_CODER_MODEL`. A selftest compares both onboarding surfaces against that spelling and rejects the transposed `SWBP_MODEL_EM`/`SWBP_MODEL_CODER` form.
+
+**Reason:** `models.env` is the primary mapping path, so the stale text did not break correctly configured installations. It did make the documented environment-override path inert: operators following onboarding exported variables the runtime never reads, making A/B seat swaps and temporary overrides appear applied when they were not.
+
+**Do not suggest:** Supporting both spellings indefinitely (one public contract is clearer); changing `llm-call.sh` to the transposed form (README, QUICKSTART, BLUEPRINT, and existing operator configs already use `SWBP_<ROLE>_MODEL`).
+
+## D-104 — 2026-07-28 — One artifact-path policy governs the TPM shuttle and refreeze
+
+**Decision:** `scripts/spec_artifacts.py` is the executable source of truth for allowed frozen-spec staging paths: `PRD.md`, `ERD.md`, optional `ERD-DELTA.md`, `contracts.json`, `REMOVED`, `tests/<...>` (Python tests and their frozen fixtures), and `captures/<...>`, with absolute/traversing paths rejected. `tpm-pack.sh` derives its advertised reply paths and frozen document loop from it; `tpm-unpack.sh` imports it before staging; `refreeze.sh` uses it for tree validation, changed-document enumeration, and manifest generation; agent-mode TPM instructions derive the same description.
+
+**Reason:** The allowlist existed independently in refreeze, pack, and unpack and had already drifted twice—first for `REMOVED`/captures, then for `ERD-DELTA.md`. The second drift made the documented per-delta artifact impossible to round-trip through the supported chat shuttle. A single executable policy makes additions atomic across every boundary.
+
+**Do not suggest:** Reintroducing shell/Python copies “for simplicity”; allowing traversal or unsafe characters beneath `tests/`/`captures/`; narrowing tests to `.py` and thereby blocking frozen fixture files; documenting a path that the executable policy does not accept.
+
+## D-103 — 2026-07-28 — Frozen acceptance requires ordinary passed outcomes
+
+**Decision:** `run_tests` treats a test as green only when its outcome is `passed` and it carries no `wasxfail` metadata. `skipped`, `xfailed`, `xpassed`, error/failure, and passed-with-xfail-metadata outcomes all remain red and retain their real node IDs for task ownership, D-77 triage, and escalation evidence.
+
+**Reason:** Pytest exits successfully for skipped and expected-failure tests, and the JSON parser previously looked only for `failed`/`error`. A frozen suite could therefore report success while exercising no acceptance behavior. Frozen tests are the oracle; “did not run” and “failure was expected” are not equivalent to “behavior passed.”
+
+**Do not suggest:** Allowing skip/xfail globally because pytest considers them successful; rewriting node IDs with outcome suffixes (breaks plan ownership lookup); treating XPASS as ordinary pass while the xfail marker still hides a stale expectation.
+
+## D-102 — 2026-07-28 — Sandbox images copy dependency manifests, never the project tree
+
+**Decision:** The default Python `Containerfile` copies only `requirements.txt` into the build and installs from it. It never uses `COPY .`. `.dockerignore` also excludes all `.env*` files, pipeline/EM state, caches, TPM scratch, and dependency trees as defense in depth. `.dockerignore` joins the project-owned control-plane manifest beside `Containerfile`.
+
+**Reason:** Docker/Podman layers are immutable. Copying the whole build context and deleting it in a later `RUN` leaves source, local secret variants, captures, and runtime transcripts recoverable from the earlier layer. None of those artifacts is needed to construct the sandbox—the repository is mounted read-only at runtime.
+
+**Do not suggest:** Restoring `COPY .` followed by cleanup (layer history preserves the bytes); putting application source in the sandbox image for convenience (the runtime bind mount is the source of truth); assuming `.gitignore` limits the container build context.
+
+## D-101 — 2026-07-28 — Template removals are hashed and applied atomically
+
+**Decision:** `update-template.sh` treats files present in the child's old `.manifest-template` but absent from the target manifest as first-class update changes. Their deletion diffs contribute to `DIFF-SHA`, appear in dry-run/review output, apply even when there are no content changes, are removed after the old updater finishes its integrity check, and are staged in the same `[template-update ...]` commit. Removal paths are rejected if absolute or traversing.
+
+**Reason:** Reporting removals for manual cleanup while advancing `.template-version` and installing the new manifest left retired hooks, workflows, and scripts active but unpinned; drift detection then reported the child current. Deferring physical deletion until after the transition check lets the old updater safely retire itself or support scripts without losing the machinery needed to finish the update.
+
+**Do not suggest:** Advancing the template ref while leaving removals manual; hashing only added/modified content; deleting paths directly from an unvalidated manifest entry.
+
+## D-100 — 2026-07-28 — D-77 flake-green requires one isolated pass per failing node
+
+**Decision:** Plan-unmapped full-suite failures remain candidates for D-77 flake triage, but mapping absence alone no longer converts red to green. Each failing node runs twice in isolation; every node must pass at least once before the suite can be classified flake-green. A node that reproduces 0/2, or whose isolation runs cannot execute within the run budget, keeps the original full-suite failure red and follows the existing SPEC DRIFT path. Two isolated passes are not required.
+
+**Reason:** A carried-forward test can fail because a delta transitively broke carried behavior. The prior rule treated the absence of a plan mapping as proof of flakiness even when the same failure reproduced twice, allowing a knowingly red frozen suite to land `[success]`. Requiring one isolated pass adds a mechanical flake signal while preserving D-77's original evidence that real timing flakes can reproduce under host load and should not need a deterministic 2/2.
+
+**Alternatives considered:** Keep mapping as the sole discriminator (rejected — it proves ownership, not cause); require 2/2 isolated passes (rejected by the original AC-42 incident — too strict under load); remove D-77 and require every carried failure to refreeze (rejected — restores the repeated manual-bypass failure D-77 was created to remove).
+
+**Do not suggest:** Auto-greening a 0/2 reproducing failure because it is unmapped; treating a budget-skipped isolation run as positive evidence; demanding 2/2 passes without new evidence that host load no longer makes that threshold brittle.
+
+## D-99 — 2026-07-28 — Empty task state is legitimate only after a covering success
+
+> Amended 2026-07-30 by D-108: a covering success now permits an exact-match
+> restore from `.pipeline-completions.json` rather than always starting with
+> every task pending. Mid-milestone loss detection is unchanged.
+
+**Decision:** The lost-state preflight compares git history before halting on an empty `.pipeline-state/tasks/`. If the newest `[task ...]` commit is an ancestor of the newest `[success]` commit, the empty state is the orchestrator's intentional post-success cleanup and the next run may proceed (with D-108 exact-match restoration where available). If a task is newer than the last success, state was lost mid-milestone and the fail-closed halt remains. An intentional full rebuild uses the explicit `SWBP_REBUILD_FROM_SCRATCH=1` override.
+
+**Reason:** The success path has always removed `.pipeline-state/`, but the new lost-state guard treated every prior task commit as unfinished work. After the first successful run it therefore bricked every subsequent run, and its suggested recovery—deleting the already-empty directory—could never alter the verdict. Commit ancestry distinguishes the two states mechanically without weakening mid-milestone loss detection.
+
+**Do not suggest:** Removing the loss guard; treating any historical success as sufficient when a newer task exists; restoring the ineffective “delete `.pipeline-state`” escape.
+
+## D-98 — 2026-07-28 — Every test verdict requires a fresh JSON report
+
+**Decision:** `run_tests` deletes `.cache/test-report.json` immediately before every sandboxed pytest invocation. A sandbox launch, image-build, or timeout failure that produces no new report reaches the existing `NO_REPORT`/no-verdict path; it can never consume the preceding invocation's JSON.
+
+**Reason:** The sandbox command deliberately suppresses its raw exit status because pytest exit 1 is an ordinary test failure whose structured report must be parsed. Without first invalidating the old report, that suppression let an infrastructure failure replay a stale green result and mark a task—or the final frozen suite—successful.
+
+**Do not suggest:** Failing on every nonzero pytest process exit (exit 1 is the expected failing-test path); retaining reports between invocations for convenience; using report modification time as a substitute for deleting the stale verdict before launch.
+## D-97 — 2026-07-27 — Housekeeping is operator-invoked: `status.sh` (read-only report) + `teardown.sh` (explicit reclamation)
+
+**Decision:** Two new template-owned scripts serve the "what's resident?" and "give it back" questions the pipeline had no answer for. `scripts/status.sh` reports (never writes): Lima `dev-vm` state + uptime + memory + VM disk; TCP-probe of the three LLM-server ports `llm-call.sh` knows about (LM Studio 1234, mtplx 8001, mlx-serve 11234) — bare `nc -z`, no `/v1/models` hit that would trigger a cold model load; running + stopped podman containers inside the VM; sizes of `.pipeline-state/`, `.em-archive/`, `.cache/`, and `__pycache__/` under `tests/` and `src/`; repo disk free. Every failure to reach a component (limactl missing, VM stopped, port closed) reports and moves on — status is informational, exit 0 unless a command itself errors. `scripts/teardown.sh` performs the reclamations, one per flag, never called by `orchestrate.sh`. Flags compose: `--containers` (podman prune inside VM), `--state` (rm `.pipeline-state/`), `--caches` (`__pycache__`/`.pytest_cache` under tests/src), `--lm-studio` (`lms server stop`, falling back to `pkill -f 'LM Studio'`), `--lima` (`limactl stop dev-vm` — opt-in, NOT in `--all`), `--em-archive` (opt-in, NOT in `--all` — default KEEP because the corpus feeds the M28 diagnosis A/B), `--all` (containers + state + caches + lm-studio). Every action prints the exact command it will run before running it; `--dry-run` runs the whole plan with no side effects; bare `teardown.sh` prints help and exits 0. Both scripts are template-owned (`.manifest-template`) so `update-template.sh` (D-96) propagates them to every child.
+
+**Reason:** The pipeline's persistent-VM design (D-55) and warm-model economics (D-72; ~120s cold load) mean auto-teardown after every run is *wrong* — it would burn real seconds every run for no gain. But without any reclamation tool the CEO had no visibility into resource state and no protocol to say "wrap up now" at the end of the day. The right split is operator-controlled reclamation with a read-only reporter alongside: the reporter is safe to run any time; the reclaimer is safe only when the operator has decided the tradeoff. Two decisions inside the design encode this: (a) `teardown.sh` never runs in `orchestrate.sh` pre- or post-flight (would silently start eating warm state), and (b) `--lima` and `--em-archive` are opt-in outside of `--all` (the two flags with the highest cost-to-reverse or destroyed-signal). CEO's stated concern was "sometimes Lima VMs are left running or processes are left running" — status.sh answers "are they?" honestly; teardown.sh answers "reclaim which of these?" precisely; neither answers "and do it silently on my behalf," because the operator's judgment is the point of the tool.
+
+**Alternatives considered:** (a) Auto-teardown in `orchestrate.sh` post-flight — rejected on the D-55/D-72 economics above; the persistent VM and warm models are not leaks. (b) Fold status + teardown into one script with a `--report` flag — rejected; a reporter running arbitrarily during a shared session is fundamentally different from a reclaimer, and merging them raises the "did I get the flags right?" cost on the read-only path. (c) Have status.sh also probe `/v1/models` on each LLM port to prove liveness — rejected; some servers load a model on that hit, and a status report that changes system state is exactly the opposite of what a status report is for. (d) Live under `~/.config/sw-dev-blueprint/` instead of the template — rejected; children carry their own `.pipeline-state/`/`.em-archive/`, and the operator invokes these from wherever they are in the fleet — per-child locality wins. (e) Default `--all` to include `--lima` and `--em-archive` for "one command frees everything" — rejected; `--all` should be safe to type without regret, and both those flags have consequences (cold Lima boot; destroyed diagnosis-brief corpus) an operator should opt into by name.
+
+**Do not suggest:** Auto-invoking `teardown.sh` from any script the pipeline runs (breaks the persistent-VM design; makes cold-start costs invisible until they hit); adding `--force` variants of individual flags "for CI" (there is no CI path that legitimately reclaims host state — CI runs in ephemeral runners); default-including `--em-archive` in `--all` (destroys signal the M28 open item explicitly needs); coupling status.sh output to the pipeline exit code (a stopped VM is not a defect, and the exit-code coupling would break scripts that just want the report).
+
+## D-96 — 2026-07-27 — `update-template.sh` auto-proceeds by default; y/N retired to --interactive
+
+**Decision:** `scripts/update-template.sh` defaults to auto: after resolving the clone/ref, reading the template's `.manifest-template@target`, and computing the aggregate diff + `DIFF-SHA`, the pull applies without a terminal prompt when there is something to change. Prints `auto-approved (D-96): DIFF-SHA <hash> — applying` as the audit line. The three explicit paths are unchanged in behavior: `--dry-run` (print + exit), `--review` (adversarial-reviewer bundle for a second model), `--approve <sha>` (D-61 hash-bound apply). New `--interactive` flag preserves the pre-D-96 y/N for the rare eyeball case and still requires a terminal. The docstring's approval-screen framing and the runtime message that told the CEO "your y/N is an authorization" are rewritten to name D-96 and point at `--review` / `--interactive`. Two selftests: auto proceeds without a tty on a fixture with a real diff and lands a `[template-update ...]` commit; `--interactive` without a tty errors with a message pointing back to D-96 / D-61 / --review.
+
+**Reason:** The doc itself had already conceded that this y/N was not a code review — line 36 of the script read *"the CEO's y/N is an AUTHORIZATION that the control plane changed with a human aware — not a code review. Correctness is carried by the template's selftests and the next run's gates."* An authorization with no defect-catching role is precisely what the CEO's rubber-stamp complaint targets. The material verdicts are (a) the template's selftests, which turned green *before* the template committed the change upstream, and (b) `phase-gate.sh manifest HEAD` post-apply, which still fails closed on integrity mismatch. The middle keystroke was ceremony. Same argument as D-95, one layer over — and per that decision's rejected alternative (d), this was the deferred symmetric cut, now taken. Escape hatches preserved (`--dry-run`, `--review`, `--approve <sha>`, `--interactive`) so an operator who wants human authorization on a specific pull still has an explicit flag for it.
+
+**Alternatives considered:** (a) Keep the y/N because "template updates change the pipeline's rules" — rejected; every rule change already happened in the blueprint under its own gates (including D-95), and pulling a rule change into a child adds no new decision the human can meaningfully act on in the ~2 seconds a rubber-stamp actually takes. If an operator wants to consider whether to pull *now* or later, they can `--dry-run` and choose not to apply; if they want a second read, `--review` produces the adversarial bundle. (b) Cut `--interactive` too because "auto is enough" — rejected; the escape hatch costs nothing and preserves the operator's ability to pause on a specific pull without inventing a new flag later. (c) Fold refreeze and update-template into one gate — rejected here as it was under D-34: the tools share a pattern but not their approval semantics (refreeze approves *new* spec authored by the TPM; update-template pulls *already-approved* template state — asymmetric enough that a common engine would over-generalize).
+
+**Do not suggest:** Reinstating y/N as the default because "a human should authorize each pull" (the human already authorized the change upstream in the blueprint under D-95; a second keystroke here adds no signal); removing `--interactive` (the escape hatch is the point); auto-proceeding on a `phase-gate.sh manifest HEAD` failure "since the operator will review the output anyway" (the post-apply integrity check is fail-closed by design — never soften it); adding a size threshold that flips to interactive on "big" diffs (arbitrary and either false-positives on legitimate large syncs or false-negatives on nasty small ones — the same rejection as D-95 alt (c)).
+
+## D-95 — 2026-07-27 — Refreeze auto-proceeds on preflight-green; y/N retired to opt-in
+
+**Decision:** `scripts/refreeze.sh` defaults to `auto` mode: every mechanical preflight runs unchanged (D-56 externals, D-78 satisfiability, D-87 static-asset reachability, D-88 smoke-check quotes, D-89 ERD prose mass, INV-4 test surface, staged-test parse+lint+determinism); when they are all green the freeze applies without a terminal prompt, printing `auto-approved (D-95): all mechanical preflights green; DIFF-SHA <hash>` as the audit line. Any preflight failure still `die`s with the specific finding as before. The three explicit paths are unchanged in behavior: `--diff` computes+prints+exits, `--approve <sha>` (D-42) is the hash-bound conductor path gated by the conductor's own ask-prompt, `--interactive` (new flag) preserves the pre-D-95 y/N for the rare "eyeball this one" case and still requires a terminal. Docs updated (BLUEPRINT.md, README.md, CLAUDE.md, docs/ESCALATION.md, docs/TPM-ROLE.md, docs/CEO-PLAYBOOK.md) so the loop diagrams and role descriptions match what the script now does. Selftests: auto proceeds without a terminal on a green fixture; auto still `die`s when a preflight rejects (D-78 satisfiability failure exercised); the `auto-approved (D-95)` audit line is printed. Fixture repos exercise the FULL apply path (`git commit "[refreeze vN]"` completes).
+
+**Reason:** The y/N approval was ceremonial once every material check already ran. The mechanical preflights (D-78/D-87/D-88/D-89/INV-4/D-56) hold the artifact accountable to properties a human cannot re-derive from a diff. What the y/N theoretically caught — "the TPM spec drifted from my intent" — the CEO could not judge in the seconds a rubber-stamp actually takes: a 62KB re-touched ERD turned the gate into performance for five straight testchat refreezes (v60–v64), and the CEO delegated freeze approval to the model on 2026-07-27 as an interim response. The right places to catch intent drift are upstream (TPM authoring against a brief) and downstream (D-44 milestone acceptance against the running app) — not a keystroke after the machine has already decided. This brings the code into line with the delegation the doctrine already made, and generalizes the D-85 lesson (a verdict nobody consumes is not a gate): a *material* verdict was already produced; the ceremonial re-verdict was noise. Escalation paths that DO summon the CEO — --diff for pre-review, --approve <sha> for D-42 explicit apply, --interactive for opt-in — remain, so "if you have to ask, ask" is preserved as an explicit invocation, not a per-freeze default.
+
+**Alternatives considered:** (a) Keep y/N but require a typed short reason on approval — rejected; the reason field would decay to "ok" within days and the ceremony persists. (b) Promote every advisory (D-56 zero-externals NOTE, D-80 debt sweep WARNING, D-83 fresh-freeze note) to a hard-fail before allowing auto-proceed — rejected; each of those advisories exists precisely because the machine *cannot* decide (a zero-externals spec is legitimate when a feature has no third-party surface), and promoting them makes the pipeline brittle without adding signal. The advisories still print above the audit line where a conductor can react. (c) Auto only when the diff is "small" — rejected; a size threshold is arbitrary and either false-positives on legitimate large freezes or false-negatives on a nasty one-line change, and the gates don't care about diff size. (d) Cut `update-template.sh`'s parallel y/N in the same change — deferred; the CEO's directive was scoped to refreeze, and update-template's approval semantics deserve their own consideration (D-61 already binds it with `--approve <SHA>` for scripted callers; the interactive path is invoked less often).
+
+**Do not suggest:** Reinstating y/N as the default because "a human should approve every freeze" (the human already delegated it, and the material approval is the preflight suite passing — a keystroke after the fact adds no signal); removing --interactive because "auto is enough" (the escape hatch is the price of the default; it costs nothing and preserves the CEO's ability to inspect); auto-proceeding on preflight failure "since the operator will review the output anyway" (a preflight `die` is exactly the halt shape the escalation ladder expects — never soften it); moving the auto behavior to a separate `--auto` flag (that would make the pre-D-95 y/N the default again by omission — the CEO's ask was to remove the default ceremony, not add a flag to skip it).
+
+## D-94 — 2026-07-27 — ERD split: optional per-milestone doc alongside the standing ERD
+
+**Decision:** `refreeze.sh` accepts an optional `ERD-DELTA.md` staging artifact alongside `PRD.md`/`ERD.md`/`contracts.json`. When present it installs to `scripts/.approved/ERD-DELTA.md`, pins into the same `frozen-manifest` under the same freeze, and reaches the EM as combined context via `build_context` (which silently skips missing paths — no prompt-shape change for children that don't stage it). The initial v1 freeze does NOT require it. `refreeze.sh` concatenates `ERD.md` + `ERD-DELTA.md` before running D-89's per-file ERD-mass advisory so moving prose between the two docs cannot silence the signal. `.opencode/prompts/em.md` tells the EM to treat the two as one combined spec when both are present; `docs/TPM-ROLE.md` documents the intent — standing ERD holds architecture/inventory/conventions and changes rarely; ERD-DELTA holds this milestone's ACs/mapping/inventory changes — with an opportunistic adoption threshold roughly where the diff stops being reviewable at a glance. Three selftests pin accept-and-manifest, whitelist-still-rejects-stray-filenames, and the no-delta-doc backward-compat path.
+
+**Reason:** Testchat let five straight refreezes (v60–v64) through a rubber-stamped y/N because the 62 KB re-touched ERD made the diff un-reviewable at approval — the one human gate degraded to noise. A feature-sized per-delta diff makes approval actually possible. Splitting cuts EM prompt size too (order-of-magnitude on revisions carrying the full spec), but the freeze-gate integrity is the load-bearing win: a gate nobody can read is not a gate (the D-85 lesson generalized).
+
+**Do not suggest:** Making ERD-DELTA.md mandatory (backward compat is deliberate — children adopt at their next spec cut); adding a separate ERD-VERSION or explicit "authored against v<N>" stamp mechanism (both docs are pinned under one manifest hash — that IS the stamp; the CEO can layer this on if drift shows up in practice); moving ERD-DELTA.md content to a wholly separate directory (path locality inside `scripts/.approved/` keeps the freeze artifact set discoverable, and the frozen-manifest already treats every file under that path as one bundle).
+
+## D-93 — 2026-07-27 — Trivial one-file re-plans construct mechanically, no EM call
+
+**Decision:** `validate-plan.py --subtree-scope` now emits a `trivial_construct` flag — true iff the delta re-plans exactly one existing file, adds no new inventory files, and carries no contract changes across ANY delta in the range (skip-behind restart is honored, not just the last delta). When the flag is set, `ensure_plan` calls `validate-plan.py --construct-one-file` (new mode) which reuses the prior task's brief, contracts and depends_on verbatim and refreshes only `tests` to `scope.map_nodeids`; the output goes through `--merge-subtree` exactly as an EM subtree reply would. The full `validate()` gate then judges the merged artifact unchanged. The path consumes no plan-revision budget. On mechanical-construction rejection (a mismatch the scope check missed, e.g. keep-id absent from the prior plan), ensure_plan falls through to the EM subtree branch — no silent degradation. New files stay EM-only because contract-id selection is a semantic call the shell cannot make.
+
+**Reason:** For the trivial one-file re-plan case, no judgment survives for the EM to add: the carried brief still describes what the file does, the D-59 coder receives the file's current content anyway, and only the mapped node-ids change. The safeguard against a stale brief is the same one that guards every other path — mapped tests go red and the escalation ladder (D-70) summons the EM at its consult rung, where its judgment is real. The honest argument is the D-91 argument one level down: bijection/coverage/DAG/D-64 closure are properties of the artifact, not of who authored which part.
+
+**Do not suggest:** Enabling trivial construction across contract changes (a changed contract may make the carried brief wrong, and Cut 1's delta-only rule cannot save the case where the brief describes the removed behavior); enabling it for one-new-file cases without EM (contract-id selection is judgment); repairing scope/merge rejections in the mechanical path (falling through to the EM is the escalation the scope check exists to trigger); reusing a mechanically-constructed task across multiple future re-freezes as if it were EM-vetted (each re-freeze evaluates trivial_construct fresh from the current delta range).
+
+## D-92 — 2026-07-27 — Briefs for existing files are delta-only
+
+**Decision:** The EM role prompt (`.opencode/prompts/em.md`) and both EM plan-emission prompt strings in `scripts/orchestrate.sh` (the full-plan branch and the D-91 subtree branch) carry an identical rule: a brief for an EXISTING file describes ONLY the change from current behavior; a brief for a NEW file describes the whole file (target under 150 lines). The rule is bare — no compensating "change nothing else" line, because negative-constraint framing is exactly what Rule 8 forbids for local coders.
+
+**Reason:** D-59 already makes the coder's OUTPUT delta-only (anchored SEARCH/REPLACE for existing files — carried behavior is structurally untouched). Restating that behavior in the brief protected nothing and invited D-65-class stray edits to regions the task didn't own; it also drove briefs across the plan-gate `MAX_BRIEF_CHARS` cap for reasons that had nothing to do with new work (the v64 collision class). This makes the input side match what the output side already was.
+
+**Do not suggest:** Adding a "do not modify anything else" clause to compensate — that reintroduces negative-constraint framing local coders reliably ignore; the anchored-edit machinery is the mechanism, not the brief text. Removing the rule from either the full or subtree branch — both must carry it to prevent drift when the EM's context differs across branches.
+
+## D-91 — 2026-07-27 — Subtree re-plan: on a re-freeze the EM emits only what the delta invalidated
+
+**Decision:** `ensure_plan` no longer asks the EM to re-emit the whole plan after a re-freeze. `plan_subtree_prepare` detects a prior plan whose `erd_version` lags the frozen VERSION, collects every intermediate `DELTA-v*.json`, and calls `validate-plan.py --subtree-scope` (new mode): prior-plan tasks hit by the deltas (mapped-test / contract / declared-file intersection, plus transitive dependents — the same closure as `--affected`, loaded leniently because the prior plan rightly fails current-spec validation), new inventory files, and the node-ids needing a home. The EM call carries the full ERD/contracts but only a compact carried summary (id/file/depends_on — briefs stay home) and must emit tasks ONLY for the scoped files, reusing each re-planned file's prior id. `--merge-subtree` (new mode) recombines: carried tasks verbatim (stale mappings defensively stripped), subtree tasks appended, versions stamped by the shell. The merged artifact then faces the EXISTING full `validate()` gate unchanged — bijection, exactly-once mapping, DAG, D-64 closure are properties of the artifact, not of who authored which part. Id discipline is rejected, never repaired: a wrong keep-id or a colliding new-file id is validator feedback for the EM's revision — silent renumbering would make `depends_on` references ambiguous. Fallbacks, all loud (Rule 4): greenfield, malformed prior plans, inventory removals, missing intermediate deltas, and mappings no subtree task can absorb refuse at scope time → full emission; the first rejected merge abandons subtree mode and the next revision is a full-plan emission within the same plan-revision budget (amended 2026-08-14; the original "two rejected merges" promise was unreachable at the default budget because revision count and subtree attempts increment in lockstep — the cap fired before the branch ever could). A delta that invalidates nothing merges mechanically with ZERO EM calls and no budget spend. Twelve selftests, including two end-to-end `ensure_plan` drives.
+
+**Reason:** Plan emission was the pipeline's largest fixed cost and it scaled with inventory, not delta: testchat M31 measured 282s = 68% of a 413s run re-emitting a 19,572-char plan for a 3-task delta, and a revision carrying the full prior plan (~34k tokens) overflowed the mtplx 32768 window — a seat-choice constraint unrelated to model quality. A subtree revision fits easily. This is the D-59 insight applied to planning: never ask a model to reproduce content it is not changing.
+
+**Do not suggest:** Having the EM re-emit carried tasks "for context consistency" (the merge is the consistency mechanism); repairing wrong subtree ids in the merge (ambiguity is worse than a revision cycle); weakening the merged plan's validation because "the parts were already validated" (the merged artifact is the only thing the gate ever certifies); enabling subtree mode across inventory removals without a design pass on dependent-brief invalidation.
+
+## D-90 — 2026-07-27 — Freeze-time verification falls back to the host when the sandbox is unreachable (superseded by D-114)
+
+**Decision:** Both mechanical test steps in `refreeze.sh` gain a host-interpreter fallback, and both print which path ran. (1) Node-id collection: sandbox pytest `--collect-only` first (canonical env); if it yields fewer ids than the AST floor, host `python3 -m pytest --collect-only` (PYTHONPATH=.); AST wins only when BOTH fall short, and the message names both failed attempts. (2) The D-75 red-check: sandbox run first; if its report is unreadable, the delta runs on the host with `--junitxml` (pytest core — no plugin a host can be missing; `pytest-json-report` stays sandbox-only) and INCONCLUSIVE now requires both paths to have failed. Companion doc rule (TESTING.md): each task's mapped tests run per task and ONE full-suite run closes the milestone (D-28); the freeze verifies only the delta — a freeze-time full-suite run is catch-up only, for freezes where `src/` changed outside the pipeline.
+
+**Reason:** Refreezes run where TPM operators run them — on the macOS host, where the podman sandbox lives only inside the dev VM. testchat v64 AND v65 silently froze AST-shaped, suffix-less node-id sets (no parametrized expansion, no Playwright `[chromium]`), and the v65 red-check — the freeze's only mechanical test check — degraded to an advisory INCONCLUSIVE at the exact freeze it existed for. A verdict nobody can obtain is not a gate (the D-85 lesson, one layer down).
+
+**Do not suggest:** Making the host the primary path (the sandbox is the canonical environment; the host is the fallback that keeps the check alive); requiring `pytest-json-report` on hosts (junitxml is the zero-dependency form); treating a host-red-check pass as equivalent to a sandbox pass for anything beyond D-75's warn-only purpose (the M29 root-vs-unprivileged lesson stands).
+
+## D-89 — 2026-07-27 — Per-file ERD prose mass: freeze-time advisory + plan-gate hint
+
+**Decision:** Two-half, both driven off the same heuristic. (1) `validate-plan.py --erd-mass ERD CONTRACTS` (new mode) prints an advisory for each inventory file whose ERD prose section exceeds `ERD_MASS_ADVISORY_THRESHOLD = 2000` chars. `refreeze.sh` calls it after the D-78/D-87/D-88 preflight, before the human approval prompt, on the staged ERD when present (falling back to the frozen one). Advisory-only: exit 0 regardless, `--diff` still reaches DIFF-SHA. (2) `validate()`'s plan-gate `MAX_BRIEF_CHARS` overflow message now names the offending file's ERD prose mass — the same heuristic — so a future TPM reading the halt sees "the spec section is 2900 chars, threshold 2000" rather than only "the EM wrote 2697 chars," routing the restage to spec sizing rather than another actor swap. Eight selftests pin both halves and each boundary (oversize flag, under-threshold silence, heading-cap for last-file inflation, unmentioned file no-signal, table-format recognition, missing ERD tolerated, plan-gate hint present, refreeze wire).
+
+**Found by:** testchat M31 v64 (2026-07-26). The ERD concentrated 12 behavioral items on `src/static/app.js`. The EM's brief transcribed to 2697 chars against `MAX_BRIEF_CHARS = 2500` — 197 chars over. `validate-plan.py`'s plan-gate fired **after** two EM plan calls (~250–280s each on the 4-bit seat, 68% of run wall clock), so ~10 minutes to learn what the ERD already implied at freeze time. Retry could never succeed: the overshoot was structural (spec mass per file), not model variance. The v65 recut confirmed the fix by doing exactly what D-60 legislates — one concern per brief, splitting the feature into its own file.
+
+**Heuristic:** The ERD is prose, not a schema; a per-file mass measure is inherently approximate. For each inventory file f: find the first line-anchored mention (possibly after a bullet `-*+`, a numbered `1.`, a heading `#`, a table `|`, and/or bold/backtick wrapping); order by position; f's section spans from that position to the earlier of the next file's first mention or the next `#`-heading. Files with no line-anchored mention yield no measurement — no signal, no advisory. Cross-checked against three real specs: testchat v65 (7/16 files matched, top section 1266 chars, no false-positive advisories), sparkv3 v1 (5/5 matched via `|`-table row, top 513), wordcount v1 (3/3, top 191). No live spec is flagged; the M31 v64 shape would be.
+
+**Reason:** the plan-gate cap is a hard backstop but a late one — it fires after the whole plan is generated, and re-planning the same oversized spec with a different seat produces the same overshoot. The signal it detects (spec mass concentrated on one file) is derivable from the ERD alone, so the cost of learning it can be traded from "two EM plan calls" down to "one grep at freeze." The correlation between ERD prose mass and brief length is heuristic — some prose is nested detail the EM will summarize, some is oracle text the EM must transcribe verbatim — so this is an *advisory*, not a gate: an authored spec must not be blocked by an approximation. The paired plan-gate hint is what makes the whole loop close: when the backstop does fire, the TPM sees the *upstream* number that made it fire, and the restage is aimed at the actual cause.
+
+**Alternatives considered:** (a) Hard-block above the threshold — rejected explicitly by the handoff and matches D-20/Rule 9 posture: an approximation cannot license a block, and a false-positive here forces a spec author to distort valid ERD prose to appease a heuristic. (b) Structured `contracts.behavioral_ac_count` per file — rejected, changes the TPM authoring contract for a signal the source already carries; the mechanical count of ACs would also decouple from the human-authored prose the EM actually reads. (c) Splitting the ERD into per-file files at freeze time — rejected, `ERD.md` is one document by CEO practice and mechanical fragmentation would fight the reader (the same reason D-84 kept `project-trail/` flat). (d) Fixing the plan-gate message alone without the freeze-time advisory — rejected, the whole cost of the M31 v64 arc was the 10 minutes between the freeze and the plan gate; only a check that runs *before* the EM removes that cost. (e) Blocking only on egregious multiples of the threshold — rejected, either advisory or blocking cleanly; a "sometimes hard" gate is the exact behaviour trains bypass into.
+
+**Do not suggest:** promoting to fail-closed on evidence of a single false negative (the plan gate remains the hard backstop; the advisory's job is early warning, not correctness); tuning the threshold below 2000 without checking every live child's ERD first (the calibration ceiling is what preserves fail-open on legitimate specs — a lower cap would false-positive on wordcount- and testchat-shaped specs today); adding regex support for filenames the ERD wraps in prose punctuation the heuristic doesn't recognise ("we can catch a few more cases" — silent overreach into false positives is exactly what the "no signal, no advisory" boundary rejects); moving the advisory to plan-time ("the EM sees it too") — the point is to fire *before* the EM burns wall clock on a spec the ERD had already flagged.
+
+---
+
+## D-88 — 2026-07-27 — Quote-brittle smoke_check patterns fail the freeze-time preflight
+
+**Decision:** `validate-plan.py --spec-preflight` now also proves that every **new or changed** entry in `contracts.smoke_checks` naming a grep-family invocation carries a pattern that will accept either quote character in the source. For each such entry: parse the command with `shlex`, walk flags to extract the pattern (`-e PATTERN` or first positional), and reject if any literal `'`/`"` appears outside a bracket expression, or inside a bracket expression that does not contain BOTH quote types. `grep -F`/`fgrep` with any literal quote is rejected wholesale (character classes are a regex construct and cannot express the fix). Compound commands, shell substitutions, and non-grep invocations carry no signal for this gate — fail open, exactly as D-78 does for a new route family. The failure names the entry, prints a quote-agnostic rewrite of the exact pattern, and directs the author to `grep -qE` when `-E`/`-P` is not already set. Nine selftests pin the v61 reproduction and each boundary (both quote directions, single-quote-only bracket, no-quotes, fixed-string mode, carried-forward grandfather clause, non-grep, and compound-command bail).
+
+**Found by:** testchat M31 v61 (2026-07-26). The frozen contract carried `grep -q '\[data-active="true"\]' src/static/current-chat.css`. The coder wrote CSS with `[data-active='true']` — byte-different, semantically identical (HTML/CSS attribute selectors take either quote). The spec's own oracle rejected a file that satisfied the spec: 4 coder strikes + 2 EM diagnosis calls (~62s) + an escalation halt — all against correct code. The ladder cannot recover from an oracle authored above the EM tier; the only place this class can be caught is the spec, before it is frozen.
+
+**Reason:** D-78 and D-87 prove *reachability* of surfaces the spec commits to; D-88 proves *robustness* of the oracles the spec ships. Grep is a byte matcher and the TPM is a natural-language reasoner — the gap between "the file has this attribute" and "the file contains this byte sequence" is exactly where v61 lived, and the checkable class is finite: literal-quote characters in patterns whose source-language has a semantic equivalent using the other quote. The check is deliberately narrow (only grep-family, only literal quotes, only new/changed entries) — that narrowness is what makes it safe to fail closed. A carried-forward brittle pattern is grandfathered; the whole point is that the next spec revision cannot introduce this class.
+
+**Alternatives considered:** (a) Advisory warning instead of fail-closed — rejected for the same reason D-87 rejected it: a warning in a long freeze transcript is not consumed, and the M31 cost was steep enough (4 strikes + escalation, halted below the tier that could diagnose it) to justify the stricter variant the handoff explicitly named as defensible. (b) Proving the pattern will match the eventual implementation — rejected, unknowable at freeze time; only the *robustness class* of the pattern is checkable, and that is exactly what failed. (c) Checking every quote character regardless of position — rejected, a pattern like `\bfoo\b` in a language where `\b` means "word boundary" carries a quote in some source languages but the smoke_check does not; the boundary is quotes in the source language, not quotes in the pattern language. The bracket-class-with-both-quotes rule is the tightest form that captures the fix. (d) Extending to all matcher tools (`awk`, `sed`, `python -c 're.search(...)'`) — rejected, out of scope for the M31 evidence and each carries its own quoting semantics that would need separate treatment; the check speaks only about patterns it can confidently read. (e) Re-checking carried-forward entries — rejected, would retroactively fail every child whose already-approved smoke_checks were authored before this gate existed, breaking freezes over historical spec.
+
+**Do not suggest:** relaxing the fixed-string (`-F`) branch ("the user picked -F on purpose" — the pattern IS the oracle, and a fixed-string oracle with a literal quote is the exact defect this gate exists to catch); adding `awk`/`sed` to the grep family without a matching literal-quote semantics analysis (the family list is the check's scope, not a stylistic preference); demoting to advisory once "we haven't seen a false positive in N freezes" (the M31 arc is exactly the kind of intermittent evidence a warning would consume without acting on); treating the presence of `-E` as sufficient without checking the pattern (`-E` enables the fix but does not compel it — a brittle regex is brittle in every mode).
+
+---
+
+## D-87 — 2026-07-27 — Static-asset reachability joins the freeze-time preflight
+
+**Decision:** `validate-plan.py --spec-preflight` now also proves that every **new** non-`.py` file added to `contracts.files` can be referenced. For each such file not already on disk: if any file under the build lane already contains its basename, it is satisfiable. Otherwise the check finds the files that reference same-suffix assets today — the hosts that would have to carry the new reference — and fails closed when none of them is an editable `contracts.files` member, naming the host in the error. No host references that asset type at all → no signal, fail open, exactly as D-78 does for a brand-new route family. Six selftests pin the v62 reproduction and each boundary.
+
+**Found by:** testchat M31 v62 (2026-07-26). The spec added `src/static/current-chat.css` to the inventory. The only `<link>` in the project lives in `src/static/index.html`, which the delta could not reach, and `src/static/style.css` was in `no_edit_files`. The coder would have written a correct stylesheet that nothing could ever load: the task goes green, the highlight ACs fail, and no error anywhere names the cause. One `grep link index.html` at spec time would have caught it; nothing ran it. Cost one full refreeze cycle inside the five-cycle M31 arc.
+
+**Reason:** D-78 proves reachability for the two surfaces whose implementing file is derivable — an entry_point's module path is exact, a route's home is its path-siblings' registration site. A stylesheet, script, or template has neither: its only reachability signal is a textual reference from another file, so it fell through a gate that was otherwise doing exactly this job. The failure is worse than an unimplementable route, because it does not fail — it produces a green task and dead code, and the diagnostic burden lands on whoever reads the AC failure. Same principle as D-78, one artifact class wider.
+
+**Alternatives considered:** (a) Requiring the TPM to declare a `referenced_by` field per asset — rejected, it changes the authoring contract and adds a schema field when the source tree already carries the signal mechanically (the same reasoning D-78 used for routes). (b) Checking `.py` files too — rejected, imports are already proved by the entry_point branch and a second gate over the same artifact would double-fail on new modules. (c) Warning instead of fail-closed — rejected for the same reason D-78 rejected it: the defect survived a human approval already, and a warning in a long freeze transcript is not consumed. (d) Requiring the asset be referenced *before* the freeze — rejected, that is impossible by construction for a file the delta is about to create.
+
+**Do not suggest:** tightening the no-host fail-open branch (a project with no HTML/template layer has no signal by construction — failing it would block legitimate greenfield specs, the mirror of D-78's stated boundary); treating basename-found as proof the reference is correct (it proves only that something mentions the name — the check is reachability, not correctness); extending it to files already on disk (their reachability is not this delta's concern).
+
+---
+
+## D-86 — 2026-07-27 — The TPM declares the delta's scope: `contracts.changed_files` reaches the coder
+
+**Decision:** `contracts.json` gains an optional `changed_files` array — the inventory files this delta's work touches, declared by the spec author. `refreeze.sh` copies it verbatim into `DELTA-vN.json`'s `changed_files`, which `validate-plan.py --affected` already unions with the test and contract deltas to derive the coder's editable set; the field was hardcoded `[]` at `refreeze.sh:532` until now, so that union arm was dead. It is a **per-delta** declaration: a freeze that does not stage `contracts.json` declares no scope of its own and inherits nothing. The preflight rejects an entry outside `contracts.files` (no task can target it, so it scopes nothing) or one also listed in `no_edit_files` (self-contradictory). When a computed delta scopes nothing at all — no changed tests, no changed contract ids, no declared files — refreeze prints an advisory naming the consequence.
+
+**Found by:** testchat M31 (2026-07-26). `cmd_affected` derives the editable set from `tests ∩ changed_tests`, `contracts ∩ changed_contract_ids`, and `file ∈ changed_files`. With `changed_files` hardcoded empty and the contract delta walking only `entry_points`/`routes`/`schemas`/`errors` — never `ui` — the EM's test mapping was the sole remaining lever. It assigned 49 tests to `app.js` and 2 to `index.html`, so `index.html` was uneditable for a milestone that plausibly needed markup in it, across five consecutive refreezes. Separately, spec v62 changed only `contracts.json` and produced a delta with `changed_tests: 0` and `changed_files: []`; combined with the inverted no-edit default that made **every existing file** untouchable while the run reported normally.
+
+**Reason:** scope is a containment boundary — it decides what a local model may overwrite — and it was being set implicitly, by inference, by the least capable actor in the loop. That inverts Rule 9 (gate strength ∝ blast radius). The plumbing to do it properly already existed and was reachable in one line; what was missing was any way for the spec author to *say* what a milestone touches. The empty-delta advisory closes the second half: absence of state must read as unknown, never as nothing to do (the same principle already applied to lost `.pipeline-state`), and an empty delta previously read as "nothing is in scope" when it usually meant "only spec prose changed."
+
+**Alternatives considered:** (a) Deriving `changed_files` from a git diff of the inventory — rejected, the files do not exist yet at freeze time; that is the whole point of INV-1. (b) Extending the contract-id delta to walk `ui` entries — useful and orthogonal, but it still infers scope from contract churn rather than letting the author state it, and a milestone can touch a file without changing any locked surface. (c) Making the field required — rejected, it would break every existing child's next freeze and every greenfield v1, where the test delta already names everything. (d) Inheriting the declaration when `contracts.json` is not staged — rejected, silently widening a later delta with a stale list is the same class of defect this decision removes. (e) Halting instead of warning on an empty delta — rejected pending evidence: a legitimately empty delta exists (a docs-only or captures-only refreeze), and Rule 9 does not license a halt where a named advisory suffices.
+
+**Do not suggest:** reintroducing `"changed_files": []` as a literal in `refreeze.sh` ("the field is unused" — it is the TPM's only scope lever); treating the declaration as a substitute for `no_edit_files` (one names what changes, the other what must not, and the preflight rejects a file in both); allowing entries outside `contracts.files` ("the coder could still create it" — the plan gate's bijection is over the inventory, so no task can target it); carrying the field forward across freezes for convenience.
+
+---
+
+## D-85 — 2026-07-24 — A red CI stops the line: `orchestrate.sh` pre-flight consumes the external verdict
+
+**Decision:** `orchestrate.sh` pre-flight calls `check_ci_health` before the D-55 smoke test (after every free local check, so a red CI costs one bounded API call instead of a cold model load). It reads the newest run of EACH workflow on the current branch via `gh run list --limit 20 --json`, parsed by python3 (no jq dependency). A completed `failure` on any workflow is a hard halt naming the workflow, the two commands to inspect it, and the override. Everything else proceeds with an explicit status line: `GREEN` passes, `PENDING` (still in flight) is not a failure, `NONE` (no runs yet) proceeds, and every unobtainable answer — no `origin` remote, `gh` absent, `gh` failed, detached HEAD, unparseable output — prints **INCONCLUSIVE** and proceeds. The escape hatch is `SWBP_SKIP_CI_CHECK=1`, deliberate and named in the halt text.
+
+**Found by:** testchat, 2026-07-24. CI had been RED for 7 days and 46 consecutive runs on a single mypy error (`src/api/chat.py:33`, `str | None` where `str` was expected) introduced by the 2026-07-18 DeepSeek live-fix. Because Type check runs before Run tests in `ci.yml`, the 151-test suite and the coverage floor never executed in CI at all during that window — and `[success] spec v56` shipped inside it. Every internal gate was green and correct; the one check that could have caught the defect was shouting into a void. Surfaced only incidentally, while raising the coverage floor.
+
+**Reason:** CI is the only check that runs OUTSIDE this pipeline's own gates, so it is the only one that catches what the gates structurally cannot — type errors, lint, packaging, anything the frozen suite does not assert. The 2026-07-14 correction-log rule already said to verify CI is green before trusting any quality claim it implies; it had no mechanical enforcement, so it decayed into a suggestion within a fortnight. This is the third instance in one session of the same class (INV-3 dark since D-53 and retired; the coverage floor unreachable behind the failing type check; CI itself unread) — hence the general lesson recorded here: **a verdict nobody consumes is not a gate.** Rule 9 (gate strength ∝ blast radius) says the reverse case is equally wrong, so the halt is paired with an override: running the pipeline is frequently how a red CI gets fixed, and a gate with no exit there is a deadlock, not a safeguard.
+
+**Alternatives considered:** (a) Warn-only — rejected, that is precisely the status quo that failed for 7 days; an advisory line in a 40-line pre-flight is not consumed either. (b) Check only the single newest run — rejected, and pinned by selftest: `gh` returns newest-first across ALL workflows, so a green `check-drift` (runs on every push, ~8s) would routinely mask a red CI, recreating the exact blackout. (c) Gate on the commit-status API for HEAD — rejected, HEAD is often unpushed and would report nothing on precisely the runs that matter most. (d) Fail closed when `gh` is missing or unauthenticated — rejected, `gh` is optional in QUICKSTART and many children have no remote at all; a check that cannot run must say INCONCLUSIVE, never imply green (Rule 4, D-75 precedent). (e) A pre-push git hook instead — rejected as the primary, it fires after the work is done; the pre-flight stops the line before the model burns time. The two are complementary and a hook may still be added.
+
+**Do not suggest:** downgrading the RED branch to a warning ("it is usually unrelated" — that assumption cost 7 silent days); removing `SWBP_SKIP_CI_CHECK` ("gates should not have overrides" — this one must, see above); treating PENDING or INCONCLUSIVE as failures (they are unknowns, and halting on an unknown trains people to set the override permanently); adding `jq` as a dependency (python3 is already required and parses this); consulting only the default branch's CI when running on another branch.
+
+---
+
+## D-84 — 2026-07-19 — `postmortems/` becomes `project-trail/`: the archive broadens from incidents to the project's running trail
+
+**Decision:** The D-76 directory is renamed `project-trail/` and its intake criterion broadens from "incidents that changed the rules" to the exploratory companion of the frozen specs: rejected alternatives with reasoning, explorations and benchmarks, incident writeups, near-misses, scratch thinking, external context. Authorship widens with it: the working session (conductor seat) writes notes as routine doc upkeep — same lane as `docs/` and `tasks/CURRENT.md`, expected most sessions, not only on incidents — alongside anything the human adds. Two structural rules carry from D-76 unchanged: pipeline phases remain mechanically excluded (outside every `.gate-paths` lane, INV-2 fails closed on pipeline-phase writes), and nothing here is authoritative — zero pipeline dependency, one-way references, committed files, flat `YYYY-MM-DD-slug.md` naming, `docs/DECISIONS.md` stays the single decision log. New corollary of agent authorship: a note is narrative, never evidence — when a note and the tree disagree, the tree wins (Operating Rule 5).
+
+**Reason (CEO directive, 2026-07-19):** D-76 rejected the general vault on the "would I re-read this" test — a test that assumed a human reader, for whom write-once-read-never notes are dead weight. The directive names a different consumer and a different producer: the project writes its own notebook as it works, and a model is later asked — at milestone or project close — to parse the whole record and produce a CEO summary. For that reader, dead ends and fail stories are not swamp — they are the corpus, and reading costs nothing. D-76's swamp risk was really a read-cost problem, and LLM retrieval removes it; D-76's capture-cost concern falls away too, because capture is session work, not CEO time. The narrow name "postmortems" was suppressing exactly the material — near-misses, rejected paths, half-formed hunches — that a retrospective model can mine and a frozen spec can never hold.
+
+**Alternatives considered:** keeping `postmortems/` narrow and adding a second trail directory (rejected — two unauthoritative directories with a boundary to police is ceremony; one flat directory, grep does the taxonomy); a sibling repo or Obsidian vault (rejected in D-76, still rejected — same repo, plain markdown, no tooling); per-milestone structured templates to ease the future LLM parse (rejected — the mining model handles unstructured; required fields are how capture dies); keeping D-76's human-only authorship (rejected by the directive — a notebook only the CEO may write is a notebook that stays empty; the risk of agent narrative is bounded by the narrative-never-evidence rule, not by banning the writing).
+
+**Do not suggest:** letting the pipeline or any gate read `project-trail/` or depend on a note's presence/absence/content; treating a note as evidence in any dispute with the tree (Rule 5 — the 2026-07-19 disposition-ledger overclaim is the standing example of why); taxonomy, templates-with-required-fields, or linters; migrating or mirroring DECISIONS.md entries here; renaming back on "postmortem is the standard term" grounds — the directory is deliberately broader than incidents now.
+
+---
+
+## D-83 — 2026-07-19 — Freeze hygiene: a new milestone's spec is next-session work by default
+
+**Decision:** Advisory, two halves. (1) CEO-PLAYBOOK rule: a new milestone's spec is next-session work by default — spec authoring is the highest blast-radius activity in the system (Rule 9) and deserves a fresh head; same-session freezes get a deliberate pause and a from-scratch contracts re-read. (2) The mechanical nudge: `refreeze.sh` prints a NOTE at the human gate when the most recent `[success]` commit is under an hour old, in all modes, before approval. Explicitly never a gate: same-milestone fix deltas (escalation replies, ratifies) legitimately freeze minutes after a close, and the actor being advised is the human — a hard block would train bypass, not rest.
+
+**Found by:** testchat M28 (2026-07-19): both defect-bearing freezes (v51 23:34, v52 23:49) were authored minutes after M27 closed at 22:50, at the end of a long day, across a pause/resume and multiple model changes — and both sailed through their human approvals. The postmortem's "soft" recommendation; kept soft, but given a mechanical voice at the exact moment it matters instead of living only in a doc nobody re-reads at 23:30.
+
+**Alternatives considered:** blocking new-milestone freezes within the window (rejected — "new milestone vs fix delta" is not mechanically decidable at freeze time, and a false block on an urgent escalation reply is worse than a fatigue-authored spec that D-78/D-75/INV-4 now partially backstop); keying on wall-clock hour instead of time-since-success (rejected — "late at night" is timezone- and person-dependent; distance from the previous close is the signal M28 actually exhibited); tracking "same session" (rejected — sessions are a chat-tool concept the repo cannot see; the <1h heuristic approximates it honestly).
+
+**Do not suggest:** promoting the NOTE to a y/N confirmation or hard halt (advisory by design — see above); suppressing it for `--approve` mode (the D-42 flow is exactly where a tired approval happens); treating its absence as "well-rested spec" (it measures recency, not fatigue).
+
+---
+
+## D-82 — 2026-07-19 — Hand-fix ledger at close-out + interaction-path ACs for UI milestones
+
+**Decision:** Two halves, metric + spec-side, both documentation (no gate). (1) The milestone close-out records the post-`[success]` live-fix count in `tasks/CURRENT.md`'s Results (CEO-PLAYBOOK step 5; mirrored as a TPM operating discipline). Zero is the norm — testchat held it M7→M27 — and a spike is the honest measure of what leaked past the frozen ACs, surfaced as input to the next TPM intake instead of being silently absorbed. (2) TPM-ROLE duty 1: UI milestones must pin interaction-path ACs — cancel/abort reverts, status truthfulness, mid-operation gating, refresh/reload races, concurrent-operation indicator staleness — not only happy-path assertions.
+
+**Found by:** testchat M28 (2026-07-19): eleven post-`[success]` live-fixes, breaking the zero streak held since M7 — ALL interaction detail the frozen ACs never pinned, so the coder's output was technically correct, the full suite passed, and the app was wrong. Nothing in the close-out surfaced the count; the trend was invisible until a human noticed the volume.
+
+**Alternatives considered:** a mechanical gate on the count (rejected — live-fixes happen AFTER `[success]`, outside any gate's window; the ledger is a trailing indicator for spec-quality trend, not a blocker); freezing interaction-path ACs as a schema requirement in contracts.json (rejected — "has UI" is not mechanically decidable at freeze time, and D-58's testid surface already constrains what UI tests may observe; the gap was in what the TPM chose to assert, which is a role-doc matter); counting all post-success commits instead of live-fixes (rejected — ratify deltas and doc commits are not defect signal).
+
+**Do not suggest:** treating a zero ledger as proof of spec quality (it proves only that nobody had to fix anything by hand YET); letting the ledger justify skipping the D-44 hands-on gate ("suite green + zero fixes" still isn't CEO acceptance); moving the recording to an agent-authored file other than CURRENT.md's Results (the close-out ritual already lives there).
+
+---
+
+## D-81 — 2026-07-19 — Gate-symmetry doctrine: gate strength proportional to blast radius
+
+**Decision:** Codified as BLUEPRINT.md Rule 9. Every seat's output artifact receives a mechanical validity check at handoff; gate density is proportional to the artifact's blast radius (downstream work an undetected defect destroys), never inversely proportional to the seat's capability. The rule is documentation-only — it changes no code, but establishes the design principle that D-78, D-80, D-75, INV-4, and D-56 collectively embody for the TPM lane, and that future gates must respect. Items 1 and 4 of the M28 handoff are the first two instances; future spec-level checks must satisfy this rule to be admitted.
+
+**Found by:** testchat M23 + M28 pattern. M23: all three spec bugs were the TPM's; the coder was blameless. M28: all four recuts (v51→v54) were spec-layer TPM defects. Both exposed the same structural flaw — the weakest seat (local coder) had four checks per task; the strongest seat (frontier TPM) had only hash-integrity checks (frozen-manifest, INV-4) and zero semantic-validity checks. Defects entered ungated at the top and burned the bottom of the ladder.
+
+**Alternatives considered:** (a) Adding a "TPM gate density" section without formalizing it as a numbered rule (rejected — numbered rules are the only ones that get read by agents at session start; an unnumbered section buried in Anti-Patterns would be ignored the way the M4 conductor compliance rule was). (b) Making this a code-level change instead of doctrine (rejected — the code changes already exist as D-78/D-80/D-75; this rule is the *principle* that explains why they exist and that governs what future gates are admitted).
+
+**Do not suggest:** exempting any seat from mechanical validation because it's "capable enough" (the rule exists specifically because capability arguments prevented gates on the TPM lane for the first 22 milestones); gating only downstream seats (that IS the anti-pattern this rule names); adding gates that are not proportional to blast radius (a trivially-costly gate on a low-blast artifact is ceremony, not safety).
+
+---
+
+## D-80 — 2026-07-19 — D-68 debt sweep at freeze time: pre-existing swallowed-error debt surfaces at the human gate
+
+**Decision:** `refreeze.sh` runs `check-swallowed-errors.py` over every on-disk file in the delta's effective `contracts.files` (staged contracts if present, else frozen) and prints any findings as a WARNING in the pre-approval report, next to the D-56 externals note — in `--diff`, interactive, and `--approve` modes alike. Advisory by design, never a freeze blocker: the right response may be a justification comment, an M28c-style remediation directive added to THIS spec, or explicit acceptance — a TPM/CEO call the gate cannot make. The point is only that the call happens on day one, at spec time, instead of mid-run.
+
+**Found by:** the class fired twice after D-68 shipped. app.js (2026-07-17, incident #2): a legacy file's first post-D-68 edit failed the gate on handlers that predated the gate, regardless of the new work; cleared by live-fix `1eb4054`, and the session's template-debt note named the class. models.py T11 (M28, 2026-07-19): same class forced the v54 recut, and during the escalation both local EMs revised the WRONG handler. The 07-17 note was recorded but not mechanized — "the correction log is memory, not enforcement" (CLAUDE.md 2026-06-04: mechanical gates over doc guards).
+
+**Alternatives considered:** fail-closed at freeze (rejected — the debt is in files the delta may not even touch, and a justified-swallow judgment belongs to humans; blocking every freeze on legacy debt would train operators to bypass the door); sweeping only files the delta's tests exercise (rejected — the D-68 gate fires on the file's first EDIT, and which files get edited is the EM's downstream decision, unknowable at freeze); auto-inserting a remediation directive into the spec (rejected — no agent writes frozen artifacts, D-31; the sweep informs the human who does).
+
+**Do not suggest:** promoting the WARNING to a halt without new evidence; scanning outside the inventory (out-of-delta debt is real but not this freeze's business — it enters when its file enters an inventory); treating a silent sweep as "no debt anywhere" (it sees only on-disk inventory members; files the delta will CREATE are checked at coder time by D-68 itself).
+
+---
+
+## D-79 — 2026-07-19 — Escalation ladder audits the puzzle before blaming the solver: SPEC DEFECT rung at plan-budget exhaustion
+
+**Decision:** When the plan gate has rejected `MAX_PLAN_REVISIONS` consecutive EM plans, `orchestrate.sh` no longer halts straight onto the actor path. It first re-runs the D-78 satisfiability audit on the FROZEN spec against the current tree (`validate-plan.py --spec-preflight /dev/null contracts.json` — the old={} form: everything already registered or on disk passes; what remains must be buildable by the inventory). Audit fails → halt as SPEC DEFECT with a `spec-defect` TPM bundle (exit 2, batched per D-29): no further EM strikes, no model swaps — the halt text says so explicitly. Audit passes → the pre-existing actor-path halt, whose message now records that the spec was cleared. The rung is documented in `docs/ESCALATION.md` and selftested end-to-end via `drive-plan.sh` (real extracted functions, scripted fake EM — both exits plus the no-rung happy path).
+
+**Found by:** testchat M28 (2026-07-19). The ladder interprets every gate failure as evidence about the actor (retry → consult → swap model → escalate seat) and had no branch for "the upstream artifact is impossible": two different EM models failed identically at the plan gate against v51/v52 — evidence about the artifact, not the actors — and the ladder burned ~75 minutes, two EM swaps, and a seat escalation before a human named the spec. Capability-independent: a maximally capable EM still fails against an unimplementable spec.
+
+**Alternatives considered:** running the audit before the FIRST EM call on every run (rejected — D-78 already gates new freezes at the door; pre-emptive auditing of older frozen specs would hard-block runs on any audit false positive, whereas at the post-exhaustion rung a false positive costs nothing extra — the run was halting anyway, and the audit only redirects WHERE it halts); auditing after every single rejection (rejected — the validator's error feedback demonstrably fixes honest plan defects on the second emit, testchat M6; one rejection is not yet evidence about the spec); a consult-verdict route via the EM (rejected — the defect is provable mechanically; asking a mid-tier model to confirm it re-enters the actor path this rung exists to bypass, and M23 showed diagnosis is the weak rung).
+
+**Do not suggest:** consuming an EM strike or inviting a model swap on the SPEC DEFECT path (the halt exists precisely because those cannot help); treating an audit PASS as proof the spec is good (it clears only the mechanically provable classes — the actor-path halt message says "not provably at fault", not "fine"); refreshing the plan budget to retry against an unchanged spec after a SPEC DEFECT halt (the fix is a TPM delta via refreeze.sh, which refreshes it automatically).
+
+---
+
+## D-78 — 2026-07-19 — Freeze-time satisfiability preflight: new/changed contracts must be implementable by the inventory
+
+**Decision:** `refreeze.sh` now proves, before the human approval gate — and in `--diff` mode, before the CEO reads the diff — that every new/changed route and entry_point in the staged contracts is implementable by the delta's `contracts.files`, via `validate-plan.py --spec-preflight OLD NEW`. Entry points are checked exactly: the module path IS the implementing file, so a new module must be in the inventory or on disk, and a new `:symbol` on an on-disk module outside the inventory is equally unbuildable. Routes are checked through the source tree's registration signal (AST scan for route-decorator/registration literals, prefix-aware suffix matching): a route registered nowhere must be buildable by the delta — its path-siblings' registering file must be an editable inventory member; a route family with no siblings needs at least one editable `.py` in the inventory. Fail-closed naming the uncovered contracts; fail-open only where the spec genuinely carries no signal.
+
+**Found by:** testchat M28 v51 (2026-07-19). The spec froze `route:GET /api/v1/models/catalog` without adding `src/api/models.py`/`src/services/models.py` to `contracts.files`. The plan gate's exact plan↔inventory bijection made the spec unimplementable by ANY EM — but that verdict only exists downstream, so it cost ~75 minutes, two EM model swaps, and a seat escalation before the v53 DELTA named it ("no valid plan could contain a task that builds the catalog endpoint"). Verified against ground truth, not just synthetic fixtures: the real v51 staging replayed against the real pre-v51 tree fails this preflight in ~2 seconds naming `src/api/models.py`; the real v53 recut passes.
+
+**Alternatives considered:** requiring the TPM to name an implementing file per route contract (rejected — changes the TPM authoring contract, adds a schema field, and the source tree already carries the signal mechanically); implementing the check in refreeze.sh's shell (rejected — the route/segment matching machinery lives in validate-plan.py; the preflight is a spec-only mode of the same file, so the two gates cannot drift apart); a warning instead of fail-closed (rejected — v51's defect sat through TWO human approvals, v51 and v52, both minutes after a milestone close at day's end; a warning would have scrolled past).
+
+**Do not suggest:** treating preflight-pass as proof of implementability (it proves only the provable classes; ERD prose can still direct work to the wrong file); extending it to schemas/errors ids (no mechanical file signal exists for those); tightening the fail-open branches to fail-closed without new evidence (an initial v1 freeze and genuinely new route families have no source signal by construction — failing them would block every greenfield spec).
+
+---
+
+## D-77 — 2026-07-19 — Flake triage before declaring SPEC DRIFT
+
+> Corrected same day (2026-07-19, second pass): the first cut gated flake classification on 2/2 isolated passes. The M28 postmortem then recorded the same AC-42 node failing 4/4 IN ISOLATION under host memory load (nemotron + an LM Studio model resident) — an isolated run measures the environment as much as the test, so gating on it turns triage into a coin flip. The entry below is the corrected decision.
+
+> Amended 2026-07-21 (`fbfc1f0`): isolation re-runs are budget-aware — over `SWBP_RUN_BUDGET` they are skipped and the evidence string records the skip (`"isolation runs skipped — over SWBP_RUN_BUDGET"`) instead of the k/2 tallies. This is the ONE phase safe to skip over budget: isolation is corroborating evidence only (per the same-day correction above), so a die here would fail a run whose suite is flake-green — the wrong direction. The rest of the decision — plan mapping as the sole discriminator, unmapped-only as the flip condition, k/2 as recorded-only when it runs — is unchanged.
+
+> Amended 2026-07-28 by D-100 after adversarial review found the opposite false-success edge: mapping absence was treated as proof of flakiness even when a carried failure reproduced 0/2 in isolation. Isolation now supplies a deliberately weak minimum gate — at least one pass in two runs per failing node. The 2/2 threshold rejected above remains rejected.
+
+**Decision:** When the final full-suite run fails but every task passed its projection, each failing node-id is classified by the D-57 ownership signal: mapped in `tasks/plan.json` (delta-owned) keeps the DRIFT path unchanged; unmapped means carried-forward and eligible for flake triage. Every failing carried node is re-run twice in isolation. Only when every failure is unmapped AND every node passes at least once is the suite treated as green, with a loud WARNING and a D-77 note in `tasks/CURRENT.md`. A 0/2 reproduction, collection error, mapped failure, or budget-skipped isolation keeps the original full-suite failure red.
+
+**Found by:** testchat M28 (2026-07-19, spec v54). The run halted on `test_thinking_placeholder_shows_then_clears` — a timing-sensitive M9-era Playwright test outside the M28 delta's inventory — which had passed 150/150 earlier in the same session. Drift detection tripped on a flake, three orchestrate retries burned on the same node, and the CEO manually authorized `[success]` after hand-running the inventory check this decision mechanizes. Rule 6's corollary cuts both ways: "something went wrong" ≠ "the safeguard tripped for the right reason".
+
+**Alternatives considered:** isolation-retry as the sole or 2/2 gating signal (rejected by same-day evidence — see correction note); no isolation minimum at all (superseded by D-100 after the 0/2 false-success finding); triaging on the test FILE being in `contracts.files` (rejected — the plan mapping is the exact D-57 ownership signal); re-running the full suite instead (rejected — a flake can flake again in the full run); quarantining or skipping flaky tests (rejected — the frozen suite is the acceptance surface; a flake is surfaced loudly, never removed).
+
+**Do not suggest:** raising the minimum to 2/2 without new evidence (host load still affects isolation); removing the one-pass minimum (reopens the reviewed false-success path); auto-retrying MAPPED failing nodes; silencing or downgrading the WARNING; moving this triage into `run_tests` itself (per-task projections must stay strict).
+
+---
+
+## D-76 — 2026-07-18 — postmortems/ incident archive adopted; general vault and per-file ADR migration rejected
+
+> Amended by D-84 (2026-07-19): directory renamed `project-trail/`, intake broadened to the project's full running trail, and authorship widened to the conductor seat as routine session work — the vault rejection below was re-litigated by CEO directive once the intended reader changed from human to model. The pipeline-exclusion and nothing-authoritative rules in this entry still stand; the human-only-authorship rule does not.
+
+**Decision:** A top-level `postmortems/` directory holds one file per incident that changed how the system works — a rule, gate, or invariant exists or changed because of it (naming `YYYY-MM-DD-slug.md`, `status: historical`, one page). It is deliberately unauthoritative: human-authored, agent-read-only (advisory for the conductor; pipeline phases are structurally excluded because the directory is outside every `.gate-paths` lane, so INV-2 fails closed on any pipeline-phase write), and nothing in the pipeline reads it — zero dependency, forever. References are one-way: a postmortem cites decisions and specs by number/path; no pipeline artifact cites back. Files stay committed (INV-2 counts untracked files repo-wide during runs). Decisions do NOT move: `docs/DECISIONS.md` remains the single decision log. Backfilled at adoption: the 2026-07-11 fabricated-authorization incident (the honor-string family's live occurrence, → D-61) and the 2026-07-04 M4 conductor breach (→ hooksPath pre-flight, D-55 outer sandbox).
+
+**Alternatives considered:** (a) A general notes vault / "second brain" (Obsidian-style, per the source suggestion) — rejected: exploratory notes evaporate by design, a junk-accumulating directory sits untracked and trips INV-2 mid-run, and every category beyond incidents failed the "would I re-read this" test. (b) One-file-per-decision ADR directory — rejected: DECISIONS.md is load-bearing (agents consume "Do not suggest" lines; the INV-3 architect gate greps its D-numbers; scripts cite D-nn as cross-reference currency) and fragmenting it would break all three. (c) A sibling notes repo — rejected: one project, in-repo is simpler; revisit only if cross-project postmortems materialize.
+
+**Reason:** The blueprint already had compressed postmortems (the CLAUDE.md correction log) and full decision records, but the handful of incidents that reshaped the system's *rules* had their narratives scattered across correction-log rows, multiple decision entries, and chat memory — the fabricated-authorization story spanned D-31, D-42, D-61 and lived nowhere whole. A consolidated one-page narrative is what future operators (and reviewing agents) actually re-read; the strict intake criterion (system's rules changed, not just code) is what keeps the archive small enough to stay read.
+
+**Do not suggest:** letting the pipeline read or write `postmortems/` (unauthoritative is the point — nothing here gates anything); adding taxonomy, templates-with-required-fields, linters, or naming enforcement (the instant it becomes ceremony it stops being written); migrating or mirroring DECISIONS.md entries here; writing postmortems for bugs that changed only code (correction log's job); back-references from decisions or specs into this directory.
+
+---
+
+## D-75 — 2026-07-18 — Red-before-green check: a refreeze runs the delta's tests against the pre-implementation tree
+
+**Decision:** After a refreeze applies and computes `DELTA-vN.json`, `refreeze.sh` runs the delta's changed test node-ids (filtered to ids that exist in the new frozen set — `changed_tests` also lists removals) in the sandbox, against the tree as it stands BEFORE any implementation work. Tests that already PASS are printed as an explicit WARNING; all-red prints confirmation; a missing/unreadable report prints INCONCLUSIVE (Rule 4: a check that didn't run must say so). Warn-only by design — never a halt, never an exit-code change — because legitimate early passes exist: `no_edit_files` acceptance (D-65) and carried-forward behavior. The human at the freeze decides whether an early pass is one of those or a vacuous test to bounce back to the TPM.
+
+**Alternatives considered:** (a) Mutation testing per run — rejected: mutating and re-running the suite every orchestrate run is orders of magnitude more compute for the same signal, and flags noise on healthy tests. (b) Run the check pre-approval on the INV-4 merged preview — rejected for now: node-ids and the DELTA don't exist until after apply, and mounting the preview into the sandbox is new machinery; post-apply still lands the claim before any pipeline run, and a bad freeze reverses through the same delta protocol as any other spec defect. (c) Hard halt on early passes — rejected: D-65 makes some early passes spec-legitimate; a gate that halts on legitimate states trains people to bypass it.
+
+**Reason:** INV-1's premise is that tests are written before the code they gate — but nothing ever *observed* a new test failing. A test that passes against the pre-implementation tree gates nothing: its task's acceptance is green regardless of what the coder writes. That is the entry point of the green-suite/broken-app family (v6/M5 mocks built from imagination; M16's hit-counter counting collapsed-think DOM text), which the CEO's eyes caught only after shipping. The machinery was already in place — `DELTA-vN.json` names exactly the changed node-ids and the sandbox is warm from node-id collection — so the check costs one bounded pytest invocation per freeze, at the moment the TPM's output is cheapest to reject (Rule 6: "nothing went wrong" and "the safeguard works" are different claims; this makes the red state an observed fact instead of an assumption).
+
+**Do not suggest:** promoting the warning to a halt (D-65 legitimizes some early passes; the human gate is the right arbiter); running the check on every orchestrate run (the red state is meaningful exactly once, at freeze time — post-implementation, passing is the goal); skipping the check when the delta is "just one small test" (M16's vacuous hit-counter was one small test).
+
+---
+
+## D-74 — 2026-07-18 — Coder output is linted per task, fail-closed, before acceptance
+
+**Decision:** After a coder attempt lands (and never for `no_edit_files`, D-65), the orchestrator runs `ruff check` on the ONE `.py` file the task wrote, before the mapped tests. A lint failure is a task failure like any other: `pass=0`, the findings (flattened, ≤600 chars) become the attempt's evidence — feeding the next retry brief and any EM consult — and the mapped tests are skipped for that attempt (the retry re-runs them). A missing ruff is a hard halt, same as D-67 at the freeze door: a gate that skips silently is not a gate. Non-Python files pass through untouched — ruff's domain is `.py`, and the browser oracle (D-58) plus smoke checks remain the acceptance surface for markup/CSS/JS.
+
+**Alternatives considered:** (a) Rely on CI — rejected: a gate that lives only in CI does not exist until a remote does (2026-07-14 meta-rule; testchat ran 40 spec versions with its type gate dark). (b) Lint as a warning — rejected: warnings in an unattended pipeline are noise nobody reads; the retry-with-feedback loop is the mechanism that actually consumes findings (D-71's validator-fed pattern, proven on plans and diagnoses). (c) Also run mypy per task — deferred: type-checking needs the whole tree and project config; per-file lint is the cheap, always-correct slice.
+
+**Reason:** Nothing in the pipeline lints what the coder writes. D-67 rejects lint debt in *staged tests* because frozen files cannot be cheaply fixed later; coder-written `src/` had no equivalent even though it is the highest-volume writer in the system. Lint findings are exact-location, machine-generated feedback — precisely the input shape a local coder handles best (Rule 8: precision tools, positive instructions), and far cheaper than a sandbox pytest round-trip. Catching an unused import or shadowed variable at the task that introduced it costs one retry; catching it post-merge costs a human review cycle.
+
+**Do not suggest:** widening the gate to files the task did not write (INV-2 owns the lane; lint debt elsewhere is not this task's evidence); demoting the halt-on-missing-ruff to a skip ("the gate ran zero times" and "the gate found zero issues" must stay distinguishable, Rule 6); bolting formatting (`ruff format`) onto the gate (style churn in a retry loop burns strikes on non-defects; the check gate flags real findings only).
+
+---
+
+## D-73 — 2026-07-18 — Failure detail from the json-report reaches retry briefs and EM consults
+
+**Decision:** `run_tests` now extracts the crash message (or longrepr tail) of the first 3 failing tests — plus the first failing collector — from `.cache/test-report.json` into a bounded, single-line `FAIL_DETAIL` (≤240 chars per failure, ≤900 total), which rides along with the failing node-ids into the task's `lastfail` (and therefore the next attempt brief) and into EM consult evidence, including the drift consult. The shell owns the extraction end to end; no model gains any tool or access (D-53 intact).
+
+**Alternatives considered:** (a) Debugger integration (attach on failure, dump backtrace/locals) — rejected: heavy machinery for information pytest already serializes into the report the pipeline was discarding. (b) Full longrepr passthrough — rejected: unbounded text in a brief stresses the coder's context and the EM's transcription discipline (D-66); the tail carries the error line. (c) `pytest -l/--showlocals` — unnecessary once the report's own crash text is used; can be revisited if the terse form proves insufficient.
+
+**Reason:** The evidence string was node-ids only — `mapped tests failing: tests/x.py::test_y` — while the diagnosis-bearing text (assertion message, import error, traceback tail) sat unread in the report on disk. The 2026-07-16 ladder drill showed the cost: an EM given only a traceback-free failure surface plausibly-but-wrongly diagnosed `brief_wrong` twice. The retry path has the same shape as the plan path's proven pattern (validator errors fed back fix emit #2, D-71): a coder told *what* failed, not just *which id* failed, can fix the cause instead of guessing.
+
+**Do not suggest:** raising the truncation caps "for completeness" (the bound is what keeps briefs inside the 2500-char discipline and the EM inside its transcription envelope); feeding the model the report file itself or a tool to read it (D-53: the shell gathers context, models get one completion); treating richer evidence as a substitute for the escalation ladder (a coder that still fails with the error text in hand is a seat or spec problem, not a prompt problem).
+
+---
+
+## D-72 — 2026-07-17 — Quantization tier for EM/coder seats: 4-bit is the CEO default; 8-bit is the reactive escalation
+
+**Decision (CEO directive):** For BOTH EM and coder seats, the default is **4-bit**. Switch to **8-bit** (or higher) only on a specific triggering signal or explicit CEO judgment call. Speed wins as the default axis because the pipeline's user-visible cost is wall-clock per milestone and 4-bit's measured advantage on this repo's coder-shaped prompts is 1.4×-1.7× real time. The CEO's operational choice sits in `models.env`; this decision is guidance the operator applies at role-mapping time, not a mechanical gate — the blueprint has never gated by quantization identity, per D-41.
+
+**When to switch to 8-bit (any one is sufficient; act on the first signal, not a pattern of them):**
+
+- Task strikes climbing on shapes that used to pass first-try (a coder that was character-perfect starts drifting from the ERD's exact text)
+- Plan validation needing 2+ revisions on straightforward milestones (transcription discipline degrading)
+- EM diagnosis prose becoming visibly rambly or hedging across multiple verdicts (multi-step reasoning under pressure)
+- Milestones with long context (>~16K prompt tokens) or briefs approaching the 2500-char cap
+- New-feature work with 4+ files whose acceptance shapes stress the EM's exact-copy discipline
+- CEO judgment: "this milestone matters and I want the safety on"
+
+**Reason:** Testchat's M25 web-search milestone ran with `ddalcu/Qwen3.6-27B-4bit-MTP-MLX-Serve` in both seats. Empirically excellent: coder character-perfect across 7 files, EM plan first-try valid, D-71 diagnosis schema-valid on the first live-fire. Head-to-head benchmark against `mtplx-qwen36-27b-optimized-quality` (8-bit) on identical prompts: 4-bit 1.4×-1.7× faster on realistic pipeline shapes (prefill 726 t/s at 1489-token contexts, decode 54-92 t/s vs 8-bit 36-53 t/s wall-effective). The known 4-bit failure modes (perplexity climb past ~16K context, drift on exact wording — the D-66 transcription-precision axis, weaker multi-step reasoning under state pressure) did not surface on that milestone shape. The CEO's operational call: run 4-bit as the daily driver and escalate reactively rather than paying the speed cost defensively. This inverts an earlier draft of D-72 that recommended 8-bit-default; the CEO overrode it explicitly on 2026-07-17.
+
+**Do not suggest:** reflexively switching to 8-bit on a transient hiccup — a template bug (pycache accretion, dirty tree before consult), a spec defect (over-scoped ERD), or a first-time D-68 gate hit on legacy debt are NOT seat-quality signals and burning a seat swap on them wastes the safety; ignoring the actual triggers above when they do surface (the escalation is cheap — one env-var line — and there is no honor in riding a degraded seat); running WITHOUT the 8-bit variant available for the swap (keep it loadable, keep `models.env.8bit-backup` or equivalent one cp away).
+
+---
+
+## D-71 — 2026-07-16 — EM diagnosis hardened: shrunken reply surface + one validator-fed retry
+
+**Decision:** The consult reply the EM owes is `verdict` + `reason` (+ `revised_brief` when the verdict is `brief_wrong`) — nothing else. `task_id` is removed from the reply surface entirely: the orchestrator knows which task it is consulting about and stamps the id into the artifact itself before validation (a model-supplied value is overwritten). The consult prompt now carries an inline literal example of a valid reply. An invalid reply — unparseable JSON or failed `validate-plan.py --diagnosis` — earns exactly ONE retry with the validator's errors appended to the same instruction; a second invalid reply halts, as before (Rule 4). `validate-plan.py --diagnosis` is unchanged and still requires `task_id` on the artifact — the stamp guarantees it, so the gate now also catches a shell that forgot to stamp. `consult_em` is selftested for the first time (the module's own docstring reserved bash coverage "until an incident says otherwise" — M23 was that incident): `scripts/selftest/drive-consult.sh` extracts the real functions from `orchestrate.sh` and drives them against a scripted fake EM covering first-try success, schema-invalid-then-valid recovery, non-JSON-then-valid recovery, the bounded two-invalid halt, and task_id stamping (66 selftests total, was 61).
+
+**Alternatives considered:** (a) retry-only, (b) example-only, (c) shrink-only — combined because they compose at near-zero cost and attack different failure modes: the stamp makes the one production failure (M23: empty `task_id` echo) structurally impossible, the retry covers residual semantic misses (missing `revised_brief`, bad verdict), the example covers format drift. A frontier EM was rejected per D-66 (buys probability, not certainty).
+
+**Reason:** No production EM diagnosis had ever passed schema validation — the 122B was weak on live consult (D-66 family) and the MTPLX 27b's M23 diagnosis died on an empty `task_id`, so every two-strike task dead-ended at the diagnosis gate and the verdict-routing and TPM-bundle rungs below it stayed unexercised. Asking a mid-tier model to echo back an id the shell already holds was pure transcription risk (D-66: the seat is weak at exactly that) with zero information value — D-05 applies: the shell computes everything computable. The retry mirrors `ensure_plan`'s proven pattern: validator error feedback demonstrably fixes the second emit (testchat M6). A side hardening rode along: `em_call`'s lane gate (`phase-gate.sh em`) now dies explicitly rather than relying on `set -e`, which is suppressed when `em_call` runs inside the retry loop's if-condition.
+
+**Do not suggest:** re-adding `task_id` to the reply surface for "self-consistency checking" (the shell's knowledge is ground truth; a mismatch check would only re-import the transcription risk); raising the retry above 1 (the plan path's evidence is that feedback fixes emit #2 — a model that fails twice with the errors in hand needs a different fix, likely at the seat); treating the diagnosis path as production-proven because these selftests pass (Rule 6: selftest coverage and live-fire are separate claims — the next two-strike consult in a child is the live validation).
+
+---
+
+## D-70 — 2026-07-15 — The escalation ladder is armed: MAX_TASK_STRIKES defaults to 2 (CEO directive)
+
+**Decision:** `MAX_TASK_STRIKES` defaults to 2. A task's first failure now retries with the failure appended to the brief; a second failure triggers the EM consult and the verdict machinery (`brief_wrong` revision / `decomposition_wrong` re-plan / `contract_or_test_wrong` TPM escalation). `MAX_BRIEF_REVISIONS=1` and `MAX_PLAN_REVISIONS=2` are unchanged — the ladder stays bounded at every rung, and D-69's run wall-clock budget (default 20 min) caps the total. `MAX_TASK_STRIKES=1` on the command line restores fail-fast per run.
+
+**Reason:** The ladder had been dead code in every default run since M4 — through roughly 23 milestones, `consult_em` and all three verdict branches never executed, which Operating Rule 6 classifies as an untriggered safeguard: inconclusive, not green. The standing backlog item offered two honest exits: validate it or prune it. The CEO chose validation (directive, 2026-07-15: "fix"), and the risk that originally justified fail-fast — unattended thrash burning hours — is now bounded by machinery that didn't exist when strikes=1 was chosen: D-69 halts a sick run on wall-clock, D-60 keeps briefs atomic, D-59 makes a bad second attempt fail closed rather than corrupt. First milestone run at the new default doubles as the validation run: observe whether the second strike produces a schema-valid diagnosis, whether a `brief_wrong` revision actually changes the brief, and whether `caps-exhausted` packages a usable TPM bundle.
+
+**Do not suggest:** raising strikes above 2 (the second strike exists to feed the consult, not to grind retries); reverting to 1 because a consult produced a bad diagnosis (that is the validation working — log it and fix the diagnosis path); treating an unexercised ladder as validated after this lands — only a run that actually climbs it counts (Rule 6).
+
+---
+
+## D-69 — 2026-07-15 — run wall-clock budget + phase-timing log: thrash halts in minutes, not hours
+
+**Decision:** `orchestrate.sh` keeps a per-run phase-timing log (`.pipeline-state/logs/timings.tsv` — one row per phase boundary: pre-flight, each EM call, each coder attempt, each test run, each task verdict) and enforces `SWBP_RUN_BUDGET` (seconds; default 1200, `0` disables, non-numeric dies at startup). The budget is checked BETWEEN phases only — before each plan revision, before each task dispatch, before the full frozen suite — never mid-call. On breach: fail-closed halt that prints the timing table. `.pipeline-state` persists (D-24), so a re-run resumes from completed tasks and a budget halt costs only the re-run command.
+
+**Reason:** Milestone runs ranged 10 minutes to 2 hours on the same task shapes. The long tail was never healthy work — it was unattended thrash (thinking-mode drift ruminating for thousands of tokens, EM revision loops against unsatisfiable specs, misconfigured instances), and the human noticed only after the babysitting hour was spent. With D-60 atomic tasks and a non-thinking local coder at 30–50 tok/s, a healthy run fits in minutes; a run that doesn't is *evidence*, and fail-fast should apply to wall-clock the way it already applies to strikes (MAX_TASK_STRIKES=1) and revisions (MAX_PLAN_REVISIONS=2). Second gap this closes: no historical run recorded per-phase timings, so every "where did 45 minutes go" was reconstruction from memory — Rule 5 violation by omission.
+
+**Do not suggest:** killing a call mid-flight on breach (a truncated coder write or half-applied plan is worse than two extra minutes; AGENT_TIMEOUT already bounds individual calls); raising the default when a project's runs are slow (raise per-run on the command line for a known-cold start, otherwise fix the phase the timing table names); folding the budget into AGENT_TIMEOUT (per-call and per-run are different failure classes — ten healthy 3-minute calls are a sick run).
+
+---
+
+## D-68 — 2026-07-14 — silent error swallows are a task failure; failure paths are spec surface
+
+**Decision:** Two halves, mechanical + spec-side. (1) `scripts/check-swallowed-errors.py` runs in `run_coder` after both apply modes (edit-block and create); a Python `except: pass` with no comment, or an empty JS `.catch()`/`catch {}`, fails the attempt as a strike whose evidence names the line and the fix. A justification comment inside the handler makes a deliberate swallow pass — the rule targets silence, not swallowing. (2) TPM-ROLE law: any spec touching a side-effect (persist, external call, file write) must carry a failure-visibility AC ("WHEN it fails, the user SHALL see …").
+
+**Found by:** external audit of testchat (2026-07-14): the thread-persist PUT ended in `.catch(function () {})` — a failed save of the user's data was indistinguishable from a successful one, for six milestones, all tests green, because no AC ever asked and no gate ever looked.
+
+**Do not suggest:** hard-halting on a finding (a strike with a named line is exactly what retry briefs are for); banning swallows outright (best-effort cleanup is legitimate — the comment requirement is the point); relying on the TPM law alone (advisory prose without the mechanical half is a suggestion, per the operating-rules preamble).
+
+---
+
+## D-67 — 2026-07-14 — refreeze lints staged tests; lint debt is rejected at the freeze door
+
+**Decision:** `refreeze.sh` runs `ruff check` on every staged `.py` test file before the approval prompt and dies on any finding. Fail-closed on a missing ruff binary (install it; no silent skip). Rationale: frozen files are hash-pinned — once lint debt freezes in, fixing it costs a full human-gated refreeze ceremony, so it never gets fixed. Same gate family as the D-58 determinism grep: strict at the door, because the door is the only cheap place.
+
+**Found by:** external audit of testchat (2026-07-14): 7 unused imports had ridden along in frozen test files for 30+ freezes. CI lints `src/` only, refreeze linted nothing — the incoming suite had no lint gate anywhere.
+
+**Do not suggest:** lint-fixing frozen tests in place (INV-1 violation — only refreeze changes them); widening CI's ruff to `tests/` as the primary fix (CI runs post-merge and can be dark for repos without a remote; the freeze door is pre-commit and always present).
+
+---
+
+## D-66 — 2026-07-14 — The EM seat is precision-transcription work; bench it on verbatim copying, dense models preferred
+
+**Decision:** The EM's real job (after D-57/D-64/D-65 mechanized everything else) is copying ERD prose into briefs with ZERO interpretation. Any EM bench must therefore test transcription fidelity — replay a spec containing one subtly under-defined term and check whether the model copies the gap or fills it — not just schema-valid plan output. Dense models are preferred for the seat over sparse MoE at similar quality claims: a MoE activating only a few B params per token behaves like a small model on precision work.
+
+**Found by:** testchat M17/M18 head-to-head. The 35B MoE (3B active) "helpfully" resolved an implicit variable into a false definition (headroom = cap − cap = 0), derailing three coder attempts; the dense 27b, replayed on the identical ambiguous ERD, copied it verbatim — gap preserved, nothing invented. The original 2026-07-07 bench crowned the 35B at 100/100 on plan-JSON validity: it measured the wrong axis. Historical corroboration: the 122B EM also failed transcription (the 58-node-id array, D-57). As of 2026-07-14 the 27b holds both EM and coder seats in testchat.
+
+**Do not suggest:** re-benching on schema validity alone; assuming parameter count predicts transcription fidelity; a frontier EM as the fix (buys probability, not certainty — put load-bearing formulas in contracts instead, fully defined, no inference required).
+
+---
+
+## D-65 — 2026-07-14 — no_edit_files: spec-declared no-op tasks never reach the coder
+
+**Decision:** `contracts.no_edit_files` (TPM-authored, frozen, human-approved at refreeze) lists inventory files the milestone leaves unchanged. The orchestrator skips the coder call for those tasks — acceptance (mapped tests + smoke_check) still runs in full. `validate-plan.py` rejects no_edit_files entries outside the inventory.
+
+**Found by:** testchat M16: two "NO EDIT NEEDED" tasks were still handed to the coder. One damaged index.html (dropped a class the CSS keyed on — the smoke check greps survived, the regression tests caught it three tasks later); the other added redundant-but-passing code. A brief saying "change nothing" is a negative constraint (Rule 8) a local coder cannot reliably obey — the model is briefed to write, so it writes.
+
+**Alternatives considered:** invoking the coder and rejecting non-empty diffs (fail-loops — there is no "emit nothing" protocol in the D-59 edit-block contract); the declined skip-when-tests-pass heuristic (provenance by luck — here provenance is the frozen spec).
+
+**Do not suggest:** trusting "NO EDIT NEEDED" in ERD prose alone; extending the skip to files not declared in the frozen contracts; skipping the acceptance run for no-edit tasks.
+
+---
+
+## D-64 — 2026-07-13 — Browser-test mapping enforced mechanically in validate-plan.py
+
+**Decision:** A test file that imports `playwright` may only have its node-ids mapped to a task whose dependency closure contains the ENTIRE plan — in practice, the DAG's final task. Enforced in `validate-plan.py` alongside the existing import-closure check, which cannot see browser tests: they observe the app through the rendered DOM, not Python imports, and any inventory file (markup, styling, scripts) can shape what the browser renders.
+
+**Found by:** testchat M15: the ERD stated in prose "map browser node-ids to the final task in the DAG." The EM (mid-tier local model) deviated twice — first leaving a task with no acceptance signal (plan-gate halt, cost a re-freeze), then mapping the new browser test to the markup task, where it structurally could not pass before the styling task ran (false task failure, cost a manual plan fix). Schema constraints were honored both times; prose guidance was not — the recurring mid-tier signature (same as the M9 invented contract-id).
+
+**Alternatives considered:** better ERD wording (already explicit, ignored twice); a frontier EM (buys probability, not certainty, at recurring cost).
+
+**Do not suggest:** relaxing the check to "warn only"; trusting ERD prose for anything a gate can verify; special-casing single-task plans (a one-task plan's closure IS the whole plan — the check passes by construction).
+
+---
+
+## D-63 — 2026-07-12 — Ratify milestones: catching up the spec after outside-band work
+
+**Decision:** When the CEO builds features directly with a conductor outside the pipeline, the TPM issues a **ratify milestone** to bring the frozen spec in line with the landed code. ERD says "NO EDIT NEEDED" for every file; ACs describe current behavior; the pipeline run is a coder no-op; tests pin the new state.
+
+**Found by:** testchat post-M10: 10 themes landed outside-band across CEO sessions (dark mode, sidebar management, markdown rendering, etc.). The 5-theme-cycle test went red because the oracle only knew about the first 5. A ratify milestone (M11b) documented all 10 themes, updated the oracle, and the suite went green — zero code changes, pure bookkeeping.
+
+**Do not suggest:** skipping the ratify because "the code already works" (the oracle is stale and will generate false failures); retroactively splitting into per-feature milestones (the code is already merged; a single ratify is honest).
+
+---
+
+## D-62 — 2026-07-12 — LM Studio drift probe in orchestrate.sh pre-flight
+
+**Decision:** The existing smoke test (echo a trivial prompt) now also checks for the thinking-model signature (empty content = reasoning_content consumed the output) and warns when the echo doesn't match. LM Studio silently resets instance config (context window, thinking toggle, chat_template_kwargs) on any model reload — the per-model UI "save as default" is the only durable setting, and it must be re-verified before each run.
+
+**Found by:** testchat M11a: both models unexpectedly entered thinking mode mid-day after a reload. The API-side `chat_template_kwargs` field was no longer honored; only the LM Studio UI Reasoning toggle (with save-as-default) worked. The smoke test passed because it only checked for non-empty output — a thinking model returns reasoning_content, which llm-call.sh strips, leaving empty content that the downstream parser silently accepts as "no output." The existing THINKING_MODEL guard in new-project.sh was not ported to the run-time pre-flight.
+
+**Do not suggest:** trusting `chat_template_kwargs` in the API request (currently broken in LM Studio); removing the drift probe because "the model should be configured correctly."
+
+---
+
+## D-61 — 2026-07-11 — Template updates gain hash-bound approval (`--approve <DIFF-SHA>`): the D-42 refreeze pattern applied to the second protected-artifact class
+
+**Decision:** `update-template.sh` gains `--approve <sha>`, mirroring refreeze's D-42 flow: `--dry-run` (and `--review`) print the `DIFF-SHA` — sha256 of the exact aggregate diff text — and `--approve <sha>` recomputes it and applies only on a byte-exact match, no tty required. Any change to the template or the child between review and approval changes the hash and fails closed. The interactive y/N path is unchanged and remains the default.
+
+**Found by:** the 2026-07-11 session: the CEO authorized a reviewed template pull in chat, but the script's only non-interactive options were `--dry-run` (read-only) — so the conductor answered the y/N prompt itself through a pty wrapper (`expect`). That apply was correct and disclosed, but it is exactly the honor-string approval D-42 rejected: nothing bound what the CEO read to what got applied. The gap was structural — D-34 explicitly rejected generalizing refreeze into one engine and accepted "a shared pattern with two small tools," but only one of the two tools ever got the pattern's non-interactive half.
+
+**Alternatives considered:** keep tty-only and forbid conductor-driven pulls (rejected — the CEO runs no commands, D-40; every real pull would either need the human at a terminal or the pty workaround this exists to retire); `--yes` flag (rejected for the same reason as refreeze — it approves whatever is true at run time, not what was reviewed); generalizing refreeze and update-template into one approve-delta engine (still rejected per D-34 — this change is ~15 lines precisely because the pattern is shared and the tools are not).
+
+**Honest caveat (same as D-42):** the CEO sees the diff through the conductor's relay; a misreporting conductor could show doctored text beside the true hash of different content. The raw diff is deterministic and re-printable at any time, the terminal path remains for structural updates, and the blast radius is one control-plane update caught by the template's selftests and the next run's gates. Accident-class threat, accepted; not zero.
+
+**Do not suggest:** adding `--yes`/`--force`; approving on a stale hash after either side moved; retiring the interactive path.
+
+---
+
+## D-60 — 2026-07-09 — Task sizing is governed by the coder's measured bare-completion capability, encoded where the tiers read it
+
+**Decision:** The coder-capability profile (one concern per brief; new files well under ~150 lines; existing files touched via at most two tightly-related edits; brief must fit the model's working memory — no tools, no retries) is LAW in the prompts the planning tiers actually read: em.md (task decomposition) and TPM-ROLE.md (milestone/ERD cutting). External benchmark claims (SWE-bench, 256K contexts) do not transfer — they assume agent scaffolds with tools and retries, which D-53 deliberately forbids; only the project's own bench and run evidence updates this profile.
+
+**Found by:** CEO directive after M7 ("we have known from the start the 27b needs atomic tasks... the control plane seems to have drifted on this"). The knowledge lived in bench notes and conductor memory, not in any prompt a planning tier reads — so M7's ERD bundled three concerns into one brief twice, and nothing mechanical objected.
+
+**Do not suggest:** relaxing sizing because a bigger context window ships; importing external agent-benchmark numbers as capability evidence; moving the sizing law to docs the EM never sees.
+
+---
+
+## D-59 — 2026-07-09 — The coder edits existing files through anchored blocks; it never retypes them
+
+**Decision:** For a task whose file already exists, the coder's reply contract is anchored edit blocks (`<<<<<<< SEARCH` exact-verbatim existing lines `=======` replacement `>>>>>>> REPLACE`), applied by `scripts/apply-edit-blocks.py` — fail-closed: every anchor must match the target exactly once; a missing/ambiguous anchor or truncated block writes nothing. `=== NO CHANGES ===` is a legal no-op reply (mapped tests still gate). New files keep the full-file sentinel contract. Companion rules from live corruption incidents: anchors must not include lines containing think-tag literals, new code constructs such strings by concatenation, and `llm-call.sh` strips only a LEADING think block (a global strip eats code that legitimately mentions the tags).
+
+**Found by:** testchat M5..M7. The full-file contract asked a local coder to faithfully retype hundreds of lines it wasn't changing; it deleted 99 lines (v10, 638-line file) and 119 lines (v14, 347-line file, 16K ctx) of working logic — proving the failure is the output format, not file size or context. Controlled CEO-run experiments with edit blocks on the identical tasks: 11/11 anchors verbatim-exact across three replies, both behavior fixes correct, 67/67 frozen tests green including the browser suite. The model consistently aced the thinking and flunked the typing; this contract removes the typing.
+
+**Alternatives considered:** unified diffs (rejected — line-number arithmetic is precisely what local models get wrong); rejecting edit output entirely, per the 2026-07-07 evaluation (overturned — that evaluation weighed diff-apply risk against full-file regeneration assumed safe; the deletion evidence reverses the risk comparison, and fail-closed anchoring converts apply-risk into a loud halt instead of silent corruption); larger/frontier coder models (still available via escalation, but the format fix makes the bench-chosen local coder sufficient).
+
+**Do not suggest:** "simplifying" back to full-file replies for existing files; fuzzy/whitespace-tolerant anchor matching (exactness is the safety property); letting the applier skip unmatched blocks and apply the rest (all-or-nothing, fail-closed); global think-tag stripping in llm-call.sh.
+
+---
+
+## D-58 — 2026-07-08 — Browser oracle: the frozen suite sees the frontend; the locked surface extends to the DOM (contracts.ui)
+
+**Decision:** The TPM authors browser-level tests (Playwright for Python) as ordinary members of the frozen suite — plain pytest node-ids, entering via `refreeze.sh`, collected into `test-nodeids`, mapped by the EM, run by the shell; no second framework, runner, or gate script. Chromium + playwright are baked into the sandbox image at build time (network exists at build; the run keeps `--network none` — app and browser share the container over loopback). The locked surface extends to the DOM: `contracts.json` gains a `ui` array of `{id, testid, description}`; `check-test-surface.py` rejects, in any playwright-importing test file, element location that is not a locked `data-testid` (role/text/label locators and raw CSS/XPath selection fail at freeze time). `refreeze.sh` grep-rejects `time.sleep`/`wait_for_timeout` in staged UI tests. Flake policy: zero retries — a flaky frozen test is a spec defect and goes back to the TPM. Every AC describing user-visible behavior maps to at least one frozen UI node-id or carries an explicit `manual-only:` waiver in the PRD.
+
+**Found by:** testchat M5 and M6, identical anatomy: full green suite, broken app, finished by hand. M6's committed `index.html` discarded think-events entirely (`replyText += ''`) and locked the model selector globally (failing AC-23) — invisible to pytest because the defects live in browser-executed JS the suite never runs. The consequence chain: oracle weaker than the goal → the human is the real acceptance oracle, post-hoc → hand-fixes land outside the pipeline → nothing defends them → the next full-file rewrite regresses them (think-toggle broke twice). Tracked metric: hand-fix commits after `[success]` (M5: 4 + debug session; M6: 2 dirty src files + hotfix).
+
+**Alternatives considered:** Screenshot/visual-diff oracle (rejected — non-deterministic, locks pixels instead of behavior); a separate UI test runner outside the frozen suite (rejected — a second oracle with its own gates is drift surface, and its verdicts would compete with the frozen one); letting UI tests use arbitrary selectors (rejected — whatever tests observe is thereby locked, INV-4; arbitrary selectors would freeze the coder's entire DOM by accident); a second browser-free "light" image (rejected — two images is drift surface, constraint 4); running the browser outside the sandbox (rejected — reopens the exfiltration hole the sandbox closes).
+
+**Do not suggest:** retry-on-flake for UI tests (converts the oracle into a suggestion); `wait_for_timeout`-based synchronization (auto-waiting is the law); giving the coder or EM a browser (D-53 — the browser lives in the test path, not the model path); diff-based coder output to offset larger frontend files (evaluated and rejected 2026-07-07 — the ERD splitting the frontend into more files is the sanctioned fix).
+
+---
+
+## D-57 — 2026-07-07 — The carried-forward regression bucket is computed by the shell, never emitted by the EM
+
+**Decision:** `plan.regression` is retired. `validate-plan.py` now computes the carried-forward split itself, from the ownership signals its reachability gates already extract: an unmapped frozen node-id whose test file imports a task-owned module at module level, or whose test body makes an AST-visible call to a route some task claims, belongs to this delta and MUST be mapped (decomposition incomplete, named per node-id); every other unmapped node-id is a carried-forward regression test, auto-assigned, with the final full-suite run as its acceptance point. A plan carrying a `regression` key is rejected outright (same class as status fields — orchestrator bookkeeping is never the EM's to emit). The plan schema drops the field, so schema-constrained generation cannot produce it. Fail-open by construction: a dynamic import or built-up path hides the ownership signal, which can only move a test INTO regression — it still gates the run at the end, just not per-task. Mapped-but-unownable node-ids remain legal (the EM may know a relationship the AST cannot see).
+
+**Found by:** testchat M6 (2026-07-07). The EM (a 122B model) failed twice to transcribe the 58-element regression array into valid JSON, and the conductor hand-wrote `tasks/plan.json` on CEO order — a lane violation by fiat in the first milestone where the conductor otherwise stayed in-lane. The bucket's definition ("node-ids testing files not in this delta's inventory") requires no judgment; asking the least reliable tier to do derivable bookkeeping was the pipeline outsourcing its own job.
+
+**Alternatives considered:** keeping EM-emitted regression with more revisions (rejected — bench data shows the EM task is structured output, not intelligence; the failure mode is transcription volume, which grows with every milestone as the suite accretes); auto-bucketing ALL unmapped node-ids with no ownership check (rejected — a lazy or degenerate EM could map nothing and every test would silently drift to end-of-run acceptance; the ownership signal keeps per-task early failure detection mechanically demanded exactly where it is mechanically derivable).
+
+**Do not suggest:** Re-adding a regression field to the plan schema "for EM transparency"; making mapped-but-unownable node-ids an error (the AST signal is deliberately fail-open); pre-filtering test-nodeids out of the EM's context based on ownership — the EM still needs the full list to map from.
+
+---
+
+## D-56 — 2026-07-06 — External interfaces enter the spec only as captured reality (contracts.externals + frozen captures)
+
+**Decision:** `contracts.json` gains an optional `externals` array: every external interface the spec makes assumptions about (third-party APIs, model output/streaming formats, wire protocols) is declared as `{id, probe, capture}`. The `probe` is the exact command the operator ran against the real dependency; the `capture` is its raw recorded output, staged under `captures/` and installed to `scripts/.approved/captures/`, hash-pinned in the frozen manifest like every other frozen artifact. `refreeze.sh` fails closed if a declared capture is missing (or is invalid JSON for `.json` captures), and rejects staged captures no external references. The TPM authors mocks and tests from captures, never from memory of how the dependency probably behaves; the probe-first loop (TPM requests probes → operator runs them → pastes raw output) happens before spec authoring.
+
+**Reason:** testchat M5 shipped a fully green frozen suite over an app that didn't work. Every post-success hand-fix was a spec-vs-reality mismatch: the real LM Studio models endpoint is `/api/v1/models` returning `{"models":[{"key":...}]}` (spec assumed OpenAI-style `/v1/models` + `data[].id`), and the real model streams thinking as `delta.reasoning_content` (spec assumed inline `<think>` tags). Mocked tests are a fixed-point check — they verify code-matches-spec, and cannot verify spec-matches-world. The gap was structural: no gate required the TPM's external-interface assumptions to be grounded in anything. Same failure tier as the v6 no-oracle incident: TPM, not EM/coder.
+
+**Alternatives considered:** live integration tests in the frozen suite (rejected — the sandbox is offline by design, and live tests make the gate flaky and environment-dependent); prose-only rule in TPM-ROLE.md (rejected — advisory rules on LLM tiers are suggestions; every hard-won guard here is mechanical); a separate contract-check script in the run loop (rejected — heavier, and the run loop is the wrong place: the error is made at freeze time, so the gate belongs at freeze time).
+
+**Cost accepted:** one extra loop at spec time (probe → paste → author). Captures can go stale when the upstream changes; the recorded `probe` makes re-verification a one-liner, and staleness surfaces at CEO acceptance (D-44) exactly as before — this narrows the gap, it does not claim to close it.
+
+**Do not suggest:** letting the TPM skip captures for "well-known" APIs (the M5 miss WAS a well-known API shape); making captures advisory; running probes from inside the sandbox at test time.
+
+---
+
+## D-55 — 2026-07-05 — Linux dev VM boundary; D-53 partial reversal for cross-boundary model access
+
+**Decision:** Conductors move inside a persistent Lima VM (Ubuntu 24.04, virtiofs mount of `~/dev`). The VM is the structural boundary that replaces advisory conductor constraints; agents run with permissions bypassed because the VM is the containment. `orchestrate.sh` refuses to run on macOS (`uname -s` check, hard halt). D-30 Podman lanes run unchanged inside the VM as native rootless containers — same nesting depth as the previous `podman machine` arrangement on the host.
+
+**D-53 partial reversal (cross-boundary model access):** D-53 moved LLM calls host-local precisely because cross-boundary port wiring caused the failures of the first three supervised runs. The VM boundary reintroduces cross-boundary access: `SANDBOX_LLM_HOST` (default `localhost`, set to `host.lima.internal` in the VM) parameterizes the endpoint in `llm-call.sh` and `orchestrate.sh`. This is accepted as the cost of the VM boundary. A round-trip smoke test (`llm-call.sh` with a trivial prompt, assert non-empty reply) runs in `orchestrate.sh` pre-flight to catch plumbing bugs — the class of failure that was invisible to static review and caused the misdiagnosed "model hallucinations" in early runs (correction log 2026-07-03).
+
+**Alternatives considered:** keeping conductors on the host with advisory constraints (failed — testchat M4 proved frontier conductors cross every advisory lane under goal pressure); Docker/devcontainer (rejected — Docker-in-Docker conflicts with D-30 Podman lanes); OrbStack (rejected — shared-kernel model, insufficient isolation for skip-permissions agents); ephemeral VMs per session (rejected — destroys `.pipeline-state` crash checkpointing D-24 and git continuity).
+
+**Deferred:** a coder sentinel-format micro-check (send a prompt that should produce `=== FILE: ... === END FILE ===` wrapping and verify the format parses) — the current smoke test only asserts non-empty reply, which catches plumbing failures but not format mismatches between llm-call.sh and the coder extraction logic. Low urgency: the extraction already hard-fails on bad format during real tasks, so it's caught one call later.
+
+**Do not suggest:** Running `orchestrate.sh` directly on the macOS host. Removing the `uname` pre-flight check. Using Docker instead of Podman inside the VM. Hardcoding `localhost` instead of `SANDBOX_LLM_HOST`. Skipping the round-trip smoke test.
+
+---
+
+## D-54 — 2026-07-05 — Spec-drift policy: the test surface is the binding spec; ERD prose is advisory design intent
+
+**Decision:** Only what is mechanically checkable at freeze or run time is binding: the frozen test suite, `contracts.json` (entry points, routes, schemas, smoke_checks), and the gates that enforce them. ERD prose — implementation constraints, library choices, internal design notes — is advisory design intent. Code that passes the full frozen suite is conformant by definition, even where it deviates from ERD prose. Consequences: (1) the TPM must express every MUST-HOLD constraint as something observable at the locked surface — a test, a contracts entry, or a smoke_check — or accept that it is guidance, not law; (2) deviating from advisory ERD prose is not a violation, but it MUST be reported to the CEO in the run summary (silent drift is still a reporting defect under Operating Rule 4); (3) when drift accumulates enough that the ERD misleads the next milestone's TPM, the fix is a refreeze that re-trues the prose — bookkeeping, not rollback.
+
+**Found by:** the testchat M3/M4 supervised runs (2026-07-04): shipped code replaced httpx with raw urllib reads and streamed think-content to the frontend, both contradicting frozen ERD prose (C-4, think-stripping) — with the full suite green throughout. The tests observe only the locked surface, so prose-level constraints were undetectably violated. Nothing in the pipeline can catch this class of drift, and pretending otherwise mislabels a suggestion as a rule.
+
+**Alternatives considered:** a post-success conformance review step, human or LLM, diffing implementation against ERD prose (rejected — it is an advisory review by exactly the class of agent that the M4 incident proved ignores advisory constraints under goal pressure; it adds a cycle per milestone without a mechanical guarantee, and its failure mode is silent, which is the problem it claims to solve); making ERD prose binding by policy alone (rejected — restates the repo's founding axiom in reverse: a rule that cannot be enforced mechanically is a suggestion).
+
+**Do not suggest:** Failing or re-running a green milestone because the implementation deviates from ERD prose. Adding a conformance-review gate without new evidence that reported-but-tolerated drift caused a real defect. Moving constraints into tests retroactively to "win" a disagreement — that is a TPM spec change and goes through refreeze like any other.
+
+---
+
+## D-53 — 2026-07-03 — Retire the agent harness from the execution loop: EM/coder called over bare HTTP, no tools, shell writes every artifact
+
+**Decision:** `scripts/orchestrate.sh` no longer runs `opencode serve` or invokes agents via `opencode run --attach --agent <name>`. Instead: (1) `scripts/llm-call.sh` sends ONE completion per call directly to the local OpenAI-compatible endpoint (LM Studio) — no harness, no filesystem/tool access for the model, no memory between calls. It reads a CEO-owned role→model mapping (`~/.config/sw-dev-blueprint/models.env`, successor to the `opencode.json` agent mapping, D-41 spirit unchanged) and hard-halts on an unmapped role — never a silent substitution. It supports LM Studio's `response_format: json_schema` for schema-constrained generation, with graceful fallback to unconstrained if the server rejects it. (2) The orchestrator now gathers whatever context a call needs (ERD, contracts, test-nodeids, the prior plan, relevant failing test source) into the prompt itself and writes the model's reply to disk itself: JSON straight to `tasks/plan.json`/`diagnosis.json` for the EM, and for the coder, a sentinel-wrapped block (`=== FILE: path === ... === END FILE ===`, the same convention the TPM shuttle already uses) parsed and written to exactly the task's named path — a reply naming a different path or missing the block is a coder FAILURE (retry/consult evidence), never written. (3) `sandbox-run.sh` and the `Containerfile` drop everything OpenCode-related (the D-52 config-mount, the version-pinned install) since nothing inside the sandbox talks to a model anymore — it now runs `pytest`/`smoke_check` only, with `--network none` (no LLM to reach, so no reason for the container to have network at all — untrusted generated code gets no exfiltration path either). `opencode.json` is stripped to the conductor's own permission config (the `em`/`coder` agent blocks are deleted — nothing invokes them); it is now entirely optional, relevant only if the CEO happens to pick OpenCode as their conductor.
+
+**Found by:** the first two supervised POC runs on the wordcount instance (2026-07-02/03). Every failure across both runs was a harness seam, never the actual pipeline logic: `opencode run --agent em` silently fell back to a default agent on a remote free-tier model when `em` was `mode: subagent` (D-52 fixed the mode, but the failure recurred); the container's pinned OpenCode build (1.15.13) had drifted from the host (1.17.12), and the version mismatch is the prime suspect for the server dropping the `--agent` selection even after D-52's mode fix; the remote fallback then hit provider rate limits. Zero of these failures were about the actual gates, lanes, or escalation ladder — every one of those fired correctly across three runs. The seam was always the harness sitting between the shell and the model, never the trust boundary itself.
+
+**Alternatives considered:** keep tuning the OpenCode attach/agent-mode path (rejected — three consecutive fix attempts, D-40/D-52/this incident, each patched one seam and surfaced another; the pattern is the mechanism, not the configuration); swap OpenCode for a different CLI agent harness inside the sandbox (rejected — same class of seams: any harness between the shell and the model is a version to pin, a config to lose, a fallback to silently take); give EM/coder real tool access so they read files themselves (rejected — the entire value of the capability ladder is that the shell owns procedure and knows exactly what changed; tool-using agents reintroduce the "did it actually only touch its lane" question that sandboxing was built to make moot, for zero capability gain since every prompt in this pipeline is a single, boundedly-scoped question).
+
+**Reason:** The shell already read every file these agents needed and validated every artifact they produced (`validate-plan.py`, `phase-gate.sh`, INV-4) — the harness was never load-bearing for trust, only for convenience, and it was the only thing that ever broke. A model that receives a full prompt and returns one answer needs no tools to do its job in this design; every "read X" instruction to the old agents is mechanically equivalent to pasting X into the prompt, and the shell can do that pasting without an intermediary that has its own versions, configs, and failure modes.
+
+**Do not suggest:** Re-introducing an agent CLI/harness into the EM or coder invocation path for "richer" tool use — if a future task genuinely needs the model to explore rather than answer one bounded question, that is a signal the task decomposition (EM's job) is wrong, not that the execution tier needs tools. Hardcoding a model name anywhere to avoid the models.env mapping (violates D-41). Re-enabling sandbox network access "just in case" without a concrete test that needs it — add it deliberately, with a reason, if that day comes.
+
+---
+
+## D-52 — 2026-07-02 — em/coder back to primary mode; model mapping mounted into the sandbox; no silent agent/model substitution
+
+**Decision:** Three coupled fixes from the first orchestrate run. (1) `em`/`coder` return to `mode: "primary"` in `opencode.json` — `opencode run --agent <name>` refuses subagent-mode agents ("not a primary agent"), so D-40's flip broke the orchestrator's only invocation path. Impersonation protection does not regress: the sandbox lane mounts (D-30) physically bound what each agent can write regardless of mode, and both agents keep `task: false` (D-43/D-48). (2) `sandbox-run.sh` mounts the host's global `~/.config/opencode/opencode.json` (the D-41 agent→model mapping) read-only into the container HOME, rewriting `localhost`/`127.0.0.1` to `$SANDBOX_LLM_HOST` so a mapping that points at the host LLM still resolves from inside the container; auth.json rides along if present. (3) `orchestrate.sh` hard-halts if the run log shows OpenCode substituted the default agent — before this, it silently proceeded as `build` on a default REMOTE free-tier model.
+
+**Found by:** the first supervised POC run (wordcount): the plan phase logged `agent "em" is a subagent, not a primary agent. Falling back to default agent` and ran as `build · mimo-v2.5-free`. Nothing was running on the CEO's mapped local models; the CEO noticed and aborted.
+
+**Reason:** The silent fallback is the worst half: pipeline work left the machine on an unchosen remote model with no actor deciding that. Halting is the only honest behavior when the invoked agent is not the one that runs.
+
+**Do not suggest:** Re-flipping em/coder to subagent mode to hide them from the CEO's TUI (cosmetic benefit, breaks the pipeline); baking a model ID into the repo to avoid the mount (violates D-41); downgrading the substitution halt to a warning.
+
+---
+
+## D-51 — 2026-07-02 — Initial freeze collects node-ids statically: the v1 suite cannot import src/ that doesn't exist yet
+
+**Decision:** `refreeze.sh` falls back to static AST-based node-id derivation (module-level `test*` functions and `Test*` class methods in `tests/**/test_*.py` / `*_test.py`) when dynamic collection yields nothing AND the failure is `No module named 'src…'`. Parametrized ids are not expanded by the fallback; the first refreeze after `src/` exists re-collects dynamically. Additionally, collection diagnostics now capture and grep BOTH streams — pytest reports collection errors on stdout, which D-50's stderr-only capture missed, leaving the exact misleading "no tests" message D-50 claimed to have retired.
+
+**Found by:** the first supervised POC run (wordcount instance): the very first v1 freeze in template history failed at collection. This is structural, not incidental — INV-1 requires the TPM suite to exist before any implementation, so at v1 every test module's `import src.…` must fail. The initial-freeze path could never have worked; every prior instance was either migrated mid-history or hand-patched.
+
+**Alternatives considered:** stub `src/` files at freeze time (violates lanes — no actor may write src/ outside a coder task); deferring node-id collection until after the first build (the EM's plan gate needs the ids before any coder runs); having the TPM hand-author the node-id list (unverifiable, drifts from the actual suite).
+
+**Reason:** Static derivation is exact for the accident class the template constrains anyway (frontier-TPM-authored plain pytest functions), and self-heals to dynamic collection at the next freeze. Known limit: a v1 suite relying on parametrize-expanded ids maps them unexpanded until the v2 freeze.
+
+**Do not suggest:** Making the AST fallback the primary collector (dynamic collection is ground truth whenever imports resolve); relaxing the "no nodeids = fail" rule — a freeze without a suite still cannot gate anything.
+
+---
+
+## D-50 — 2026-07-02 — Stack drift killed mechanically: content-hashed sandbox image, podman preflight, honest collection errors
+
+**Decision:** Three fixes for the sparkv2-Issue-9 failure family (TPM picks a stack at spec time; the sandbox doesn't have it; the gate reports a misleading "pytest collected no tests"). (1) `sandbox-run.sh` tags the image with a hash of `Containerfile`+`requirements.txt` — any stack change produces a new tag and an automatic rebuild; a stale image is now structurally impossible, and manual `podman image rm` ceremony is retired. (2) `sandbox-run.sh` checks podman is actually running before anything else and says exactly what to do if not — previously it failed downstream with unrelated-looking errors. (3) `refreeze.sh` captures collection stderr instead of discarding it (`2>/dev/null` was hiding `ModuleNotFoundError` since the beginning), prints it on failure, and names the requirements.txt fix when the cause is an import error. Plus a conductor guardrail in CLAUDE.md: check staged test imports against `requirements.txt` before every freeze.
+
+**Found by:** the second live run — the TPM chose FastAPI+httpx while the sandbox carried the previous project's stack, re-creating sparkv2's Issue 9 exactly. The first occurrence was hand-fixed in the instance and logged but never ported to the template as machinery; recurrence was guaranteed.
+
+**Reason:** An error message that misdescribes the failure ("no tests" when the truth is "can't import") costs a debugging session per occurrence. Discarded stderr is the root sin. And rebuild-on-change must be mechanical because the actor who changes the stack (TPM, via spec) is not the actor who maintains the image (operator) — a handoff that relied on someone remembering.
+
+**Do not suggest:** Pinning the stack in the template to avoid drift (the TPM must be free to choose per project, D-41 spirit); pruning old image tags aggressively (cheap disk, and old tags let an interrupted migration fall back).
+
+---
+
+## D-49 — 2026-07-02 — tpm-pack.sh defaults to stdout; conductor must relay the bundle verbatim (first live-run bug)
+
+**Decision:** `tpm-pack.sh` now writes the bundle to stdout by default; clipboard copy is opt-in via `--clipboard` (`--stdout` kept as a no-op for compatibility). CLAUDE.md gains a conductor guardrail: when the CEO asks for the TPM briefing, run the script and reproduce its entire stdout verbatim — no summarizing, no pointing at repo files (the bundle is assembled, not hand-collectable), no "it's in the clipboard"; TPM replies pasted back go to a temp file unmodified, then `tpm-unpack.sh <file>`.
+
+**Found by:** the first live conductor session (CEO asked for the TPM prompt; got a file reference in one attempt and a false "copied to clipboard" in another). Root cause: the script's TTY auto-detection (`[ -t 1 ]`) was built for a human at a terminal, but agent harnesses may allocate a pty — the check fired inside the subprocess, the bundle went to a clipboard call the CEO never received, and nothing instructed the conductor to relay output rather than report about it.
+
+**Reason:** In the conductor-operated design (D-40) the primary caller of this script is an agent, not a human — defaults must serve the common caller. Auto-detection that guesses the caller's context is exactly the class of cleverness that fails silently; an explicit flag cannot misfire. The instruction-layer half exists because the script fix alone doesn't stop an agent from summarizing captured output.
+
+**Do not suggest:** Restoring TTY auto-detection; having the conductor paraphrase or trim the bundle ("the CEO only needs the gist" — the TPM needs every byte, and the sentinel footer is load-bearing for tpm-unpack.sh).
+
+---
+
+## D-48 — 2026-07-02 — Conductor denied the task tool: no agent in this repo can spawn another
+
+**Decision:** The built-in Build agent gets `"tools": { "task": false }` in the project `opencode.json`, completing D-43. No agent — conductor, em, or coder — can spawn any agent. The only inter-agent invocation path in the entire system is `orchestrate.sh` calling `opencode run --agent` inside the sandbox. CEO-surfaced gap: "Build hands to the orchestrator" was doc-advisory while Build held the task tool — it could have dispatched coder directly, skipping sandbox mounts and per-task gates. Residual soft path: Build running `opencode run --agent coder` via bash is not allowlisted, so it falls to the ask-prompt (= CEO alarm), subject to the D-45 glob caveat.
+
+**Alternatives considered:** Leaving Build the task tool for utility subagents (explore-style) — rejected: the pipeline never needs it, and the utility doesn't justify keeping open the one bypass around the shell's procedural monopoly.
+
+**Reason:** "The shell is the only actor with procedural authority" (D-26) is now enforced by configuration at every seat, not by prompt discipline. Rules that can be mechanical must be (CLAUDE.md operating-rules preamble).
+
+**Do not suggest:** Re-enabling task for Build to "parallelize" or "speed up" anything; the orchestrator is the parallelism boundary.
+
+---
+
+## D-47 — 2026-07-02 — External TPM review of D-40..D-46 adjudicated: pytest/conftest hole closed, permissions hardened, honest-layer statements added
+
+**Decision:** A frontier-LLM review of the conductor redesign produced five findings; all were verified against the tree before acting (none taken on the reviewer's word). Actions: **(1) CONFIRMED+FIXED** — `"pytest*": "allow"` plus undenied root `conftest.py` gave the conductor a zero-prompt arbitrary-code-execution path (write `./conftest.py`, run bare `pytest` unsandboxed), also loadable inside sandboxed suite runs where `.cache/` is writable (test-report forgery path). Removed `pytest*` from the allowlist (suite runs go through `sandbox-run.sh`; bare pytest now asks) and denied edits to root pytest-config files (`conftest.py`, `pytest.ini`, `pyproject.toml`, `setup.cfg`, `tox.ini`) for the conductor AND the coder. **(2) OPEN** — OpenCode glob-vs-compound-command matching is untested; caveat recorded in D-45, probe scheduled for first live session. **(3) FIXED** — D-42's conductor-relayed-diff weakening now stated in its entry. **(4) CONFIRMED+FIXED** — coder's `"**": "allow"` could override global control-plane denies depending on merge semantics; denies mirrored into the coder block, and `em` got an explicit `"**": "deny"` terminal rule (fail closed regardless of merge semantics). **(5) FIXED** — `new-project.sh` warns when multiple models are loaded and respects `SANDBOX_LLM_PORT`; stale y/N-only comments in `refreeze.sh` header and CLAUDE.md structure tree updated.
+
+**Reason:** The pipeline's own doctrine applied to its own control plane: external review, source-verified adjudication, fixes committed per concern. Finding 1 was the exact class D-45 claims to prevent (unprompted write→execute), found by an actor who never saw this session — the review layer works.
+
+**Do not suggest:** Re-adding `pytest*` to the conductor allowlist "for quick checks" — `scripts/sandbox-run.sh -- pytest ...` is the allowed, sandboxed way to run tests.
+
+---
+
+## D-46 — 2026-07-02 — Milestone sizing is TPM judgment against a fixed balance; no formula
+
+**Decision:** Milestone cutting is the TPM's call, made per project, documented briefly in each PRD. The optimization target is fixed and two-sided: small enough that the CEO's acceptance check (D-44) catches errors before they compound — one bad milestone is the maximum blast radius; big enough to use a full freeze→build cycle well — no fragment milestones that spend a freeze/accept round-trip on trivia. No arc, ordering, or size unit is prescribed to the TPM — not even as an example: an example in role instructions anchors an LLM and becomes a de-facto formula (the CEO's own sketch — engine → connector/frontend → MVP → features — lives only here, as history, deliberately outside `TPM-ROLE.md`). Corollary: every milestone must end CEO-checkable, with acceptance depth scaling to what exists — live demo with real inputs for pre-UI milestones, hands-on prototype use once any UI exists. A milestone whose CEO check can't be described is cut wrong.
+
+**Alternatives considered:** (a) A sizing formula (N tasks / N files / N tests per milestone) — rejected: project-dependent; a formula would be gamed or fought rather than judged. (b) CEO cuts milestones — rejected: sizing requires estimating what the pipeline can deliver in one spec, which is technical judgment; the CEO states outcomes and accepts results.
+
+**Reason:** CEO-stated doctrine (2026-07-02): balance early error detection by human user-testing against per-cycle throughput; "a TPM can intelligently figure this out; there is no formula ideally, and it depends on project." Resolves the D-44 tension for backend-only milestones (nothing hands-on to test) via scaled acceptance instead of forbidding them.
+
+**Do not suggest:** Adding numeric sizing thresholds to gates or schemas; milestones that end at internal refactors with no CEO-observable behavior.
+
+---
+
+## D-45 — 2026-07-02 — Conductor bash allowlist: pipeline scripts + read-only git; everything else asks
+
+**Decision:** The Build (conductor) session's bash permission in `opencode.json` becomes an allowlist — the pipeline scripts (orchestrate, bootstrap, new-project, tpm-pack/unpack/agent, sandbox-run, check-drift), read-only git (`status`/`log`/`diff`/`show`), pytest, and read-only file commands are allowed; `refreeze.sh` stays `ask` (D-42); **everything else falls to `ask`**. Combined with the playbook rule, this gives the non-technical CEO a decision procedure requiring zero code judgment: the only prompt you expect is refreeze-approve; any other prompt = alarm = deny and ask the conductor what it wanted.
+
+**Alternatives considered:** (a) Default-allow bash (previous state) — rejected: bash bypasses `permission.edit`, so a conductor could `sed -i` protected files without any prompt. (b) Default-deny — rejected: the conductor legitimately needs incidental commands (installing a dep the CEO approved, starting the app for UAT); `ask` keeps those possible with the human in the loop.
+
+**Reason:** Closes the routine accident surface of D-40's honest caveat (conductor bash outside the sandbox) while keeping fail-closed backstops (hooks, manifests) as the guarantee against what slips through. OpenCode permission enforcement remains soft (D-24/D-39); this is friction + visibility, not a wall. **Unverified assumption (Rule 6, flagged by D-47 review):** whether OpenCode matches these globs against parsed sub-commands or the raw command string is untested — if raw-string, `scripts/bootstrap.sh && <anything>` would pass as allowed. Probe this in the first live conductor session before trusting the allowlist; until then treat it as friction only.
+
+**Do not suggest:** Widening the allowlist with write-capable commands (`sed -i`, `rm`, `git push`, `pip install`) to reduce prompts; those prompts are the point.
+
+---
+
+## D-44 — 2026-07-02 — The CEO gate is outcome acceptance, not diff review; refreeze approval reframed as authorization
+
+**Decision:** The CEO does not review code or diffs — ever. The refreeze approval (terminal y/N or D-42 hash prompt) is redefined as **authorization**: "this delta is a change I asked for," verified by matching the TPM's plain-language description against the CEO's own request. The technical scrutiny of a delta is entirely mechanical and pre-approval: INV-4 surface check, contracts schema validation, hash binding. The CEO's real quality gate moves to the end of every milestone: **user-test the running prototype** (conductor launches it; CEO uses it like a real user). Definition of Done gains this as its one judgment item: orchestrate exit 0 = built-as-specified; CEO acceptance = built-right. A green suite that fails CEO acceptance is a spec defect → back to the TPM, not a code fix.
+
+**Alternatives considered:** (a) CEO reads every diff (original D-31/D-42 framing) — rejected: not meaningful for a non-technical CEO; a signoff that can't distinguish good from bad diffs is theater and trains rubber-stamping. (b) A second LLM as diff reviewer — rejected for now: adds an unaccountable layer whose review is itself unverifiable self-report; may be revisited as a separate decision.
+
+**Reason:** Matches the actual operator (CEO checks outcomes, not codebases) and the agile cadence: milestones are the checkpoints, prototype acceptance is the check. Aligns the gate's claimed meaning with its real meaning — the system's honesty principle applied to its own front door.
+
+**Do not suggest:** Skipping the UAT step because tests are green; treating CEO acceptance as optional for "internal" milestones (every milestone ends at something the CEO can try — if it doesn't, the milestone was cut wrong).
+
+---
+
+## D-43 — 2026-07-02 — Flat hierarchy under the shell: `em`/`coder` denied the task tool
+
+**Decision:** Both subagents get `"tools": { "task": false }` in `opencode.json`. The orchestrator invokes EM and coder independently, as direct reportees; neither agent can spawn any other agent. The EM "manages" the coder exclusively through `tasks/plan.json` — its briefs are the management; the shell delivers them, gates each result, and owns retries.
+
+**Alternatives considered:** EM-drives-coder (the org-chart intuition the names suggest) — rejected: coder would run inside EM's sandbox context (wrong write lane), the per-task gate and mapped-test run between tasks would be skipped, escalation counters would drift, and the task tool is the known OpenCode permission-bypass route (issues cited at D-24/D-39).
+
+**Reason:** No LLM should sit in the reporting chain of another LLM — every inter-agent handoff must cross a deterministic checkpoint (D-26). Advisory "EM never drives" becomes mechanical.
+
+**Do not suggest:** Re-enabling the task tool for either subagent to "streamline" plan execution; having the conductor invoke coder directly around the orchestrator.
+
+---
+
+## D-42 — 2026-07-02 — Refreeze approval without a terminal: `--diff` / `--approve <hash>` behind the OpenCode ask-prompt
+
+**Decision:** `scripts/refreeze.sh` gains two non-interactive modes so the conductor (D-40) can drive freezes while the human stays the gate. `--diff` validates the staging dir, prints the full diff plus its `DIFF-SHA` (sha256 of the diff text), and applies nothing. `--approve <sha>` recomputes the diff and proceeds only if the hash matches; `opencode.json` marks `scripts/refreeze.sh *` as `bash: ask`, so the CEO's click on that prompt — whose command line carries the hash of the diff they just read in chat — IS the approval. Any change to staging between review and approval changes the hash and fails closed. The interactive y/N path is unchanged and remains the fallback.
+
+**Alternatives considered:** (a) Keep terminal-only y/N — rejected by CEO direction (no command running). (b) Honor-string approval ("CEO said yes in chat") — rejected: no binding between what was read and what is applied. (c) A `--yes` flag — rejected: approves whatever staging contains at run time, not what was reviewed.
+
+**Reason:** The gate's essence is "a human read THIS diff and approved THIS diff." The hash preserves that binding without a TTY. Honest layer statement: the ask-prompt depends on OpenCode's permission enforcement (soft, see D-24/D-39 caveats); the backstops remain the hash binding itself, the pre-commit hook, and the frozen-manifest verification failing closed on every gate run. **Known weakening vs terminal y/N (D-47 review):** the CEO sees the diff only through the conductor's relay — a misreporting conductor could display doctored diff text alongside the true hash of different staged content, and the prompt would look right; the tty path showed the script's own output on a trusted channel. The raw diff is always at `.pipeline-state/refreeze-pending.diff` for direct reading, the terminal path remains for structural freezes, and the blast radius of an unread-but-authorized delta is one milestone, caught at UAT (D-44). Accident-class threat, accepted; not zero.
+
+**Do not suggest:** Adding `--yes`/`--force`; letting the conductor summarize the diff instead of printing it in full; approving on a stale hash after restaging.
+
+---
+
+## D-41 — 2026-07-02 — Model identity leaves the repo: the blueprint is model-agnostic
+
+**Decision:** No file in the template or its instances names an actual LLM (no model IDs in `opencode.json`, scripts, or operative docs). The repo's `opencode.json` defines roles, prompts, modes, and write lanes only. The CEO maps agents to models in the global `~/.config/opencode/opencode.json` (OpenCode merges global + project config) and loads whatever they choose in LM Studio; pre-flight probes discover the loaded model via `GET /v1/models` instead of asserting a name. The blueprint constrains model *class* only: TPM frontier-tier, EM mid-tier, coder local non-thinking (Hard Rule 1 stays, expressed class-wise).
+
+**Alternatives considered:** (a) Keep pinned models with placeholders like `[EM_MODEL]` — rejected: placeholders leak into instances unfilled (see sparkv2) and every model swap dirties the repo. (b) Env-var indirection in the repo config — rejected: still couples the repo to a naming scheme.
+
+**Reason:** Model choice is an operator preference that changes weekly; the pipeline's guarantees come from gates and frozen tests, not from any particular model. Hardcoding created recurring drift between what docs claimed and what was actually loaded (SANDBOX-VALIDATION.md records four different models in one week).
+
+**Do not suggest:** Re-adding model IDs to the repo "for reproducibility" — record the model used for a given run in session notes if it matters, not in the control plane.
+
+---
+
+## D-40 — 2026-07-02 — OpenCode Build agent as conductor; `em`/`coder` become subagents; CEO runs no commands
+
+**Decision:** OpenCode is the harness AND the CEO's single interface. The built-in **Build** agent is the conductor: the CEO talks to it in business language; it runs `new-project.sh`, the TPM shuttle scripts, `refreeze.sh --diff/--approve` (D-42), and `SANDBOX=1 scripts/orchestrate.sh`, then reports results. `em` and `coder` flip to `"mode": "subagent"` — machine-invocable (task tool / `opencode run --agent`), no longer Tab-cycled by a human. Procedural authority does NOT move: `orchestrate.sh` still owns the DAG, gates, counters, and escalation (D-26); Build launches it and interprets exit codes, nothing more. Project-level `opencode.json` denies the Build session edits to `tests/`, `scripts/`, `src/`, hooks, and the control plane.
+
+**Alternatives considered:** (a) Build re-implements orchestration conversationally — rejected: reintroduces LLM procedural authority that D-26 removed for cause. (b) Keep em/coder as Tab-cycled primaries — rejected: requires the CEO to operate the TUI, contradicting the no-commands direction.
+
+**Reason:** The CEO's two real decisions (what to build, whether to approve a freeze) never required a terminal; everything else was operator toil. Honest layer statement: Build's edit denies are OpenCode-harness-soft (the D-24/D-39 permission caveats apply) — the hard walls remain the read-only sandbox mounts for em/coder (D-30), phase-gate manifests failing closed, and the pre-commit hook.
+
+**Do not suggest:** Moving DAG/retry/escalation logic into Build's prompt; making the TPM an OpenCode agent (OpenCode cannot deny reads — see D-39 alternative (b)); giving Build write access to `scripts/` or `tests/` to "unblock" a run.
+
+---
+
+## D-39 — 2026-07-02 — Agent-mode TPM: scoped repo access via `tpm-agent.sh` (D-38(b) triggered by CEO decision)
+
+**Decision:** The TPM may now run as a repo agent — `scripts/tpm-agent.sh` launches Claude Code with `scripts/tpm-agent-settings.json`. Containment, per the shape D-38(b) recorded: WRITE only `.tpm/outbox/` (gitignored; installed exclusively through the interactive human y/N of `scripts/refreeze.sh .tpm/outbox` — refreeze already took a staging-dir argument, unchanged); READ everything except `src/` (harness-denied), with `Bash` denied entirely so the wall cannot be bypassed via `cat`; anything outside the pre-approved lane falls to the harness's ask-prompt, which the playbook tells the CEO to treat as an alarm. The TPM triggers no procedure — orchestrate/refreeze/EM/coder runs stay operator- and shell-initiated. Chat mode (D-38 pack/unpack) remains fully supported as the fallback and the stronger air gap. The operator's imagined third job — couriering prompts from TPM to EM — is explicitly documented as nonexistent: the frozen spec is the only TPM→EM handoff, delivered by `orchestrate.sh` (D-26/D-28).
+
+**Alternatives considered:** (a) Unrestricted repo access — rejected: reading `src/` breaks oracle independence from milestone 2 onward, and free writes re-open the incident class in TPM-ROLE.md's institutional memory. (b) OpenCode agent for the TPM instead of Claude Code — rejected for containment: OpenCode `permission.edit` globs are non-transitive (bypassable via the Task tool — opencode issues #12566/#20549, already cited at D-24); Claude Code deny rules take precedence over allows and cover Read as well as writes. (c) Podman-mounted physical wall (tmpfs over `src/`) — stronger but the frontier-agent harness cannot usefully run inside the pipeline's container; recorded as the hardening step if harness-level deny ever proves insufficient in practice.
+
+**Reason:** The CEO explicitly chose the D-38(b) upgrade path — the operator cost of chat-mode shuttling outweighed the marginal wall-strength difference for this operator. The honest layer statement is in `tpm-agent.sh`'s header: the read wall is harness-enforced (softer than the chat air gap); the write wall is layered and hard (harness deny + ask-prompts + hash-pinned manifests failing closed + the interactive refreeze gate).
+
+**Do not suggest:** Widening the read scope to `src/` "for better test quality" — that inverts the role's reason to exist. Letting the TPM run `refreeze.sh` or answer its prompt. Removing chat mode — it is the fallback wall and the reference trust model. Weakening the `Bash` deny in `tpm-agent-settings.json` for convenience; if the TPM needs a fact only a command can produce, the operator runs the command.
+
+---
+
+## D-38 — 2026-07-02 — TPM shuttle scripts (`tpm-pack.sh`/`tpm-unpack.sh`) + CEO playbook; TPM stays chat-side
+
+**Decision:** The operator's courier burden around the chat-based TPM is automated, not the air gap. `scripts/tpm-pack.sh` assembles the complete TPM session briefing (TPM-ROLE.md, contracts schema, and the currently frozen spec + VERSION when one exists) into one clipboard blob — deliberately excluding `src/` and `tests/` (oracle independence, INV-1). `scripts/tpm-unpack.sh` splits the TPM's reply — artifacts wrapped in mandatory `=== FILE: <path> ===` / `=== END FILE ===` sentinels, format recorded in TPM-ROLE.md — into `scripts/.approved/incoming/`, validating paths against the same whitelist `refreeze.sh` enforces, fail-closed (one bad path rejects the whole reply; a non-empty staging dir requires `--force`). The trust model is unchanged: unpack only stages; the human y/N diff in `refreeze.sh` remains the only installation door. `docs/CEO-PLAYBOOK.md` documents the operator loop end-to-end.
+
+**Alternatives considered:** (a) Repo read/write access for the TPM — rejected: read access breaks oracle independence for every milestone after the first (the TPM could derive tests from `src/`), and write access re-opens the exact incident class in TPM-ROLE.md's institutional memory (an agent quietly weakening a gate to make a run pass). (b) Scoped agent-TPM (deny-read `src/`, write only `incoming/`) — viable, deferred: harness-permission scoping is a softer guarantee than the chat air gap; revisit if shuttle friction still chafes after a few real milestones. (c) Status quo (manual file courier) — rejected: per-artifact hand-selection is error-prone in both directions, and friction the operator routinely skips is a control that doesn't exist.
+
+**Reason:** The no-repo-access design is load-bearing; the copy-paste drudgery around it is not. Separating the two makes the safe design cheap enough to actually operate: one paste starts a milestone, one command banks the reply. On CEO-PLAYBOOK.md vs D-01: this is an operator runbook for machinery that did not exist at D-01 — it restates no diagrams or rules from BLUEPRINT.md, which is what D-01 pruned.
+
+**Do not suggest:** Giving the TPM direct repo access (see alternative (b) for the recorded upgrade path and its trigger). Having tpm-pack include `src/` or the frozen `tests/` "for context". Letting tpm-unpack write anywhere but the staging dir, or skip its path whitelist because refreeze validates too — the double validation is deliberate (named culprit at unpack time; defense in depth at install time).
+
+---
+
+## D-37 — 2026-07-02 — `build_extra`/`test_extra`: exact-file lane exceptions in `.gate-paths`
+
+**Decision:** `.gate-paths` gains two optional keys, `build_extra=` and `test_extra=` — space-separated lists of **exact file paths** outside the lane directory that the legacy `build`/`test` phases may also touch. `phase-gate.sh` filters them from the violation list with `grep -vFx` (fixed-string, whole-line): no globs, no regex, no prefix matching. Unset keys change nothing — the default gate behavior is byte-identical to before. Motivating case: a JS/TS build lane that must touch `package.json` alongside its source directory.
+
+**Alternatives considered:** (a) Glob/regex patterns — rejected: a pattern is a scope grant whose true size is unknowable at review time; an exact filename is auditable at a glance. (b) Making the lane a path *list* instead of one directory — rejected: broader redesign of every consumer of `build_dir`/`test_dir` for a need that is, so far, one file per stack. (c) Nothing (status quo) — rejected: `.gate-paths` already exists precisely so non-default layouts don't require editing the gate; "one manifest file outside the lane" is the same class of layout fact, and without this key the only workaround is disabling the gate.
+
+**Reason:** Closes the concrete slice of the stack-flexibility gap (flagged by the 2026-07-02 external review) that costs almost nothing to carry: directories were already configurable, but one out-of-lane manifest file (`package.json`, `Cargo.toml`, `go.mod`) had no legal path. Verified in an isolated worktree: gate still fails without the key, passes with it, and a nested `frontend/package.json` does NOT match a bare `package.json` entry — exact-match semantics hold.
+
+**Do not suggest:** Extending `build_extra`/`test_extra` to globs, regexes, or directories — if a phase needs a whole extra directory, that is a lane redesign (alternative (b)) and gets its own decision. Adding entries to `.gate-paths` on an agent's initiative: the file is control-plane-adjacent and lane-widening is a human call (Rule 3).
+
+---
+
+## D-36 — 2026-07-02 — Gate-script self-tests (`scripts/selftest/`) + sandbox LLM port made configurable
+
+**Decision:** The two Python gate scripts — `validate-plan.py` and `check-test-surface.py` — get a hermetic pytest suite at `scripts/selftest/selftest_gates.py`, run by a dedicated unconditional CI job (`selftest`, no skeleton guard: it needs no project `src/` or requirements). The file is deliberately named `selftest_` (not `test_`) so the bare `pytest` / `pytest --collect-only` runs in `orchestrate.sh` and `refreeze.sh` never collect it into the frozen suite or its node-id set; it runs only when invoked explicitly. Placement under `scripts/` keeps it agent-unwritable via the existing `--rw` refusal. Both manifests track it. Separately, `sandbox-run.sh` reads `SANDBOX_LLM_PORT` (default 1234, LM Studio) instead of hardcoding the port, matching the existing `SANDBOX_LLM_HOST` pattern (D-30 addendum).
+
+**Alternatives considered:** (a) Integration tests for `orchestrate.sh`/`refreeze.sh` — rejected for now: shell-loop harnesses are expensive to carry, and dry runs cover them until an incident says otherwise (D-32's adopt-on-trigger doctrine). (b) A root pytest config (`testpaths=tests`) to allow normal `test_*` naming — rejected: it changes what the pipeline's bare `pytest` collects for every child, a control-plane behavior change disproportionate to the need. (c) Skipping self-tests entirely — rejected: a validator that wrongly passes fails open, and these two scripts are pure functions over JSON/file trees, so coverage is cheap to write and carry.
+
+**Reason:** External review (2026-07-02) correctly flagged that a project whose philosophy is "tests as ground truth" had zero tests for its own gate scripts. The Python gates are the highest-value, lowest-cost slice: deterministic, subprocess-testable, and the failure mode (fail-open validation) is the worst in the gate set.
+
+**Do not suggest:** Renaming the selftest file to `test_*.py` or moving it into `tests/` (frozen TPM lane; would pollute frozen node-id collection). Extending self-tests to the bash orchestration before an incident triggers it. Conditioning the `selftest` CI job on the skeleton guard.
+
+---
+
+## D-35 — 2026-07-01 — Fleet Tier 3 (versioned core distribution): designed, deliberately NOT built
+
+**Documentation-only:** This entry records a design and its adoption trigger so it is not re-litigated each session. No code exists for it, on purpose.
+
+**Decision:** The structural endgame for fleet distribution — template-owned scripts shipped as a versioned release artifact (`blueprint-core-vN`) with its own manifest, pulled by children as a tracked dependency, giving the control plane a provenance chain anchored outside every child — is **deferred**. Chosen shape, if/when built: release-artifact over git-subtree (cleaner provenance, no merge noise in children; the D-33 manifest split already defines exactly what the artifact would contain). **Adoption trigger, per the repo's own doctrine (D-25, D-32 — adopt on trigger, don't pre-harden):** roughly five or more active children, or the D-34 update flow demonstrably chafing (updates skipped because the diff-review burden grew, or children needing divergent control-plane versions). Until then, D-33 detection + D-34 propagation cover the only incident class that has actually occurred.
+
+**Alternatives considered:** (a) Build it now — one active child; machinery would be maintained for years before anything needs it, and the migration of existing children (establishing spark's baseline by hand — it has no birth-SHA) is real human work with no current payoff. (b) git subtree — git-native but pollutes child history and makes partial adoption ambiguous. (c) Never — at real fleet scale, per-child diff-approval of every control-plane update stops scaling; the trigger exists because the need plausibly will.
+
+**Reason:** Cheap-to-build is not the bar; cheap-to-carry is. Recording the shape and the trigger costs one D-entry; building it costs a distribution mechanism plus child migration, against a doctrine this repo has already paid to learn twice (D-01's bloat prune, D-04's demoted line-count gate).
+
+**Do not suggest:** Building Tier 3 before the trigger fires. Re-opening subtree-vs-artifact from scratch when it does — start from this entry's rationale and revise with evidence.
+
+---
+
+## D-34 — 2026-07-01 — Template propagation: update-template.sh (the refreeze pattern, applied to the control plane)
+
+> Amended by D-96 (auto-apply default) and D-101 (upstream removals are hashed and applied in the same update).
+
+**Decision:** Children pull control-plane improvements with `scripts/update-template.sh`: it resolves the template (a local clone via `--from`, or `gh repo clone` of the `.template-version` slug), takes the file list from the **template's** `.manifest-template` at the target ref (so additions and removals flow in), shows one aggregate diff, applies contents, exec bits, and removals, installs the template's manifest verbatim, advances `ref=` in `.template-version`, regenerates `.manifest-project`, runs the integrity gate as a post-apply check, and commits `[template-update <sha>]`. `--dry-run`, `--review`, hash-bound `--approve`, and opt-in `--interactive` remain available under D-96. `--stamp` mode retrofits a pre-D-33 child.
+
+**Alternatives considered:** (a) Generalize `refreeze.sh` into one approve-delta engine serving both spec and control plane — considered and rejected: the two flows share only the approval UX (~40 lines); everything else differs (staging source, validation steps — INV-4 and node-id collection are spec-only — and post-apply actions). A forced common engine is parameter soup; a shared *pattern* with two small tools is cheaper to hold. Revisit only if a third protected-artifact class appears. (b) git subtree/submodule for `scripts/` — Tier 3 machinery; see D-35 for the trigger. (c) Auto-apply in CI — propagation into a child is a human-approved act, same reasoning as D-31.
+
+**Reason:** This closes the documented incident class directly: the Rule 8 fix that lived only in spark until hand-ported becomes `update-template.sh` + one y. Detection (D-33) says *that* you're behind; this is *how* you catch up, with the same fail-closed integrity guarantees as every other protected write.
+
+**Do not suggest:** Leaving upstream removals for manual cleanup (D-101); running it inside the template repo (it refuses); deleting a path that was not pinned by the child's prior template manifest.
+
+---
+
+## D-33 — 2026-07-01 — Fleet drift: birth-SHA identity, ownership-split manifests, drift detection
+
+**Decision:** Three pieces. (1) **Birth-SHA**: `.template-version` records `repo=` (template slug) and `ref=` (template HEAD SHA at instantiation, stamped by `bootstrap.sh`, retrofittable via `update-template.sh --stamp`); `gh repo create --template` leaves no upstream link, so this is the only moment fleet identity can be captured. (2) **Ownership split**: the control-plane manifest becomes `scripts/.manifest-template` (template-owned logic — gates, orchestrator, validators, schemas, prompts, hooks, drift tooling) and `scripts/.manifest-project` (per-project adaptations under Rule 3 — `.gate-paths`, `opencode.json`, `Containerfile`, `ci.yml`, the doc layer). phase-gate verifies both, fail-closed; drift is computed over exactly the template list, so a Rule 3 adaptation is never a false positive. One-shot setup scripts are deliberately unlisted: children delete them at instantiation, and the read-only mounts (D-30) already cover them. (3) **Detection**: `scripts/check-drift.sh` does a three-way compare per template-owned file (child vs template@birth vs template@HEAD) → IN_SYNC / BEHIND (exit 2, CI warns) / LOCALLY_MODIFIED, MISSING_IN_CHILD, CHILD_ONLY (exit 1, CI fails); `.github/workflows/check-drift.yml` runs it on push and weekly, skipping itself in the template repo and unstamped children.
+
+**Alternatives considered:** (a) No fleet story — the documented failure: the Rule 8 fix lived only in spark until hand-ported. (b) One mixed manifest plus a separate drift-file list — two lists drift from each other; ownership belongs in the manifest itself. (c) Auto-sync on drift — propagation is a human-approved act (D-34); detection and propagation stay separate so CI never rewrites a child.
+
+**Reason:** Drift you cannot compute is drift you discover in production. The birth-SHA is cheap now and unrecoverable later; the split makes "adapted" and "drifted" mechanically distinguishable; the CI job makes a quiet child hear the template move.
+
+**Do not suggest:** Auto-applying template changes in CI. Putting template-owned files in `.manifest-project` to silence a drift failure — that is the drift, formalized.
+
+---
+
+## D-32 — 2026-07-01 — INV-4: test-visible surface ⊆ ERD-locked surface (lowest-confidence gate)
+
+**Decision:** New invariant, same class as INV-1/2/3. Whatever the frozen tests observe is de-facto locked, whether or not the ERD meant to lock it — so the two locks are kept aligned mechanically: `scripts/check-test-surface.py` statically checks that tests import only `contracts.entry_points` entries (`module` or `module:symbol`) and exercise only declared `contracts.routes` path templates (segment-wise match, `{param}` wildcards). It runs inside `scripts/refreeze.sh` on the merged preview (current frozen tests + incoming delta), BEFORE the human approval prompt — a TPM test that reaches past the contracts is rejected before it can be frozen, and before it can silently shrink the EM's design space.
+
+**Confidence flag — read this before trusting it:** this is the **lowest-confidence mechanism in the gate set**, and deliberately so. It is a grep-level static check (regex on imports and client-verb calls), in the same spirit as INV-3's grep. It catches the accident class — the test author is a frontier model following instructions, not an adversary — and does not catch dynamic imports, computed paths, or indirect observation. Tighten it from incidents per the correction-log habit; do not pre-harden speculatively.
+
+**Alternatives considered:** (a) No check — the seam rule ("TPM locks contracts, EM owns the rest") becomes decoration the first time a test asserts on an internal. (b) AST-based analysis or import-hook enforcement at test runtime — heavier machinery than the failure class justifies today; adopt only after the crude check demonstrably misses real incidents. (c) Generating test fixtures from contracts so tests physically cannot reach elsewhere — the strongest form; noted as the escalation path if (b)'s trigger fires.
+
+**Reason:** INV-4 is what makes the seam rule real: the EM owns everything inside the locked surface only if nothing outside the contracts can fail a build.
+
+**Do not suggest:** Treating INV-4 as a security boundary. Loosening it by allow-listing individual violations instead of locking the surface properly in contracts.json.
+
+---
+
+## D-31 — 2026-07-01 — Versioned re-freeze: frozen spec changes only via human-approved delta
+
+**Decision:** The TPM's artifacts (PRD.md, ERD.md, contracts.json in `scripts/.approved/`; the test suite in `tests/`) are hash-pinned by `scripts/.approved/frozen-manifest` and verified by **every** phase-gate run, fail-closed. They change through exactly one path: `scripts/refreeze.sh`. The operator stages the TPM's delta (full new content of only the changed files) under `scripts/.approved/incoming/`; refreeze shows the human the complete diff, requires an interactive y/N (this diff-approval IS the approval gate — it also replaces the old `Status: Approved` honor-string for the initial freeze), applies, re-collects test node-ids in the sandbox, writes `DELTA-vN.json` (changed contract ids + changed/removed test node-ids), bumps `VERSION`, regenerates the frozen-manifest, and commits `[refreeze vN]`. On the next run the orchestrator resumes **only the affected subtree**: the stale plan is re-derived by the EM, unchanged task entries keep their done status via fingerprints, and `validate-plan.py --affected DELTA-vN.json` additionally resets tasks whose mapped test content changed under an unchanged entry (plus transitive dependents). Escalated/blocked tasks get a fresh chance under the new spec.
+
+**Alternatives considered:** (a) Frozen-forever spec — the repo's own history shows what boxed-in agents do against an unsatisfiable oracle (a gate was once quietly weakened to force a pass); wrongness needs a protocol, not a workaround. (b) Silently mutable spec — the pre-D-08 freeze-trap failure, where a re-plan architect overwrote the approved contract. (c) Approval recorded as a status string an agent can write — the original LOW-severity hole; an interactive tty prompt on a diff is not agent-forgeable through any lane. (d) Full re-run after every delta — wastes the completed subtree; the delta file exists precisely to compute the minimal reset.
+
+**Reason:** This threads both historical failure modes: no silent mutation (agents physically cannot write the frozen artifacts — D-30 mounts + manifest check), and no dogmatic freeze (a bounded, versioned, human-approved revision path exists, and the `[refreeze vN]` commit is the durable record of every TPM round-trip).
+
+**Do not suggest:** Letting any agent stage or apply a delta. Skipping the interactive prompt for "trivial" deltas. Editing files under `scripts/.approved/` or `tests/` directly — the next gate run fails closed on the manifest.
+
+---
+
+## D-30 — 2026-07-01 — Sandbox flip: read-only repo + per-lane rw mounts; pre-commit hook for the human path
+
+**Decision:** `scripts/sandbox-run.sh` mounts the repo **read-only** and grants write access per-lane via `--rw <relpath>` (coder: build lane only; EM: `tasks/` only; test runs and smoke checks: `.cache/` only or nothing). `--rw` refuses `scripts/`, `.git/`, and `.githooks/` unconditionally — the control plane is never agent-writable. The agent user's HOME moves to a container tmpfs (OpenCode/pip session data must not live in the read-only repo). For the interactive/human entry point, `.githooks/pre-commit` enforces the active pipeline phase (from `.pipeline-state/phase` + `task_target`) and always verifies the control-plane manifest and the frozen spec; `bootstrap.sh` sets `core.hooksPath=.githooks`.
+
+**Alternatives considered:** (a) Keep the whole-repo rw mount and rely on phase-gate detection — a prior external review demonstrated a one-phase gate-neutralization: an agent could rewrite `phase-gate.sh` plus the manifest inside its phase, and the post-phase check would execute the compromised gate. Detection-after loses to a writable detector. (b) Per-file rw mounts for the coder — Podman bind-mount granularity makes single-file mounts brittle for files that don't exist yet; lane-level mount + the `task` gate's exactly-one-file check gives the same guarantee. (c) Overlay/copy-on-write sandboxes — heavier machinery for the same property.
+
+**Reason:** Prevention beats detection where prevention is one flag. INV-2 violations and gate-tampering become physically impossible on the orchestrated path; the gate remains as backstop for the path mounts cannot cover (a human driving directly). The control-plane manifest finally has its out-of-band anchor: the only writers of `scripts/` are the human and CI.
+
+**Do not suggest:** Re-widening the mount to the whole repo for agent convenience. Allowing `--rw scripts/...` for any phase. Removing phase-gate because the mounts "already handle it" — the hook path and defense-in-depth are why it stays.
+
+---
+
+## D-29 — 2026-07-01 — Escalation ladder with batched, filesystem-only TPM round-trips
+
+**Decision:** Escalation is a shell-owned ladder with every counter in `.pipeline-state/`: task retry (strike 1, failure evidence appended to the same brief) → EM consult at two strikes (schema-bound verdict) → `brief_wrong` (revised brief, `MAX_BRIEF_REVISIONS` default 1 per task) → `decomposition_wrong` (plan re-emit, re-validated, `MAX_PLAN_REVISIONS` default 2 per run) → `contract_or_test_wrong` / caps exhausted / spec drift → **batched TPM bundle** → human applies the TPM's delta via `scripts/refreeze.sh` → affected subtree resumes. PRD-ambiguity escalates from the TPM to the CEO in chat. Because the TPM is a human-operated web chat (not a callable service), the shell packages each escalation as a self-contained copy-pasteable bundle (`.pipeline-state/escalations/<id>/bundle.md`, aggregated into `BATCH.md`), keeps driving every independent subtree to its own stopping point first, and halts exactly once with exit code 2. Format: `docs/ESCALATION.md`.
+
+**Alternatives considered:** (a) Halt-and-ping on first escalation — one browser round-trip per defect; with N independent seam problems that is N round-trips instead of 1. (b) An API integration to the frontier model — assumes a service the operator does not run; the filesystem is the only integration that exists. (c) Let the EM decide when to escalate — escalation is procedure, and procedure is shell-owned (D-26).
+
+**Reason:** Judgment escalates exactly one tier per rung, every rung is bounded, and the expensive rung (human + frontier) is batched. The bundle must be self-contained (task entry, evidence, EM diagnosis, referenced contract entries, failing frozen-test sources) because the TPM has no repo access.
+
+**Do not suggest:** Escalating straight to the TPM without an EM diagnosis (the diagnosis is what makes the bundle actionable). Unbounded brief revisions. Letting an agent write into `.pipeline-state/escalations/`.
+
+---
+
+## D-28 — 2026-07-01 — Oracle projection: EM schedules frozen TPM tests, authors nothing
+
+**Decision:** Test authorship lives at the TPM tier, frozen via re-freeze (D-31). The per-task acceptance signal of the hot loop is a **projection** of that frozen oracle: each plan task lists the frozen test node-ids expected to pass once it and its dependencies are done. The EM schedules tests onto tasks; it never authors acceptance. The plan gate enforces the mapping is total and exactly-once. Feature completion has exactly one definition: the FULL frozen suite green. The case "every task passed its projection but the full suite is red" is mechanically detected as **spec drift** and routes EM→TPM (decomposition fix or spec delta) — never to coder retries. Tasks with no covering test carry an explicitly non-oracular `smoke_check`; the validator rejects tasks with neither.
+
+**Alternatives considered:** (a) EM authors per-task acceptance checks — re-creates oracle-authorship at the mid tier, the exact hole this redesign exists to close (the green signal must not be authored below the judgment tier). (b) Run the full suite after every task — most failures would be absent-dependency noise, drowning the real signal. (c) No per-task signal, only the final suite — failure attribution collapses; every defect surfaces at integration.
+
+**Reason:** The working oracle of the loop and the truth oracle are the same artifact viewed through a schedule, so they cannot drift in content — only in scheduling, which the exactly-once mapping check and the drift signal both catch mechanically. INV-1 ("tests derive from the spec, not the code") is now structural rather than advisory: the tests are written before the code exists, by a tier that never sees the implementation, and no agent can edit them.
+
+**Do not suggest:** Letting any agent author or edit tests. Treating a task's mapped-tests-green as feature-done. Routing a spec-drift signal to the coder.
+
+---
+
+## D-27 — 2026-07-01 — Capability ladder: TPM (web-chat frontier) / EM (mid-tier) / coder (local); test-runner agent deleted
+
+**Decision:** The four-role pipeline (pm/architect/build/test agents) is replaced by a capability ladder matched to task type. **CEO** (human): business intent. **TPM** (frontier LLM in a human-operated web chat, outside OpenCode): PRD, ERD with machine-readable contracts, and the test suite — the smallest, highest-leverage artifacts — installed and frozen via `scripts/refreeze.sh`. **EM** (mid-tier free online LLM, OpenCode agent `em`): decomposition and diagnosis only, per D-26. **Coder** (local LLM, OpenCode agent `coder`): one file per task, pure execution. The pm/architect/build/test prompts and the test agent are deleted; tests are RUN by the orchestrator via `pytest --json-report` — a shell command needs no agent wrapped around it (Rule 5: an LLM whose job is to run a command and describe the output can only add error).
+
+**Alternatives considered:** (a) Keep architect as a local agent — decomposition against locked seams is mid-tier work, but plan-sized judgment (contracts, tests) is not; splitting TPM/EM matches each artifact to the cheapest tier that can own it. (b) Keep a test agent to run pytest — deleted for the Rule 5 reason above. (c) All-frontier — forfeits the cost model; the ladder exists to spend frontier tokens only on spec/contract/test artifacts and escalation deltas.
+
+**Reason:** Frontier pays per token and never stops; local is a fixed cost trending better. The ladder bets on that trendline while keeping every load-bearing artifact (contracts, tests) at the judgment tier and every procedure in shell. The seam rule: the TPM locks cross-component contracts (cheap for it, catastrophic when wrong below); the EM owns everything inside them.
+
+**Do not suggest:** Re-adding a test-authoring or test-running agent. Giving the EM a write lane beyond `tasks/`. Calling the TPM programmatically (it is a human-operated chat; see D-29).
+
+---
+
+## D-26 — 2026-07-01 — Schema-validated artifact handoffs; plan.json validation gate
+
+**Decision:** Every inter-tier handoff is a schema-validated artifact on disk; the shell orchestrator is the only actor with procedural authority. The EM's sole channel of authority is `tasks/plan.json` (schema: `scripts/schemas/plan.schema.json`), mechanically validated by `scripts/validate-plan.py` before any coder runs: one file per task and one task per file (structural atomicity), acyclic DAG, exact bijection with the frozen ERD file inventory, every frozen test node-id mapped to exactly one task, every referenced contract id present in the frozen contracts, plan freshness against `scripts/.approved/VERSION`. The plan carries **no status field** — the validator rejects one. Task status, ordering, completion, and escalation counters live in `.pipeline-state/`, owned by the shell. EM consult responses are likewise schema-bound (`scripts/schemas/diagnosis.schema.json`, verdict enum `brief_wrong | decomposition_wrong | contract_or_test_wrong`).
+
+**Alternatives considered:** (a) EM reports decomposition and progress conversationally, orchestrator parses prose — trusts narration, the exact failure class this project exists to reject. (b) EM drives the loop itself and self-reports completion — re-creates the pre-D-05 failure (LLM forgets gates, miscounts strikes) one tier up. (c) Full `jsonschema` dependency — validator is stdlib-only (`json`/`hashlib`) to match the orchestrator's existing pre-flight contract.
+
+**Reason:** A bad decomposition must fail loudly at validation time, not surface three phases later as an integration error. This is D-05 (deterministic shell owns procedure) applied uniformly: LLMs produce content, shell computes everything computable — so the EM's residual authority is exactly the content of its decomposition and diagnoses, nothing procedural.
+
+**Do not suggest:** Adding a status/progress field to plan.json for the EM to maintain. Letting any agent update `.pipeline-state/`. Parsing EM free-text instead of the diagnosis schema.
+
+---
+
+## D-25 — 2026-06-26 — INV-3: Decision traceability gate (Adoption 3)
+
+> Retired 2026-07-22: post-D-53 the pipeline has no `architect` agent tier — the shell writes tasks/, the coder writes one file per task, docs/ is only touched by the human-facing conductor seat, and no code path writes `.pipeline-state/phase=architect`. The `architect` phase and its INV-3 grep sat unrun for ~3 weeks after D-53 landed; the shipping check on 2026-07-22 found 8 recent D-ids (D-72, D-77..D-83) missing from ARCHITECTURE.md — none had triggered anything, because nothing was looking. The gate is retired rather than backfilled because its premise (an architect agent could commit to DECISIONS.md without ARCHITECTURE.md) no longer describes the pipeline. Doc-drift now relies on Rule 5 (source wins on disagreement) and PM review. Amendment made in `scripts/phase-gate.sh` and `.githooks/pre-commit` under the same 2026-07-22 review as D-77's budget-skip amendment; `build`/`test` phases retired in the same commit (D-37 amended in ARCHITECTURE.md).
+
+**Decision:** Every non-documentation decision in DECISIONS.md (tagged with a D-NN ID) MUST appear in ARCHITECTURE.md. The architect→build handoff is mechanically blocked by `scripts/phase-gate.sh architect` — the gate greps ARCHITECTURE.md for each D-ID and exits non-zero if any are missing. Documentation-only decisions are exempted via a `**Documentation-only:**` marker in the decision body.
+
+**Rationale:** This is INV-3, same class as INV-1 and INV-2 — a mechanical, blocking gate. It closes the gap where an architect could make a decision in DECISIONS.md that never reaches the build agent (ARCHITECTURE.md is the build agent's source of truth). The grep is intentionally simple — no manifest, no registry, just string matching. This keeps the ceremony low enough that the gate is a net time-saver (catches forgotten updates) rather than a tax.
+
+**Alternatives considered:** (a) A separate decision-manifest file — extra indirection, more things to keep in sync. (b) Requiring D-IDs in the build prompt verbatim — over-constrained, the prompt already references ARCHITECTURE.md. (c) No gate, rely on architect discipline — advisory only, contradicts the project's mechanical-gate philosophy.
+
+**Do not suggest:** Central registry of D-IDs (the headings ARE the registry). Making the gate check for coverage in the build prompt instead of ARCHITECTURE.md.
+
+---
+
+## D-24 — 2026-06-26 — File-based pipeline state persistence (Adoption 2)
+
+**Decision:** All pipeline loop state (iteration count, re-plan count, failure signature, repeat counter, current phase) is written to `.pipeline-state/` files before each agent phase. On crash, the orchestrator resumes by reading these files. `.pipeline-state/` is gitignored — runtime diagnostics only.
+
+**Alternatives considered:** (a) Pass state via git commit messages and re-parse them — fragile, human-hostile format. (b) Store in environment variables passed to a supervisor — doesn't survive container restart. (c) Ephemeral shell variables (current design) — lost on crash.
+
+**Reason:** A crash mid-loop (Podman OOM, network drop, host reboot) currently loses all state. The state file is a single checkpoint written BEFORE each phase, surviving anything short of `rm -rf .pipeline-state/`. Also the foundation for the OpenHands port, where the orchestrator will be an LLM agent that reads/writes files instead of shell variables.
+
+**Do not suggest:** Version-controlling `.pipeline-state/` (ephemeral diagnostic data). Using a database, Redis, or any networked state store. Writing state after the phase (loses info on crash mid-phase).
+
+---
+
+## D-23 — 2026-06-26 — Fresh context per task (Adoption 1)
+
+**Documentation-only:** This decision documents a design principle already satisfied by the shell-orchestrator architecture.
+
+**Decision:** The orchestrator MUST spawn each build and test task in a clean context window. State transfers between tasks via structured files on disk, never via conversation history.
+
+**How the shell orchestrator satisfies this:** `scripts/orchestrate.sh` makes one `scripts/llm-call.sh` HTTP completion per phase (post-D-53 — no agent harness, no attach, no session state). Each completion is stateless by construction. The orchestrator itself is a shell script — no LLM context to rot.
+
+**Target for OpenHands port:** When the orchestrator becomes an LLM agent, the coordinator loop must stay under 40% of its context budget.
+
+**Do not suggest:** Passing state between phases as part of the agent prompt. Merging the orchestrator loop into a single agent context window.
+
+---
+
+## [DATE] — [Your first decision here]
+
+**Decision:** [e.g. Using raw SQL over ORM]
+**Alternatives considered:** [e.g. SQLAlchemy, Tortoise ORM]
+**Reason:** [e.g. Query complexity made ORM unreadable for our join-heavy patterns]
+**Do not suggest:** Switching to an ORM. This was deliberate.
+
+---
+
+## [DATE] — Monorepo structure (template placeholder — skip D-ID assignment)
+
+**Decision:** Single repository for all services.
+**Alternatives considered:** Separate repos per service.
+**Reason:** Team size doesn't justify the overhead of managing multiple repos. Shared code is easier to refactor.
+**Do not suggest:** Splitting into microservices repos until team grows past 5 engineers.
+
+---
+
+## D-08 — 2026-06-09 — AC9 compliance: mandatory sandbox + freeze trap closure
+
+**Decision:** Two changes for temp PM review compliance:
+
+1. **AC9 (no sandbox override):** Removed the `I_UNDERSTAND_UNSANDBOXED` override entirely. `orchestrate.sh` now fails immediately if `SANDBOX != 1` — no fallback path, no debug flag. Containerized execution is mandatory.
+2. **Freeze trap (P3 fix):** Moved `ARCHITECTURE.approved.md` from `docs/` (architect's writable lane) to `scripts/.approved/` (outside every agent's whitelisted directory). The orchestrator creates the directory and copies the file after the architect gate passes; no agent can touch it.
+
+**Reason:** The frozen AC9 criterion specified no env var or flag that disables containerized execution. The `I_UNDERSTAND_UNSANDBOXED` override existed as a conversational suggestion from the PM during code review but violated the frozen spec. Debug frequency is low enough that the friction is negligible — strict compliance avoids the "advisory safety" pattern the project exists to reject. The freeze trap was exposed by an empirical test: a re-plan architect could and did overwrite `docs/ARCHITECTURE.approved.md` because `docs/` is the architect's permitted directory. Moving the file to `scripts/.approved/` makes the constraint structural (wrong lane) rather than rule-based (gate carve-out).
+
+**Do not suggest:** Re-adding `I_UNDERSTAND_UNSANDBOXED` or any sandbox-disable flag. Moving `ARCHITECTURE.approved.md` back to `docs/`. Both were deliberate removals against verified defects.
+
+---
+
+## D-22 — 2026-06-07 — INV-2 gate: halt, not auto-clean (reaffirmed)
+
+**Decision:** The INV-2 gate exits with code 1 on any boundary violation (build writes tests/, test writes src/). It does not auto-clean, retry, or continue. A boundary violation is a signal for the human keystone — evidence that the instruction or model is wrong — not noise to sweep.
+
+**Reason reaffirmed after:** A prior session softened the gate to cleanup+continue, which silently swallowed violations. The build agent wrote to tests/ (correctly detecting), the gate auto-swept it, and the run continued as if nothing happened. That defeat is why the halt exists. The cost of a halted run is the cost of INV-2 working correctly.
+
+**Do not suggest:** Re-softening to cleanup+continue without PM sign-off.
+
+> Add new decisions above this line, newest first.
+## D-21 — 2026-06-07 — Operating Rules: rationale per rule
+
+**Documentation-only:** This entry documents rationale for Operating Rules; it does not change the API or build plan.
+
+**Rule 1 (report against the tree):** A hallucinated "6 commits" and an undisclosed model swap each cost a full PM review cycle to catch. The marker file makes the ref retrievable outside conversation history.
+
+**Rule 2 (one commit, one concern):** A safety-rule change (gate halt→cleanup) was bundled with prompt edits and a pip fallback in a single commit, bypassing review. Bundling is how serious changes slip through.
+
+**Rule 3 (stop-and-ask on constraint changes):** The gate soften was treated as routine de-blocking. Changing what happens on violation is a process decision, not a fix.
+
+**Rule 4 (conditionals are checkpoints):** The `-ud-mlx` fallback was used silently despite its precondition (base model failure) never occurring. The swap was only caught in post-hoc review.
+
+**Rule 5 (read the artifact):** A validation report was written from the build agent's chat summary, not from the committed artifact. The summary was less accurate than the file it described.
+
+**Rule 6 ("detected" ≠ "enforced"):** A standalone gate-test result was placed under a live-run section, implying the pipeline enforced a boundary that was switched off at the time.
+
+**Rule 7 (decide trivial calls):** A placement question (where in AGENTS.md to put the Reporting section) burned three turns when the PM had already stated "put it where process docs live." Re-asking after the principle is clear wastes cycles. Asking is not failure when correctness is at stake — that's the second clause of the rule.
+
+---
+
+## D-20 — 2026-06-07 — Advisory vs mechanical enforcement
+
+**Decision:** Of the seven Operating Rules, only Rule 1 ("report against the tree") has a mechanical backstop — `docs/.pm-last-review` for the ref plus the PM's source-side reconciliation as the ultimate check. Rules 2–7 are advisory: they rely on PM review for enforcement and no agent workflow enforces them mechanically.
+
+**Documentation-only:** This decision documents a process observation; it does not change the API or build plan.
+
+**Reason:** Honest labeling prevents these rules from being mistaken for guarantees. The durable safeguard is the PM's verification, not the doc. Aspirational claims that a rule "prevents" or "ensures" something erode trust when inevitably violated.
+
+**Do not suggest:** Claiming mechanical enforcement where none exists; adding commit-scope hooks or other automated enforcement without a separate PM decision.
+
+---
+
+## D-19 — 2026-06-07 — docs/.pm-last-review: PM-owned ref marker
+
+**Decision:** Introduced `docs/.pm-last-review` — a one-line file holding the last PM-reviewed commit hash. The build agent reads it at report time to scope its commit list; no agent writes or advances it. "Reviewed" means verified and accepted by the PM — not pushed, not agent-declared done. This is the same artifact-over-memory principle the project enforces on tests (PRD → tests, never src → tests), applied to reporting: the marker removes the retrieval failure (ref buried in chat), but the PM's source-side reconciliation remains the actual guarantee.
+
+**Alternatives considered:** (a) Storing the ref in the build agent's session/context — proven unreliable, this entire fix is why. (b) Tagging the repo with each review — noisy and requires push permissions. (c) Reading the ref from a PM-API call — overengineered.
+
+**Reason:** The previous design relied on the PM's ref persisting in conversation history across turns. It didn't. A file in the repo is persistent, versioned, and readable by tool calls. The PM advances it only after verifying the work. The file assists, it doesn't replace the human check.
+
+**Do not suggest:** Any agent writing to this file; removing the PM's source-side reconciliation because the file exists.
+
+## D-18 — 2026-06-07 — 32K context as pinned default for local model
+
+**Decision:** Confirmed the 32,768 token context length as the pinned operational setting for `qwen/qwen3.6-35b-a3b`. Measured the largest agent payload at ~3,000 tokens (test agent prompt + instruction + opencode system preamble). 32K provides 10x headroom for conversation history.
+
+**Alternatives considered:** (a) 8,192 (LM Studio default) — caused context-length errors in prior runs. (b) 131,072 or 262,144 (model max) — unnecessary GPU memory consumption, model seats 32K at 35.16 GiB.
+
+**Reason:** The model natively supports 262,144 tokens (`max_position_embeddings` confirmed via HuggingFace config). 32K is a comfortable operating point that leaves GPU memory headroom (35.16 GiB used across the available 128 GiB). No prompt trimming needed — the bottleneck was LM Studio's default.
+
+**Do not suggest:** Lowering context below 32K; raising to 256K without a demonstrated need.
+
+---
+
+## D-17 — 2026-06-07 — Template deps: app packages baked into Containerfile
+
+**Decision:** Keep `fastapi uvicorn httpx pydantic` baked into the Containerfile and `PYTHONPATH=/work` in `sandbox-run.sh` as template defaults. These are not validation-harness-only — they fix a universal bug: the non-root `agent` user (UID 1000) cannot `pip install --user` into system site-packages. Any FastAPI project in this template runs into the same failure.
+
+**Alternatives considered:** (a) Remove baked deps, require every project to add its own via `requirements.txt` — every new project re-debugs the same user-site-packages issue. (b) Switch to root container user — defeats the isolation purpose. (c) Install via build agent at runtime — rejected because it is lost on container exit and is no longer used.
+
+**Reason:** The four packages cover the most common FastAPI stack. The former runtime `pip install` fallback has been removed; the Containerfile guarantees the dependencies are present at build time. The `PYTHONPATH=/work` fix is similarly universal: without it, `from src.main import app` fails in the container regardless of project.
+
+**Do not suggest:** Removing these deps from the Containerfile. Removing `PYTHONPATH=/work`. Both will cause the same failures for every new project and the fix will be re-discovered each time.
+
+---
+
+## D-16 — 2026-06-07 — Model pin: qwen/qwen3.6-35b-a3b (base) as default
+
+**Decision:** Standardize on `qwen/qwen3.6-35b-a3b` (base model, 8-bit MLX, 37.75 GB) as the local build/test agent model. The `-ud-mlx` variant exists at 21.66 GB (4-bit) as a lower-memory fallback. The `opencode.json` config already points to the base model — this entry confirms it as the deliberate choice, not an accidental default.
+
+**Alternatives considered:** (a) `qwen3.6-35b-a3b-ud-mlx` — 4-bit quantized, 21.66 GB, faster load but slightly lower quality. (b) `qwen/qwen3-coder-next` — 80B, 44.86 GB, too large for routine agent calls. (c) `[FRONTIER_MODEL]` — reserved for pm/architect only.
+
+**Reason:** The base model seated 32K context at 35.16 GiB on M5 Max (128 GB unified memory), leaving ~90 GB for other workloads. The MLX variant loads in 21.66 GB but introduces a different serving path (unsorted, unproven for this project). The base model is the one the prompts were written and validated for. The two-tier cost model (frontier for planning, local for build/test) is preserved with a line at 35B, not 7B.
+
+**Do not suggest:** Switching to `-ud-mlx` as the default; running build/test on frontier models permanently; dropping below 35B for writing agents.
+
+---
+
+## D-15 — 2026-06-07 — INV-2 gate: halt, not cleanup
+
+**Decision:** Reverted the INV-2 gate handler in `scripts/orchestrate.sh` from cleanup+continue back to halt-and-flag (exit 1 with violation note in `tasks/CURRENT.md`). The prompt-hardening ("Write src/ only", "Write tests/ only") from the same commit was kept.
+
+**Alternatives considered:** (a) Keep cleanup+continue — unblocks the run but silently swallows a boundary violation that should be visible. (b) Leave the gate as-is (soft-halt with inspection note but no exit) — same problem, different disguise.
+
+**Reason:** A boundary violation (build wrote to `tests/` or test wrote to `src/`) is evidence that the model or instructions are wrong. That signal must stop the run and be recorded, not auto-swept. The halt is the enforcement; the gate (phase-gate.sh) is the detector. Cleaning up and continuing makes the violation invisible to the human keystone. The price of a halted run is the cost of INV-2 working correctly.
+
+**Do not suggest:** Re-introducing cleanup+continue; treating a gate violation as a routine iteration failure rather than a process break.
+
+---
+
+## D-14 — 2026-06-07 — Context window ceiling measurement and fix
+
+**Decision:** Measured the largest 35B agent payload (test agent: `.opencode/prompts/test.md` ~721B + orchestrator instruction ~166B + opencode system preamble ~8000B). Total estimated at ~3000 tokens. Raised LM Studio context length for `qwen/qwen3.6-35b-a3b` from the 8192 default to 32768 (32K) — four orders of magnitude over the measured need, with generous headroom for conversation history. The model natively supports 262144 (`max_position_embeddings` confirmed via HuggingFace config). Lever used: context bump, not prompt trim — the prompts themselves are small; the ceiling was LM Studio's default.
+
+**Reason:** The 35B model's default context window in LM Studio (8192) was too small for the combined system preamble + agent prompt + instruction, causing context-length errors in prior runs. The model supports 256K native; 32K is a comfortable operating point that leaves GPU memory headroom (35.16 GiB used, 128 GiB available on M5 Max).
+
+**Also changed:** `developer.separateReasoningContentInAPI` in `~/.lmstudio/settings.json` from `true` to `false`. When `true`, Qwen models that have reasoning enabled return `content: ''` with output in `reasoning_content` — opencode reads `content` only, so the model was unusable. Merging reasoning into `content` (even with the `<think>` block) keeps the model functional. To fully disable thinking (no reasoning tokens wasted), toggle the "Think" switch off in LM Studio UI for this model.
+
+**Do not suggest:** Lowering context below 32K; switching to the `-ud-mlx` variant for context reasons only (the regular model seats 32K comfortably); trimming the agent prompts (they are not the bottleneck).
+
+---
+
+## D-13 — 2026-06-07 — Pipeline robustness fixes (container deps, PYTHONPATH, gate recovery)
+
+**Decision:** Bake `fastapi uvicorn httpx pydantic` into Containerfile, add `PYTHONPATH=/work` to sandbox-run.sh, soften gate violations from hard-halt to cleanup+continue, and add `pip install` fallback before pytest.
+
+**Alternatives considered:** Installing via `pip install --user` at runtime (fails — user site-packages not on Python search path), installing via build agent (lost on container exit), mounting host `site-packages` (fragile).
+
+**Reason:** Non-root `agent` user (UID 1000) has no sudo and `pip install --user` drops to `~/.local/lib/python3.12/site-packages/` which Python does not search by default. The 35B model sometimes writes tests during build phase despite explicit prompts — cleanup+continue is more productive than halting. `pip install` before pytest ensures deps survive container rebuilds.
+
+**Do not suggest:** Installing deps via the build agent (agent runs in disposable container, install lost on exit). Hard-halting on gate violations (35B model needs graceful recovery). Removing `PYTHONPATH` (required for `from src.main import app`).
+
+---
+
+## D-12 — 2026-06-06 — Local Model Tier: Qwen3.6-35B-A3B for Build/Test
+
+**Decision:** Build and test agents default to `lms/qwen/qwen3.6-35b-a3b` (35B parameters, 3B active). The 7B `qwen3-coder-next` model produces malformed tool calls (omits required fields like `filePath` and `content` from the Write tool) and is removed from any file-writing role. PM and architect agents remain on `[FRONTIER_MODEL]` per the cost-tier design.
+
+**Alternatives considered:**
+- (a) Run all agents on frontier models — higher cost, negates local-tier savings
+- (b) Wait for better 7B tool-calling support — uncertain timeline
+- (c) Use Gemma-4-31B — not tested, but 35B Qwen writes files correctly
+
+**Reason:** The 35B model is the smallest local model found that reliably constructs valid OpenCode tool calls. It writes files, installs dependencies, and passes gates. The two-tier cost model (frontier for planning, local for build/test) is preserved — the threshold is 35B, not 7B.
+
+**Do not suggest:** Reverting build/test to the 7B model; running build/test on frontier models permanently.
+
+---
+
+## D-11 — 2026-06-06 — Agent Permission Model: No Catch-All Deny
+
+**Decision:** The test agent's `edit` permission uses explicit `src/**": "deny"` and `tests/**": "allow"` with no `**": "deny"` catch-all. The catch-all overrode the specific allow because `**` matches `tests/` paths. Build agent keeps `tests/**": "deny"` with `**": "allow"` as its catch-all — reversed logic because build's allowed set (everything except tests) is too broad to enumerate.
+
+**Alternatives considered:**
+- (a) Keep `**": "deny"` and list every non-test directory explicitly — brittle, misses new directories
+- (b) Use `--dangerously-skip-permissions` server-side — bypasses the entire permission model
+- (c) Single agent with no role separation — violates INV-2
+
+**Reason:** Explicit + allow with no deny catch-all is the simplest permission config that lets the test agent write files. OpenCode's permission engine applies matching deny rules regardless of specificity — a `**`: deny always catches `tests/` paths. Removing the catch-all fixes this at the config level.
+
+**Do not suggest:** Re-adding `**": "deny"` to the test agent; adding `--dangerously-skip-permissions` as a permanent fix.
+
+---
+
+## D-10 — 2026-06-06 — macOS Compatibility Fixes for Sandbox Scripts
+
+**Decision:** `scripts/sandbox-run.sh` and `scripts/orchestrate.sh` use `pwd -P` instead of `pwd` to resolve macOS `/tmp` → `/private/tmp` symlink for Podman bind-mount path matching. `sandbox-run.sh` uses Podman's built-in `--timeout` flag instead of external `timeout(1)` (which does not exist on macOS). `orchestrate.sh` detects `gtimeout` (macOS, from `brew install coreutils`) vs `timeout` (Linux) for its script-level agent timeout.
+
+**Alternatives considered:**
+- (a) Install coreutils on macOS and alias `timeout` — requires every macOS dev to opt in
+- (b) Skip timeout entirely on macOS — agents hang indefinitely
+- (c) Use Podman's `--timeout` only (already present) and skip the script-level wrapper — the wrapper is needed for the non-sandbox path and as a belt-and-suspenders guard
+
+**Reason:** macOS is the primary development platform (verified by `uname`). The `/tmp` symlink (`/tmp` → `/private/tmp`) causes Podman bind-mount failures because the container resolves the physical path differently than the host. External `timeout(1)` is a Linux-only command. Podman's `--timeout` flag works on both platforms and replaces it. The `gtimeout`/`timeout` detection on the orchestrator's non-sandbox path follows the same pattern as the project's other platform-detection logic.
+
+**Do not suggest:** Removing macOS support; switching to a Linux-only requirement; wrapping `timeout` in a shell function that fails silently.
+
+---
+
+## D-09 — 2026-06-06 — Sandbox Wiring in Orchestrator
+
+**Decision:** `scripts/orchestrate.sh` routes agent calls and pytest through `scripts/sandbox-run.sh` when the `SANDBOX=1` environment variable is set. The sandbox path wraps each agent call with `timeout "${AGENT_TIMEOUT}"` (the container runs Debian where `timeout` is available from coreutils). The non-sandbox path uses `$TIMEOUT_CMD "${AGENT_TIMEOUT}"` (`gtimeout` on macOS, `timeout` on Linux). `SANDBOX_LLM_HOST` is read from the environment; both `orchestrate.sh` and `sandbox-run.sh` default it to `host.containers.internal` independently. When the orchestrator drives the run, its exported value is inherited by the container launcher; run standalone, `sandbox-run.sh` supplies its own default. The orchestrator does not hard-code the address — it reads the variable set upstream.
+
+**Alternatives considered:**
+- (a) Always run inside the sandbox, no fallback — breaks for developers without Podman
+- (b) Hard-code `host.containers.internal` directly in `orchestrate.sh` — duplicates the address assumption that step 0 is supposed to prove
+- (c) No sandbox path — forfeits container isolation
+
+**Reason:** The `SANDBOX=1` env var is a single indirection point. Defaulting to `SANDBOX=0` preserves the existing non-sandbox workflow for development. The sandbox path delegates entirely to `sandbox-run.sh`, which is the single script that manages Podman flags, volume mounts, and the LLM host address. The orchestrator only knows `host.containers.internal` via the env var chain, not as a literal.
+
+**Do not suggest:** Hard-coding `host.containers.internal` in `orchestrate.sh`; removing the `SANDBOX=0` fallback; adding a second sandboxing mechanism.
+
+> **2026-06-09 correction:** The "SANDBOX=0 fallback" and "always run inside the sandbox" alternatives were revisited for AC9 compliance. The sandbox is now mandatory (no fallback). This decision entry is historical context; the current behavior is documented in the 2026-06-09 entry above.
+
+---
+
+## D-07 — 2026-06-06 — Four-role PRD→Plan→Build→Test pipeline
+
+**Decision:** Adopted a four-role pipeline (PM, Architect, Build, Test) with two non-negotiable invariants: INV-1 (tests derive from the PRD, never from `src/` implementation) and INV-2 (Build never edits `tests/`; Test never edits `src/`). The PRD in `tasks/CURRENT.md` is the single oracle — the human's casual instruction is translated into structured acceptance criteria and flagged assumptions, then frozen on Approval. The Architect is also the orchestrator: it delegates build→test, runs `scripts/phase-gate.sh` after each phase, reads `.cache/test-report.json`, and routes failures per Rule 2/7 (build bug→build, same failure twice→re-plan, plan fails twice→PM).
+
+**Alternatives considered:** (a) Extend the existing single-agent loop with role instructions in CLAUDE.md; (b) use OpenCode agent permissions alone for INV-2 enforcement; (c) keep the flat loop and add no roles.
+
+**Reason:** A single-agent loop conflates planning, writing, and testing in one context — the model's self-judgment replaces the test-report oracle (Rule 5 drift) and nothing prevents it from writing tests that confirm what `src/` does rather than what the spec says (INV-1 violation). Separate roles with frozen contracts force the verification gap that catches bugs. OpenCode's agent permissions (`permission.edit` globs) are non-transitive — a restricted agent can bypass limits via the Task tool (opencode issues #12566, #20549) — so INV-2 is enforced mechanically by `scripts/phase-gate.sh`, not by permissions alone. Doc guards catch intent; mechanical gates catch the result (documented pattern from the 2026-06-04 auto-load entry). Cost rationale: build/test use the local model (free, 80% of tasks); pm/architect use frontier for reasoning walls and spec work.
+
+**Do not suggest:** Letting the test agent read `src/` implementation to author tests (INV-1). Enforcing INV-2 with agent permissions alone — the git gate is the binding layer. Merging the four roles back into a single agent — the whole point is the verification gap between them. Letting the build or test agent edit the PRD or architecture docs.
+
+---
+
+## D-06 — 2026-06-06 — Adopted EARS for acceptance criteria
+
+**Decision:** Acceptance criteria in `tasks/CURRENT.md` are now written in EARS notation (THE SYSTEM SHALL / WHEN...SHALL / WHILE...SHALL / IF...THEN SHALL / WHERE...SHALL). Each criterion is a single observable clause that maps one-to-one to a test case. The PM prompt enforces this at PRD time; the test prompt reinforces the mapping at test time. Template examples in CURRENT.md demonstrate all five forms plus an HTML-comment reference guide.
+
+**Reason:** EARS forces each requirement into a single testable clause, giving the test agent an unambiguous oracle and tightening INV-1 enforcement. Vague prose criteria ("handles errors gracefully", "works correctly") were the weak point — the tester had to interpret intent, which reintroduces the ambiguity the pipeline was designed to eliminate. A one-clause-to-one-test mapping makes the test agent's job mechanical and removes the interpretation gap.
+
+**Do not suggest:** Reverting to free-form prose criteria, or forcing all five EARS forms when a single SHALL clause suffices (avoid ceremony — see the repo's anti-over-engineering history, BLUEPRINT.md and DECISIONS.md prune entries).
+
+---
+
+## D-05 — 2026-06-06 — Code-driven orchestration loop
+
+**Decision:** Moved loop control out of `architect.md` (where an LLM must remember to run the gate, read the test report, count strikes, and route) and into `scripts/orchestrate.sh`. The orchestrator is a shell script that drives the build→test loop deterministically: it starts a headless `opencode serve`, calls each agent via `opencode run --attach --agent <name>`, runs `scripts/phase-gate.sh` after each phase, parses the JSON test report via `python3 -c`, computes a `sha1(sorted(failing_node_ids))` signature for two-strike detection, and escalates to re-plan on identical failure signatures. The architect prompt shrinks to "produce/refresh the plan only."
+
+**Reason:** Loop control in an LLM prompt is a doc-guard — the architect could forget to run the gate, mis-count strikes, or skip escalation. Moving it to a script makes the gate invocation, the two-strike counter, and the halt deterministic — each is a line of shell code, not a remembered instruction. Additionally, each scoped `opencode run` sidesteps the non-transitive-permission bug (each agent runs in its own invocation with its own permissions) and prevents context bloat over long loops. The script wraps each agent call in a `run_agent` function that is the single indirection point for future sandbox adoption.
+
+**Do not suggest:** Putting orchestration logic back into `architect.md`, or auto-approving the PRD (the orchestrator refuses to run unless `Status: Approved`). Adding a queue, daemon, web UI, or multi-feature scheduling — one approved PRD, one run. Replacing the shell script with an orchestration framework (adopt OpenHands later if needed — note it in DECISIONS, don't pre-build for it).
+
+**Server details (for posterity, empirically verified on OpenCode 1.15.13):**
+- `opencode serve --port <n>` starts a headless server; default port is 0 (random), use `--port` explicitly.
+- `opencode run --attach <url> --agent <name> <prompt>` calls a specific agent on the running server.
+- Server is killed on script exit via `trap cleanup EXIT`.
+
+---
+
+## D-04 — 2026-06-06 — Demoted BLUEPRINT.md line-count gate to heuristic
+
+**Decision:** Removed the failing `wc -l BLUEPRINT.md <= 450` check from CI and the correction log's hard-target language. The 450 number was self-imposed by the model during a pruning session, never a human requirement. Line count is a proxy that does not measure the real goal (no redundant/ambiguous content). Enforcement is replaced with a heuristic note at the bottom of BLUEPRINT.md.
+
+**Documentation-only:** This decision documents a CI gate change; it does not change the API or build plan.
+
+**Reason:** Enforcing a specific line count as a CI failure pressures edits to delete real content — including safety rules — to stay green. A mechanical gate is right for binary invariants (INV-2, placeholder completeness), wrong for a judgment call like doc leanness. The anti-bloat principle is genuine (BLUEPRINT is the LLM's entry point; redundancy is token cost and ambiguity risk), but enforcement should be human review and cross-reference discipline, not a numeric gate.
+
+**Do not suggest:** Re-adding a failing line-count check, or compressing rules to hit a number. The "do not re-add pruned sections" guards in DECISIONS.md and human review are the correct mechanisms — they target redundancy directly.
+
+---
+
+## D-03 — 2026-06-04 — Removed CLAUDE.md mirror guard (decoupling template from project)
+
+**Decision:** Remove the one-line "Do not re-add sections dropped from BLUEPRINT.md in the 2026-06-04 prune" guard from `CLAUDE.md`'s "What NOT To Do" → Operating guardrails. The rule still lives in `DECISIONS.md` → "Pruned BLUEPRINT.md" entry.
+
+**Documentation-only:** This decision documents a doc decoupling action; it does not change the API or build plan.
+
+**Reason:** CLAUDE.md is a template — `[PROJECT_NAME]` is still a placeholder. Baking a project-specific date ("2026-06-04 prune") into a template file makes the rule meaningless for any future project created from this template. The visibility argument was real but the template-vs-project boundary was muddied. The principle (don't re-add dropped sections) stays binding via DECISIONS.md's "Do not suggest" line and the correction log capture.
+
+**Do not suggest:** Re-adding the mirror guard. Cross-reference, don't copy.
+
+---
+
+## D-02 — 2026-06-04 — Auto-load assumption corrected; CLAUDE.md / opencode.json fixes
+
+**Decision:** (a) Rewrite `CLAUDE.md`'s intro to accurately describe its load behavior — file is *fetchable via tools*, not pre-loaded; the LLM is *expected* to read it. (b) Fix the project's `opencode.json` schema (OpenCode 1.15.13 rejects the old `providers` / top-level `models` form with "Unrecognized keys"). The original commit also added a "do not re-add dropped BLUEPRINT.md sections" mirror guard to `CLAUDE.md`; that mirror was later removed (see entry below) for template-hygiene reasons.
+
+**Documentation-only:** This decision documents a measurement and fix to doc guards and config; it does not change the API or build plan.
+
+**Alternatives considered:** (a) Document the asymmetry but not fix it; (b) add a hook in BLUEPRINT.md to force the LLM to read CLAUDE.md first; (c) leave the broken `opencode.json` and tell users to delete it.
+
+**Reason:** The architectural premise that "guards in CLAUDE.md auto-fire every session" was unverified and partially false. Empirical test showed the model uses the `read` tool to fetch content (not pre-loaded) and can misparse which guard applies. The memory layer is best-effort, not enforced. For things that *must* hold, prefer mechanical gates (grep, `wc -l`, CI, git hooks) that fire without the LLM's cooperation. Doc guards are strong hints, not hard gates.
+
+**Do not suggest:** Reverting `CLAUDE.md`'s intro to the "automatically read" claim, or reverting `opencode.json` to the old `providers` schema. Both are now verified-correct by empirical test.
+
+**Verified by:**
+- `opencode run --format json --dir /tmp/opencode-autoload-test "Read AGENTS.md..."` — event log showed `tool_use` with `read` tool; model fetched content but answered wrong
+- `opencode --version` → `1.15.13` (matches the schema fix)
+- `opencode run "What is 2+2?" --format default` from project dir → "Four." (schema fix loads cleanly under the installed version)
+
+**Cross-cutting lesson (worth applying to all template projects):** Treat doc guards as advisory. For must-hold rules, build mechanical checks into scripts or CI:
+- Placeholder completeness → grep (BLUEPRINT.md Step 7)
+- File size budgets → `wc -l` in a pre-commit hook
+- Schema validity → `opencode.json` parsed at session start
+- Tests as ground truth → pytest in CI (BLUEPRINT.md Rule 5)
+Doc guards catch the LLM's *intent*; mechanical gates catch the *result*. Both have a place. The test just proved the first is weaker than the design claimed.
+
+---
+
+## D-01 — 2026-06-04 — Pruned BLUEPRINT.md (557 → ~440 lines)
+
+**Decision:** Apply the noise/redundancy findings from a parallel LLM audit; skip the lifecycle/strategy findings from a second LLM.
+**Documentation-only:** This decision documents a doc-pruning action; it does not change the API or build plan.
+**Alternatives considered:** (a) accept both LLMs' suggestions and add new rules; (b) leave the file as-is; (c) full rewrite.
+**Reason:** BLUEPRINT.md is the LLM's entry point. Every redundant line is context-window cost and a chance for ambiguity to compound. Pruning is a guardrail against drift, not cosmetics. Adding more rules (the second LLM's "fortify" suggestions: Doc-Sync hard rule, TDD loop, REVIEW checkpoints, `/reset-context`) would partially undo the trim and add bloat.
+**Do not suggest:** Re-adding the dropped sections. The "Document Map" alone is sufficient; the verbose "Document Roles Explained" was redundant. "Step 5 — Adapt the stack" is a pointer to Rule 3, not a restatement. Bootstrap cleanup, OpenCode Configuration, and Quick Reference Card are now minimal — keep them so.
+
+**Trimmed (12 items, ~115 lines removed):**
+- Dropped "Document Roles Explained" (duplicated Document Map)
+- Collapsed Bootstrap Step 5 to a 1-line pointer to Rule 3
+- Trimmed Maintenance Contract from 6 rows to 4 (dropped obvious triggers)
+- Trimmed Files Never to Touch from 5 items to 3 (universal best-practice items removed)
+- Shrunk Bootstrap Step 4 cleanup (24→6 lines)
+- Trimmed Step 7 preamble (dropped "Hard Rule 5" restatement)
+- Shrunk OpenCode Configuration section (28→3 lines + pointer to `opencode.json`)
+- Trimmed anti-pattern "wrong provider name" to a one-liner
+- Deleted Quick Reference Card (restated diagram + rules)
+- Fixed phantom "Step 4.5" reference on line 490 → "Step 4"
+- Reduced duplicate "lms not lmstudio" mentions from 3 to 1
+- Reduced "AGENTS.md symlinks to CLAUDE.md" mentions from 5 to 3 (one in prose + 2 short callouts)
+
+---
+
+---
+
+## D-172 — 2026-08-15 — Brownfield adoption: vortex is the first D-165 run
+
+**Context:** D-165 in this carried doctrine ledger theorized adoption as
+*snapshot-plus-go-forward*: the legacy test suite gets frozen as a hash-pinned
+snapshot that is explicitly NOT an independent oracle (never the acceptance
+gate for legacy paths), all new behavior runs through the normal TPM → refreeze
+→ orchestrate loop, and no adoption tooling exists. Its "no brownfield run is
+scheduled" clause is superseded by this entry for the vortex subject (the
+blueprint-side ledger is amended in the same commit family).
+
+**Decision:** The CEO ordered the first brownfield run ONTO vortex
+(2026-08-15). The control plane was installed verbatim from blueprint
+HEAD `8f9ce08` (66 template-owned files, hash-verified against
+`scripts/.manifest-template`; project-owned files adapted under Rule 3 and
+re-pinned in `scripts/.manifest-project`; birth ref stamped in
+`.template-version`). The legacy prototype (shipped at `b76b5ea`) keeps its
+shape; its 16 tests are pinned by byte-hash in `scripts/.approved/legacy-pin.json`
+— a snapshot, never an oracle. This ledger carries the doctrine verbatim
+(D-1..D-165) and appends vortex entries starting at D-172 (testchat
+exhausted D-166..D-171 for its locals).
+
+**Guard:** the legacy tests only ever change via `scripts/refreeze.sh` (or a
+recorded amendment of the pin); the pre-commit hook runs `phase-gate.sh
+manifest`; the frozen-spec gate arms only once `scripts/.approved/VERSION`
+exists (see D-173).
+
+**Do not suggest:** building adoption tooling (D-165 forbids it until the
+generalization is a named feature); treating `legacy-pin.json` as an
+acceptance oracle (D-165); onboarding a live production project onto the plane
+as an experiment — the CEO ruled testchat hands-off; any future representative
+brownfield subject is mature open-source software, run #2.
+
+---
+
+## D-173 — 2026-08-15 — Adoption finding #1: the pre-spec tunnel is gate-clean
+
+**Context:** Reading `scripts/phase-gate.sh` during the adoption: the
+frozen-spec block (hash loop over `scripts/.approved/frozen-manifest` + the
+INV-1 unpinned-tests cross-check) arms ONLY when `scripts/.approved/VERSION`
+exists. Before the first freeze, the plane runs integrity-only on commits.
+
+**Decision:** A brownfield repo adopted pre-spec installs a plane that is
+gate-clean by design: the legacy suite stays unpinned (INV-1 dormant) until
+the first milestone freeze, which then decides the suite's fate (carried into
+the frozen suite or retired). No fake spec was minted to "activate" the gates.
+
+**Guard:** the first milestone MUST produce the first freeze; until then the
+frozen-spec check's dormancy is a recorded property, not a script change.
+
+**Do not suggest:** pre-minting a spec to silence the dormant check; moving
+the INV-1 cross-check outside the `VERSION` trigger — that is generalization
+tooling, deferred by D-165.
+
+---
+
+## D-174 — 2026-08-15 — Adoption finding #2: live-walkthrough findings become the first milestone backlog
+
+**Context:** The prototype's live run (2026-08-15) proved load → ready →
+proxy → unload end-to-end, and surfaced two real defects: (1) llama-server
+answers `/v1/models` 200 while weights are still loading, so the ready-probe
+passes and the FIRST inference call gets `503 Loading model`; (2) the CLI's
+10s request timeout was shorter than the daemon's synchronous ~8s termination,
+crashing `vortex unload` once (fixed: 60s, committed `2a89dd8`).
+
+**Decision:** Finding (1) becomes the first milestone candidate, driven
+through the plane end-to-end (freeze → EM → coder → gate). Finding (2) is
+already fixed and stays as a committed fix. The eviction-409 path and
+adoption-after-restart remain unexercised live; both sit on the backlog.
+
+**Guard:** backlog items in `tasks/BACKLOG.md`; the probe class
+(runtime answers ready-shape before serving) is filed for any future runtime
+entry in the catalog.
+
+**Do not suggest:** hand-editing the probe outside the pipeline — it is the
+first real work item under the plane; fixing it is the milestone.

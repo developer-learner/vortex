@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Control-plane self-test: gate scripts are tested unconditionally — no
+  # skeleton guard, because these need no project src/ or requirements. The
+  # selftest_ (not test_) filename keeps it out of the frozen suite's bare
+  # `pytest` collection in orchestrate.sh/refreeze.sh.
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install pytest reporting + ruff
+        # ruff: the refreeze fixture selftests run the real apply path,
+        # whose D-67 staged-test lint gate fails closed without it.
+        run: pip install pytest pytest-json-report ruff
+      - name: Lint control-plane Python
+        run: ruff check --isolated --select E4,E7,E9,F scripts/
+      - name: Gate-script self-tests
+        # Glob every selftest_*.py — NOT the bare directory: pytest's default
+        # python_files is test_*.py, so `pytest scripts/selftest/` collects
+        # nothing here. The glob is drift-proof: a new selftest suite is picked
+        # up automatically instead of being silently omitted from CI (the
+        # milestone-trim/context-budget/mypy-cache suites were dark this way).
+        run: pytest scripts/selftest/selftest_*.py -q
+
+  test:
+    runs-on: ubuntu-latest
+    # NOTE: the skeleton guard is a STEP, not a job-level `if` — hashFiles()
+    # is not available in job-level expressions (no workspace exists yet);
+    # using it there makes the whole workflow file invalid (0s failure).
+    # --- Postgres for projects that need it (uncomment both blocks below) ---
+    # services:
+    #   postgres:
+    #     image: postgres:15
+    #     env:
+    #       POSTGRES_USER: testuser
+    #       POSTGRES_PASSWORD: testpass
+    #       POSTGRES_DB: testdb
+    #     options: >-
+    #       --health-cmd pg_isready
+    #       --health-interval 10s
+    #       --health-timeout 5s
+    #       --health-retries 5
+    #     ports:
+    #       - 5432:5432
+    steps:
+      - uses: actions/checkout@v7
+      - name: Guard — skip bare template skeletons
+        id: guard
+        run: |
+          if [ -f requirements.txt ] && [ -d src ]; then
+            echo "run=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=no" >> "$GITHUB_OUTPUT"
+            echo "::notice::skeleton repo (no requirements.txt + src/ yet) — CI steps skipped"
+          fi
+      - name: Set up Python
+        if: steps.guard.outputs.run == 'yes'
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        if: steps.guard.outputs.run == 'yes'
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov pytest-json-report ruff mypy respx
+      - name: Lint
+        if: steps.guard.outputs.run == 'yes'
+        run: ruff check src/
+      - name: Type check
+        if: steps.guard.outputs.run == 'yes'
+        # --explicit-package-bases: src/ layouts without __init__.py files make
+        # bare `mypy src/` exit 2 on "Duplicate module named" (e.g. api/models.py
+        # vs services/models.py) BEFORE type-checking a single line.
+        run: mypy --explicit-package-bases src/
+      # If using Postgres, uncomment DATABASE_URL and the services block above:
+      # - name: Run tests
+      #   env:
+      #     DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+      #   run: pytest --cov=src --cov-report=term-missing --cov-fail-under=80
+      # Browser oracle (D-58): projects whose frozen suite includes Playwright
+      # UI tests need the browser binary; a no-playwright project skips in 1s.
+      - name: Install Playwright browser
+        if: steps.guard.outputs.run == 'yes'
+        run: |
+          if pip show playwright >/dev/null 2>&1; then
+            playwright install --with-deps chromium
+          fi
+      - name: Run tests
+        if: steps.guard.outputs.run == 'yes'
+        # PYTHONPATH: tests import `src.*` from the repo root (the sandbox sets
+        # /work; CLAUDE.md documents `PYTHONPATH=. pytest`; CI must match).
+        # mkdir: pytest-json-report does not create the report's parent dir.
+        env:
+          PYTHONPATH: .
+        run: |
+          mkdir -p .cache
+          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=80 --json-report --json-report-file=.cache/test-report.json
+      - name: Upload coverage
+        uses: codecov/codecov-action@v7
+        if: always() && steps.guard.outputs.run == 'yes'

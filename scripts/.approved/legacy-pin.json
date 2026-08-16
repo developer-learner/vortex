@@ -1,0 +1,12 @@
+{
+  "artifact": "vortex legacy suite snapshot (D-165: snapshot-plus-go-forward)",
+  "adopted_from_commit": "b76b5ea",
+  "adoption_date": "2026-08-15",
+  "status": "FROZEN SNAPSHOT \u2014 NOT AN ORACLE",
+  "note": "This pin exists so legacy bytes are provable, never gated. The frozen-spec machinery scripts/.approved/frozen-manifest is separate and arms at the first milestone freeze (VERSION).",
+  "files": {
+    "tests/test_catalog.py": "05d2a2760adbc26635720ac3543890b0e8af9649df92dcee39eed77010143515",
+    "tests/test_serve.py": "f51dd0568c8c1cec9ce73b625de8e9eb8a593ee06352837a48938d03fe9202f8",
+    "tests/fake_server.py": "a09b8266c656051dc5d450a7a46574841724f2fa0e1b9f2261ac94a644128e2b"
+  }
+}
