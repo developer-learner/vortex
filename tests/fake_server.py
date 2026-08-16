@@ -16,13 +16,21 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class FakeChatServer:
-    def __init__(self, port: int = 0) -> None:
+    def __init__(self, port: int = 0, anneal_failures: int = 0) -> None:
+        """anneal_failures: chat returns 503 (loading) for the first N calls
+        while /v1/models keeps answering 200 — the llama-server phantom-ready
+        class (D-174). -1 = chat never succeeds.
+        """
+        self.anneal_failures = anneal_failures
+        self.chat_calls = 0
         self.requests: list[dict] = []
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self) -> None:
                 if self.path == "/v1/models":
                     self._json(200, {"object": "list", "data": [{"id": "fake-model", "object": "model"}]})
+                elif self.path == "/mock/received":
+                    self._json(200, {"chat_calls": self.server.chat_calls, "anneal_failures": self.server.anneal_failures})
                 else:
                     self._json(404, {"detail": "not found"})
 
@@ -31,6 +39,15 @@ class FakeChatServer:
                     length = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(length) or b"{}")
                     self.server.requests.append(body)  # type: ignore[attr-defined]
+                    self.server.chat_calls += 1
+                    if self.server.anneal_failures != 0:
+                        if self.server.anneal_failures > 0:
+                            self.server.anneal_failures -= 1
+                            self._json(503, {"detail": "Loading model"})
+                            return
+                        else:
+                            self._json(503, {"detail": "Loading model"})
+                            return
                     if body.get("stream"):
                         self._stream()
                     else:
@@ -68,7 +85,10 @@ class FakeChatServer:
 
         self.server = HTTPServer(("127.0.0.1", port), Handler)
         self.server.requests = []  # exposed to the Handler as self.server.requests
+        self.server.chat_calls = 0
+        self.server.anneal_failures = self.anneal_failures
         self.requests = self.server.requests
+        self.chat_calls = self.server.chat_calls
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -80,8 +100,9 @@ class FakeChatServer:
 
 def main() -> None:
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 0
-    server = FakeChatServer(port=port)
-    print(f"fake server on :{server.port}", flush=True)
+    anneal = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+    server = FakeChatServer(port=port, anneal_failures=anneal)
+    print(f"fake server on :{server.port} (anneal_failures={anneal})", flush=True)
     server.thread.join()
 
 

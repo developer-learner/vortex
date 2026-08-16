@@ -15,7 +15,9 @@ from fastapi.testclient import TestClient
 
 from vortex.app import build_app
 from vortex.catalog import Catalog, CatalogEntry
-from vortex.lifecycle import _find_listening_pid
+from vortex.lifecycle import Lifecycle, SidecarStore, SpawnError, _find_listening_pid
+from vortex.manager import Manager
+from vortex.operations import OperationStore
 
 TESTS_DIR = Path(__file__).parent
 
@@ -265,3 +267,60 @@ def test_unknown_model_load_404(tmp_path: Path) -> None:
     assert client.post("/api/models/nope/load").status_code == 404
     assert client.get("/api/operations/nope").status_code == 404
     assert client.get("/api/status").json()["loaded"] == []
+
+
+def _ops_wait(ops: OperationStore, op_id: str, want: str) -> dict:
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        snap = ops.snapshot(op_id)
+        if snap is not None and snap["state"] == want:
+            return snap
+        time.sleep(0.05)
+    raise AssertionError(f"operation {op_id} never reached {want!r}")
+
+
+def test_spawn_waits_for_anneal_before_ready(tmp_path: Path) -> None:
+    """Phantom-ready class (D-174): /v1/models 200s immediately while chat
+    answers 503 — load must NOT complete until a real completion succeeds."""
+    port = _free_port()
+    catalog = Catalog(entries=[_entry(
+        public_id="m1",
+        launch_command=[sys.executable, "-m", "tests.fake_server", str(port), "2"],
+        port=port,
+        ready_url=f"http://127.0.0.1:{port}/v1/models",
+        chat_endpoint=f"http://127.0.0.1:{port}/v1/chat/completions",
+    )])
+    ops = OperationStore()
+    mgr = Manager(catalog, Lifecycle(catalog, SidecarStore(tmp_path / "sidecars"), ready_timeout=lambda: 30.0), ops)
+    op_id = mgr.load("m1")["operation"]
+    assert _ops_wait(ops, op_id, "ready")["state"] == "ready"
+    import httpx
+
+    received = httpx.get(f"http://127.0.0.1:{port}/mock/received", timeout=2).json()
+    assert received["chat_calls"] == 3, "2 anneal probes must 503, then one must succeed"
+
+
+def test_spawn_fails_when_chat_never_succeeds(tmp_path: Path) -> None:
+    """A runtime whose chat never leaves 503 must fail the load, not go ready."""
+    port = _free_port()
+    catalog = Catalog(entries=[_entry(
+        public_id="m1",
+        launch_command=[sys.executable, "-m", "tests.fake_server", str(port), "-1"],
+        port=port,
+        ready_url=f"http://127.0.0.1:{port}/v1/models",
+        chat_endpoint=f"http://127.0.0.1:{port}/v1/chat/completions",
+    )])
+    ops = OperationStore()
+    mgr = Manager(catalog, Lifecycle(catalog, SidecarStore(tmp_path / "sidecars"), ready_timeout=lambda: 2.0), ops)
+    with pytest.raises(SpawnError):
+        mgr.load("m1")
+    assert ops.active_for("m1") is None, "no lingering loading op"
+    import httpx
+
+    received = httpx.get(f"http://127.0.0.1:{port}/mock/received", timeout=2).json()
+    assert received["chat_calls"] > 0, "anneal probes must have been attempted"
+    pid = _find_listening_pid(port)
+    if pid is not None:
+        import psutil
+
+        psutil.Process(pid).terminate()

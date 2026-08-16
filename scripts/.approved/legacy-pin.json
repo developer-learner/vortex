@@ -2,11 +2,11 @@
   "artifact": "vortex legacy suite snapshot (D-165: snapshot-plus-go-forward)",
   "adopted_from_commit": "b76b5ea",
   "adoption_date": "2026-08-15",
-  "status": "FROZEN SNAPSHOT \u2014 NOT AN ORACLE",
-  "note": "This pin exists so legacy bytes are provable, never gated. The frozen-spec machinery scripts/.approved/frozen-manifest is separate and arms at the first milestone freeze (VERSION).",
+  "status": "FROZEN SNAPSHOT — NOT AN ORACLE",
+  "note": "This pin exists so legacy bytes are provable, never gated. The frozen-spec machinery scripts/.approved/frozen-manifest is separate and arms at the first milestone freeze (VERSION). Re-pinned 2026-08-16: ready-probe anneal fix (direct route, CEO ruling) extended fake_server + test_serve; test_catalog untouched.",
   "files": {
     "tests/test_catalog.py": "05d2a2760adbc26635720ac3543890b0e8af9649df92dcee39eed77010143515",
-    "tests/test_serve.py": "f51dd0568c8c1cec9ce73b625de8e9eb8a593ee06352837a48938d03fe9202f8",
-    "tests/fake_server.py": "a09b8266c656051dc5d450a7a46574841724f2fa0e1b9f2261ac94a644128e2b"
+    "tests/test_serve.py": "a0c51ec706ea874b439e4a85b7aad485cee8e59f3fa7784324af76dad3cf0901",
+    "tests/fake_server.py": "e1b3f8b27f53c316d1a053b5da58439fabef4817f0cc97b98351cb9fad688768"
   }
 }

@@ -58,6 +58,33 @@ def _responds_ready(ready_url: str) -> bool:
         return False
 
 
+def _anneal_probe(chat_endpoint: str) -> bool:
+    """A real inference anneal: the runtime must serve a 1-token completion.
+
+    Endpoints that answer /v1/models across the load (llama-server returns
+    200 while weights still load) must not count as ready until a completion
+    actually succeeds — otherwise the first client chat receives the
+    upstream's 503 Loading model (finding #1, D-174).
+    """
+    try:
+        resp = httpx.post(
+            chat_endpoint,
+            json={
+                "model": "__ready_probe__",
+                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 1,
+                "stream": False,
+            },
+            timeout=5,
+        )
+        if resp.status_code != 200:
+            return False
+        body = resp.json()
+        return bool(body.get("choices"))
+    except Exception:  # noqa: BLE001 — probe must swallow any failure
+        return False
+
+
 class SidecarStore:
     """PID + start-time record per entry; survives modelmux restarts."""
 
@@ -174,6 +201,10 @@ class Lifecycle:
             return "ready"
         return "unidentified"
 
+    def _harmonic_ready(self, entry: CatalogEntry) -> bool:
+        """Port ownership PLUS a 200 on /v1/models PLUS a real completion."""
+        return _responds_ready(entry.ready_url) and _anneal_probe(entry.chat_endpoint)
+
     def spawn(self, entry: CatalogEntry) -> tuple[subprocess.Popen, bool]:
         """Spawn the entry's launch command. Returns (process, became_ready).
 
@@ -203,7 +234,8 @@ class Lifecycle:
         deadline = time.monotonic() + self.ready_timeout()
         while time.monotonic() < deadline:
             if self.owner_status(entry, self.occupying_pid(entry)) == "ready":
-                return proc, True
+                if self._harmonic_ready(entry):
+                    return proc, True
             if proc.poll() is not None:
                 raise SpawnError(f"{entry.public_id} exited early rc={proc.returncode}", rc=proc.returncode)
             time.sleep(POLL_INTERVAL_SECONDS)
