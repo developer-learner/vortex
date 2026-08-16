@@ -8,18 +8,28 @@
   Legacy prototype pinned at `b76b5ea`; its 16 tests snapshotted
   (`scripts/.approved/legacy-pin.json`, NOT an oracle — D-1). Ledger D-172..D-174.
   Testchat ruled hands-off by the CEO (never an experimentation subject).
+- **2026-08-16 — Adoption commit `015a4a2` landed.** 112 files, 454/454
+  plane selftests, ruff clean. D-160 placeholder gate satisfied (PRODUCT /
+  ARCHITECTURE / CLAUDE contacts filled; `.manifest-project` re-pinned after
+  the AGENTS.md symlink hash trip).
+- **2026-08-16 — TPM seat named (D-139 cleared): the conductor.** EM/coder =
+  `qwen3.8-27b-8bit` served via mlx-dspark (`lmstudio-community`
+  Qwen3.8-27B-MLX-8bit, 8-bit complete; mlx-community 8-bit is shard-incomplete
+  — never use), loaded through vortex at :8103 behind the :9000 universal
+  surface. Verified round-trip 0.3s, thinking off (`--no-thinking`), usage
+  passthrough intact. Cache capped pre-import (8GB cache / 50GB memory).
 - **Pre-spec tunnel** (D-173): plane is gate-clean until the first freeze
   creates `scripts/.approved/VERSION`.
 
 ## Halt notes
 
-- **HALT — first milestone launch is CEO-gated (D-139).** The ready-probe
-  fix (`503 Loading model` class) is the first milestone candidate. Before
-  any TPM round-trip or `orchestrate.sh` run: name the TPM seat for this
-  session. Never assume the seat is "someone else."
-- Orchestrate pre-flight requires: Lima `dev-vm` running, LM Studio reachable
-  with mapped non-thinking models (`~/.config/sw-dev-blueprint/models.env`),
-  working tree clean.
+- **HALT lifted — seat named.** First milestone (ready-probe fix, `503
+  Loading model` class) may proceed: spec authored by the TPM seat
+  (conductor), frozen via `refreeze.sh`, run via `orchestrate.sh`.
+- Orchestrate pre-flight requires: Lima `dev-vm` running, **model reachable
+  from inside the VM** (vortex daemon currently binds 127.0.0.1 only —
+  VM/host-gateway wiring + VM `models.env` (`qwen3.8-27b-8bit`,
+  `SANDBOX_LLM_HOST/PORT`) is orchestrate prep), working tree clean.
 
 ## Open questions
 

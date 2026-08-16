@@ -35,6 +35,18 @@
       "upstream_alias": "Flash_IQ3XXS",
       "ram_estimate_gb": 90.0,
       "exclusive": true
+    },
+    {
+      "public_id": "qwen3.8-27b-8bit",
+      "runtime": "dspark",
+      "engine": "mlx-dspark",
+      "launch_command": ["/Users/arc.elixir/dev/mlx-dspark/run-server-8103.sh"],
+      "port": 8103,
+      "ready_url": "http://127.0.0.1:8103/v1/models",
+      "chat_endpoint": "http://127.0.0.1:8103/v1/chat/completions",
+      "upstream_alias": "Qwen3.8-27B-MLX-8bit",
+      "ram_estimate_gb": 30.0,
+      "exclusive": false
     }
   ]
 }
