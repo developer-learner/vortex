@@ -48,7 +48,7 @@ def _poll(op_id: str) -> dict:
 
 
 def _cmd_load(args: argparse.Namespace) -> int:
-    r = httpx.post(f"{BASE_URL}/api/models/{args.model}/load", timeout=10)
+    r = httpx.post(f"{BASE_URL}/api/models/{args.model}/load", timeout=60)
     if r.status_code == 409:
         print(f"conflict: {r.json().get('detail', r.text)}")
         return 2
@@ -62,7 +62,7 @@ def _cmd_load(args: argparse.Namespace) -> int:
 
 
 def _cmd_unload(args: argparse.Namespace) -> int:
-    r = httpx.post(f"{BASE_URL}/api/models/{args.model}/unload", timeout=10)
+    r = httpx.post(f"{BASE_URL}/api/models/{args.model}/unload", timeout=60)
     r.raise_for_status()
     op = _poll(r.json()["operation"])
     if op["state"] == "unloaded":
