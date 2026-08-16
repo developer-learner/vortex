@@ -2041,3 +2041,31 @@ entry in the catalog.
 
 **Do not suggest:** hand-editing the probe outside the pipeline — it is the
 first real work item under the plane; fixing it is the milestone.
+
+---
+
+## D-175 — 2026-08-16 — CEO routing ruling: pre-first-freeze bug fixes go direct; the first feature ride gets the pipeline
+
+**Context:** D-174 named the ready-probe fix the first milestone candidate.
+On inspection the fix is small and deterministic (one file was ready to
+probe; the anneal needed ~25 lines), but its regression tests live in the
+legacy suite, which INV-1 treats as frozen-lane. The CEO ruled: **this
+fix goes direct/adhoc — code, tests, and pin, in one commit — and the
+pipeline's first orchestrate ride happens on the next real feature add.**
+
+**Decision:** Pre-first-freeze bug fixes on vortex are routed direct by the
+CEO, including their regression tests (the legacy suite is a D-165
+snapshot, NOT an oracle; re-pinned in place, test_catalog untouched). The
+first pipeline run (refreeze → EM → coder → gate) is reserved for the next
+feature milestone — the testchat recut or router UI, CEO to confirm which.
+INV-1's test-lane rule is waived for the tunnel era only; the first freeze
+re-oracles whatever survives.
+
+**Guard:** recorded in tasks/CURRENT.md; the "bug fixes are direct" reading
+is a tunnel-era per-instance ruling, not a standing rule — D-132's axis
+(size + determinism, never the bug/feature label) still governs routing
+the day a bug fix is large or cross-cutting (testchat v99 precedent).
+
+**Do not suggest:** routing a large or oracle-heavy change direct because
+"it is a bug fix"; or hand-editing tests after the first freeze, when the
+frozen suite is live.
