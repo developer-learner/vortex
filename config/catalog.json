@@ -13,18 +13,6 @@
       "exclusive": true
     },
     {
-      "public_id": "Flash_Q2KXL",
-      "runtime": "llama-server",
-      "engine": "llama.cpp",
-      "launch_command": ["/Users/arc.elixir/dev/testchat/scripts/run-server-0731-q2.sh"],
-      "port": 8101,
-      "ready_url": "http://127.0.0.1:8101/v1/models",
-      "chat_endpoint": "http://127.0.0.1:8101/v1/chat/completions",
-      "upstream_alias": "Flash_Q2KXL",
-      "ram_estimate_gb": 97.0,
-      "exclusive": true
-    },
-    {
       "public_id": "Flash_IQ3XXS",
       "runtime": "llama-server",
       "engine": "llama.cpp",
