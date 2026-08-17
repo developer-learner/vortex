@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import subprocess
 import threading
 
 import psutil
@@ -114,7 +116,32 @@ class Manager:
 
 
 def estimate_ram_used_gb() -> float:
-    return psutil.virtual_memory().used / (1024**3)
+    return _activity_monitor_used_gb() or psutil.virtual_memory().used / (1024**3)
+
+
+def _activity_monitor_used_gb() -> float:
+    try:
+        out = subprocess.run(
+            ["vm_stat"], capture_output=True, text=True, timeout=5, check=True
+        ).stdout
+    except (subprocess.SubprocessError, OSError):
+        return 0.0
+    pages = {}
+    for line in out.splitlines():
+        m = re.match(r"\s*([\w ]+):\s+(\d+)\.", line)
+        if m:
+            pages[m.group(1).strip()] = int(m.group(2))
+    keys = [
+        "Pages active",
+        "Pages inactive",
+        "Pages speculative",
+        "Pages wired down",
+        "Pages occupied by compressor",
+    ]
+    if any(k not in pages for k in keys):
+        return 0.0
+    page_size = 16384
+    return sum(pages[k] for k in keys) * page_size / (1024**3)
 
 
 def estimate_ram_total_gb() -> float:
