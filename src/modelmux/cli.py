@@ -11,8 +11,19 @@ import httpx
 BASE_URL = "http://127.0.0.1:9000"
 
 
+class DaemonUnavailable(Exception):
+    pass
+
+
+def _request(method: str, path: str, **kwargs) -> httpx.Response:
+    try:
+        return httpx.request(method, BASE_URL + path, **kwargs)
+    except httpx.ConnectError:
+        raise DaemonUnavailable() from None
+
+
 def _get(path: str) -> dict:
-    r = httpx.get(BASE_URL + path, timeout=10)
+    r = _request("GET", path, timeout=10)
     r.raise_for_status()
     return r.json()
 
@@ -48,7 +59,7 @@ def _poll(op_id: str) -> dict:
 
 
 def _cmd_load(args: argparse.Namespace) -> int:
-    r = httpx.post(f"{BASE_URL}/api/models/{args.model}/load", timeout=60)
+    r = _request("POST", f"/api/models/{args.model}/load", timeout=60)
     if r.status_code == 409:
         print(f"conflict: {r.json().get('detail', r.text)}")
         return 2
@@ -62,7 +73,7 @@ def _cmd_load(args: argparse.Namespace) -> int:
 
 
 def _cmd_unload(args: argparse.Namespace) -> int:
-    r = httpx.post(f"{BASE_URL}/api/models/{args.model}/unload", timeout=60)
+    r = _request("POST", f"/api/models/{args.model}/unload", timeout=60)
     r.raise_for_status()
     op = _poll(r.json()["operation"])
     if op["state"] == "unloaded":
@@ -91,7 +102,12 @@ def main(argv: list[str] | None = None) -> int:
         "load": _cmd_load,
         "unload": _cmd_unload,
     }
-    return handlers[args.command](args)
+    try:
+        return handlers[args.command](args)
+    except DaemonUnavailable:
+        print("vortex daemon is not reachable on http://127.0.0.1:9000", file=sys.stderr)
+        print("start it from the vortex repo: .venv/bin/uvicorn vortex.app:build_app --factory --port 9000", file=sys.stderr)
+        return 3
 
 
 if __name__ == "__main__":
