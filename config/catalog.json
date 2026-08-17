@@ -35,6 +35,30 @@
       "upstream_alias": "Qwen3.8-27B-MLX-8bit",
       "ram_estimate_gb": 30.0,
       "exclusive": false
+    },
+    {
+      "public_id": "mtplx-qwen38-27b-optimized-quality",
+      "runtime": "mtplx",
+      "engine": "mtplx",
+      "launch_command": ["/Users/arc.elixir/.mtplx/bin/mtplx", "quickstart", "--model", "Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality", "--port", "8001"],
+      "port": 8001,
+      "ready_url": "http://127.0.0.1:8001/v1/models",
+      "chat_endpoint": "http://127.0.0.1:8001/v1/chat/completions",
+      "upstream_alias": "mtplx-qwen38-27b-optimized-quality",
+      "ram_estimate_gb": 30.4,
+      "exclusive": true
+    },
+    {
+      "public_id": "vmlx-dsv4-configi-mlx",
+      "runtime": "vmlx",
+      "engine": "vmlx",
+      "launch_command": ["/opt/homebrew/bin/vmlx", "serve", "/Users/arc.elixir/.cache/huggingface/hub/DeepSeek-V4-Flash-ConfigI-MLX", "--port", "8104"],
+      "port": 8104,
+      "ready_url": "http://127.0.0.1:8104/v1/models",
+      "chat_endpoint": "http://127.0.0.1:8104/v1/chat/completions",
+      "upstream_alias": "DeepSeek-V4-Flash-ConfigI-MLX",
+      "ram_estimate_gb": 100.8,
+      "exclusive": true
     }
   ]
 }
