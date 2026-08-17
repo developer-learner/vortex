@@ -46,6 +46,15 @@
   page on `:9000/`). (3) check-drift verified IN_SYNC on
   `experiment/symlink-control-plane` (child == template @`1ce8a33f`, rc=0)
   — the symlink declutter does not register as drift.
+- **2026-08-17 — Memory figure in UI = Activity Monitor's number.** The
+  daemon reports psutil-used (~111GB) while Activity Monitor counts ~126GB
+  (wired + compressor + active + inactive + cache). The UI shows the AM
+  figure (top PhysMem), not psutil-used. The daemon's eviction math
+  (`manager.py eviction_required`) is model-estimate-based
+  (`0.8*total` vs sum of loaded estimates) and is independent of the
+  displayed figure — changing the display cannot affect loadability.
+  **No load-threshold rule**: high-occupancy loads (e.g. the 3-bit at
+  ~126GB) are legitimate; the DSpark failure was GPU working-set, not RAM.
 
 ## Halt notes
 
