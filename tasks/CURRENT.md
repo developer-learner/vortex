@@ -39,6 +39,13 @@
   Direct ad-hoc work only (D-175 routing). Preflight prerequisites
   (VM gateway wiring, VM `models.env`) remain unmet until a run is
   authorized.
+- **2026-08-17 — CEO rulings.** (1) `omlx` is NOT in the backlog/plan —
+  install only on the day it is actually needed; never re-suggest as
+  pending. (2) UI concept (router phase 2) un-gated: `docs/UI-CONCEPT.md`
+  drafted, awaiting CEO sign-off (form factor A recommended: server-rendered
+  page on `:9000/`). (3) check-drift verified IN_SYNC on
+  `experiment/symlink-control-plane` (child == template @`1ce8a33f`, rc=0)
+  — the symlink declutter does not register as drift.
 
 ## Halt notes
 
