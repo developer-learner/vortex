@@ -20,6 +20,25 @@
   passthrough intact. Cache capped pre-import (8GB cache / 50GB memory).
 - **Pre-spec tunnel** (D-173): plane is gate-clean until the first freeze
   creates `scripts/.approved/VERSION`.
+- **2026-08-17 — Adoption check done.** Full control-plane selftest suite
+  green on this machine: 456 passed / 74s (`pytest scripts/selftest/selftest_*.py`,
+  CI-identical invocation). 454→456 = the two phantom-ready regression tests
+  shipped with `859bfb2`.
+- **2026-08-17 — Catalog maintenance.** `Flash_Q2KXL` entry removed
+  (`fede767`; Q2_K_XL GGUF deleted from disk 2026-08-17, ~90GB reclaimed).
+  `mtplx-qwen38-27b-optimized-quality` (:8001, 30.4GB) and
+  `vmlx-dsv4-configi-mlx` (:8104, 100.8GB) registered — registration only;
+  exercise-live (BACKLOG item) still pending: the 3-bit is resident
+  (~107GB/128GB), so no further model may load until the CEO frees memory.
+- **2026-08-17 — Ready-probe fix verified live.** `859bfb2` predicate
+  (port ownership + /v1/models 200 + real 1-token chat completion) passes
+  against the resident Flash_IQ3XXS; negative path pinned by the two
+  regression tests in the 456.
+- **2026-08-17 — Milestone + Lima deferred by CEO.** No orchestrate run, no
+  `dev-vm` boot while the 3-bit is resident (memory headroom ~20GB).
+  Direct ad-hoc work only (D-175 routing). Preflight prerequisites
+  (VM gateway wiring, VM `models.env`) remain unmet until a run is
+  authorized.
 
 ## Halt notes
 
@@ -41,6 +60,10 @@
 ## Next actions
 
 1. CEO names TPM seat → author first spec (ready-probe fix) → freeze →
-   orchestrate
-2. Verify installed plane's selftests pass on this machine (adoption check)
-3. Stand up Lima + models.env when the first milestone launches
+   orchestrate — **blocked: milestone runs deferred until memory freed**
+2. ~~Verify installed plane's selftests pass on this machine~~ — DONE
+   2026-08-17 (456/456, 74s)
+3. Stand up Lima + models.env when the first milestone launches — blocked
+   with item 1
+4. Exercise mtplx/vmlx catalog entries live once a model slot is free
+   (BACKLOG)
