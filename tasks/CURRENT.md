@@ -2,6 +2,20 @@
 
 ## State
 
+- **2026-08-18 — Daemon adoption anomaly + resolution.** A long-running
+  daemon dropped Flash_IQ3XXS from `loaded` mid-session and then refused
+  adoption (`409 unidentified process`) despite a byte-exact sidecar match
+  (verified: live `create_time` == recorded `start_time`, delta 0.0; fresh
+  in-process `SidecarStore.identifies()` returned True). Clean daemon restart
+  re-adopted at boot (sidecar path works; `v1/models` + proxy round-trip
+  verified `OK`). Root cause of the mid-session drop uninvestigated —
+  candidate backlog item: daemon state drift across long uptimes.
+  Daemon now pid 19743 (`/tmp/vortex.pid`), log `/tmp/vortex-boot2.log`.
+  Also: `/api/status` reports the Activity-Monitor figure (wired+active+
+  inactive+spec+compressor via vm_stat, `a27fcf9`) — display-only; AM's
+  exact "Memory Used" decimal (~123.7) is not reproducible from public
+  stats (app-attributed inactive pages); top-style figure (~126) and AM
+  track together within the cache delta.
 - **2026-08-15 — Brownfield adoption landed.** Control plane installed
   verbatim from blueprint @`8f9ce08` (66 template-owned files hash-verified,
   birth ref stamped, `.manifest-project` regenerated, gate hook armed).
