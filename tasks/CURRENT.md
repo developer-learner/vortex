@@ -97,3 +97,16 @@
    with item 1
 4. Exercise mtplx/vmlx catalog entries live once a model slot is free
    (BACKLOG)
+
+## Backlog
+
+- **FEATURE (proposed, un-speced): `vortex ctx-tune <model>`** — automated
+  context-length selection. Three parts: (1) workload profiler (largest
+  artifact + tool-output budget + real session token usage from opencode
+  session store), (2) model probe (needle test at 32k/64k/128k/256k +
+  TTFT/TPS curve), (3) decision + application (recommend
+  `max(workload_peak×2, artifact+budget)` clamped to the needle-validated
+  ceiling, write into catalog `ctx_size` + opencode `limit.context`) with a
+  compaction-frequency/TTFT watchdog that re-tunes only on >30% signal
+  shift. CEO approval to build pending; raised 2026-08-18. Context choice
+  should be a program's decision, not a human's.
