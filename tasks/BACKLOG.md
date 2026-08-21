@@ -9,8 +9,7 @@
 
 ## P2 — prototype hardening (post-milestone-1)
 
-- Exercise the **ds4** catalog entry live (mtplx done 2026-08-21; ds4 is
-  the 90GB deepseek-v4-flash entry — needs memory headroom).
+- (none — all retired; see below)
 
 ## P3 — roadmap phases (post-cutover)
 
@@ -34,5 +33,8 @@
 - **Exercise the ds4/mtplx catalog entry live (mtplx half)** — done
   2026-08-21: full lifecycle through vortex (spawn → ready → proxy →
   adoption across restart → unload). Evidence in session notes.
+- **Exercise the ds4 catalog entry live** — done 2026-08-21: spawn →
+  ready ~13s → real completion via :9000 → clean unload. Evidence in
+  session notes.
 - **CLI polish: daemon-less `vortex` UX when `:9000` is down** — done
   2026-08-17 (`2cf8484`).

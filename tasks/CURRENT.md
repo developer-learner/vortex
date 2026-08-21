@@ -2,6 +2,15 @@
 
 ## State
 
+- **2026-08-21 — ds4 runtime live PASSED (last P2 item closed).** Full
+  lifecycle through vortex for `deepseek-v4-flash-0731` (:8005, ds4
+  server / mtplx engine): spawn → ready in ~13s (op `4caa91b18e17`,
+  sidecar pid 46748) → real completion via the :9000 universal surface
+  (usage + cache_write passthrough) → unload `d1627e168fbd` stopped
+  clean, port freed, sidecar dropped. Peak AM figure ~126.7/128 GB.
+  Every catalog runtime family except vmlx has now run live through
+  vortex (llama-server, dspark, mtplx, ds4; vmlx entry is the 100.8GB
+  model — headroom-bound).
 - **2026-08-21 — mtplx runtime live + adoption-across-restart PASSED
   (backlog P2 items closed).** Out-of-band mtplx app server on :8001
   (pid 44845, launched 14:47 via the desktop app — the exact
