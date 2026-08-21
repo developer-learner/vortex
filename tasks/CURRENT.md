@@ -2,6 +2,17 @@
 
 ## State
 
+- **2026-08-21 — Live-demo eviction PASSED (backlog P2 item closed).**
+  Drove the real structured conflict on this machine: loaded
+  `Flash_IQ3XXS` via `POST /api/models/{id}/load` (ready in ~20s,
+  op `431abc7de1c8`; AM figure peaked ~126GB), then attempted
+  `mtplx-qwen38-27b-optimized-quality` → **HTTP 409** with
+  `required_gb: 30.4`, `eviction_candidates: ["Flash_IQ3XXS"]`
+  (budget math: 102.4 − 90 = 12.4 < 30.4). Refusal was pre-spawn:
+  port 8001 stayed free, no mtplx process ever existed. Unload
+  (`34caea6dd630`) returned `stopped: true` in ~10s; `/api/status`
+  back to `loaded: []`. First live (non-CI) evidence for the
+  never-silent-kills invariant.
 - **2026-08-18 — Daemon adoption anomaly + resolution.** A long-running
   daemon dropped Flash_IQ3XXS from `loaded` mid-session and then refused
   adoption (`409 unidentified process`) despite a byte-exact sidecar match
