@@ -2,6 +2,14 @@
 
 ## State
 
+- **2026-08-21 — UI concept SIGNED OFF (CEO).** Form factor A confirmed via
+  the live interactive preview (`examples/ui-demo/`, look-and-feel adopted
+  from the original Aug-17 preview at `~/dev/ui-demo/`, now deleted — its
+  `top`-hack RAM figure was obsoleted by `a27fcf9`). UI is the
+  first-milestone candidate. Implementation = one HTML template + static
+  route + polling JS mounted in the daemon; no new API surface, so no new
+  TPM acceptance scope per the concept doc. Milestone preflights still
+  unmet: Lima gateway wiring + VM `models.env`.
 - **2026-08-21 — ds4 runtime live PASSED (last P2 item closed).** Full
   lifecycle through vortex for `deepseek-v4-flash-0731` (:8005, ds4
   server / mtplx engine): spawn → ready in ~13s (op `4caa91b18e17`,

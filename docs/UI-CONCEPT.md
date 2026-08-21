@@ -3,6 +3,10 @@
 > Concept, not commitment. CEO-gated scope: read-only dashboard, load/unload
 > actions, RAM meter. Everything here must be implementable against the
 > existing :9000 API surface with zero new runtime dependencies.
+>
+> **STATUS: SIGNED OFF by the CEO 2026-08-21** (form factor A; look-and-feel
+> proven by the interactive preview in `examples/ui-demo/`, which adopts the
+> original Aug-17 preview's visual design). First-milestone candidate.
 
 ## Problem
 
