@@ -2,6 +2,46 @@
 
 ## State
 
+- **2026-08-21 — Daemon-drift anomaly investigation (findings; fix pending
+  CEO go).** Reconstructed from artifacts (`kern.boottime`, boot2/boot3
+  logs, sidecar dir mtimes, today's eviction-demo timings):
+  (1) The machine **rebooted Aug 20 15:36**; boot3 daemon started 16:38.
+  Boot3's log shows its FIRST `Flash_IQ3XXS/load` also got **409**, before
+  today's successful run — the refusal reproduced across daemons.
+  (2) Post-reboot, any `:8102` occupant must have been spawned by something
+  other than vortex — prime suspect **testchat's SCRIPT_MODELS spawner**
+  (`testchat/src/services/models.py` launches the very same
+  `run-server-0731-ud.sh` on `:8102`). Vortex refusing it is the
+  single-owner invariant working as designed, not drift.
+  (3) Today's load took ~20s (fresh spawn, not instant adoption) and the
+  port was free at preflight — the out-of-band server died between
+  Aug 20 and Aug 21.
+  (4) Remaining true anomaly is the **Aug 18 mid-session drop** from
+  `loaded`. Leading theory: transient probe failure at ~126/128 GB memory
+  pressure — `_find_listening_pid` swallows per-process `psutil.Error`
+  and returns None (→ silently reports "unloaded"), and `identifies()`
+  likewise swallows sidecar-read OSError / start-time-fetch failure
+  (→ false "unidentified" 409). Both self-healed on later polls, matching
+  the observed flapping; a fresh out-of-process check succeeded minutes
+  later. Unprovable retroactively: lifecycle logs NOTHING on these paths.
+  (5) **Root defect = observability**: state flips are silent, and the 409
+  body does not distinguish no-record / pid-mismatch /
+  start-time-unavailable.
+  Proposed fixes (coder lane, D-175 direct): F1 log every owner_status
+  transition + reason; F2 structured diagnostics in the PortConflictError
+  409 body; F3 anchor sidecar/catalog paths to repo root (CWD-proof;
+  current daemon verified cwd=repo root); F4 boot-time stale-sidecar
+  reconciliation log.
+- **2026-08-21 — F1–F4 LANDED (same day).** 18/18 tests green, ruff clean
+  (E4,E7,E9,F; pre-existing SIM102 in `spawn()` untouched), daemon
+  restarted on new code (`/tmp/vortex-boot4.log`). Live verification:
+  warn-once-per-port scan warning fires; refusal diagnostics live-fire
+  `409 ... refusing (no sidecar record)` via a fake `:8102` occupant.
+  **New finding:** every scan skips ~310 unreadable processes (macOS
+  denies connection enumeration on privileged processes) — the concrete
+  silent-flap mechanism; if a model's own process is transiently
+  unreadable it vanishes from `loaded`. Now visible in logs forever.
+  Regression tests pinning F2's diagnostic shape = future freeze item.
 - **2026-08-21 — Live-demo eviction PASSED (backlog P2 item closed).**
   Drove the real structured conflict on this machine: loaded
   `Flash_IQ3XXS` via `POST /api/models/{id}/load` (ready in ~20s,
