@@ -2,6 +2,14 @@
 
 ## State
 
+- **2026-08-21 — CEO architecture ruling: blueprint-driven milestones.**
+  Vortex stays **app-only**. `sw-dev-blueprint` is maturing into a
+  framework that does the codework itself; the symlink control plane
+  (`3ad9098`, branch `experiment/symlink-control-plane`) IS the intended
+  wiring, not a stopgap. The next milestone (UI) must be RUN BY the actual
+  sw-dev-blueprint acting on this repo — never a vortex-independent copy.
+  Consequence: milestone preflights live on the blueprint side; vortex's
+  `update-template.sh` path stays dormant while symlinks are in place.
 - **2026-08-21 — UI concept SIGNED OFF (CEO).** Form factor A confirmed via
   the live interactive preview (`examples/ui-demo/`, look-and-feel adopted
   from the original Aug-17 preview at `~/dev/ui-demo/`, now deleted — its
