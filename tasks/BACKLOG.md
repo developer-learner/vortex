@@ -9,11 +9,8 @@
 
 ## P2 — prototype hardening (post-milestone-1)
 
-- Live-demo adoption across a daemon restart (sidecar reconcile; tested in
-  CI only).
-- Exercise the ds4/mtplx catalog entry live (only llama-server has run).
-- CLI polish: daemon-less `vortex` UX when `:9000` is down (friendlier than
-  a traceback).
+- Exercise the **ds4** catalog entry live (mtplx done 2026-08-21; ds4 is
+  the 90GB deepseek-v4-flash entry — needs memory headroom).
 
 ## P3 — roadmap phases (post-cutover)
 
@@ -30,3 +27,12 @@
 - **Live-demo eviction** — done 2026-08-21: real 409 driven live
   (`required_gb: 30.4`, candidates `[Flash_IQ3XXS]`, pre-spawn refusal,
   port 8001 never bound). Evidence in `tasks/CURRENT.md` session notes.
+- **Live-demo adoption across a daemon restart (sidecar reconcile)** —
+  done 2026-08-21: mtplx runtime spawned by vortex survived a daemon
+  restart; new daemon re-adopted via sidecar at first poll, model process
+  unchanged, completions served post-restart. Evidence in session notes.
+- **Exercise the ds4/mtplx catalog entry live (mtplx half)** — done
+  2026-08-21: full lifecycle through vortex (spawn → ready → proxy →
+  adoption across restart → unload). Evidence in session notes.
+- **CLI polish: daemon-less `vortex` UX when `:9000` is down** — done
+  2026-08-17 (`2cf8484`).

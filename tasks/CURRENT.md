@@ -2,6 +2,22 @@
 
 ## State
 
+- **2026-08-21 — mtplx runtime live + adoption-across-restart PASSED
+  (backlog P2 items closed).** Out-of-band mtplx app server on :8001
+  (pid 44845, launched 14:47 via the desktop app — the exact
+  out-of-band-spawner pattern predicted by the anomaly investigation)
+  stopped by the CEO; vortex then spawned its own runtime on :8001
+  (ready in ~7.5s, op `4dd0bc140545`, sidecar pid 46201). Proxy
+  round-trip served real completions through :9000 (usage +
+  `mtplx_stats` passthrough intact). Daemon restarted mid-loaded
+  (46242): model process unchanged (46201), new daemon reported it
+  `loaded` immediately via sidecar reconcile, completion served
+  post-restart ("POST-RESTART-OK"). Unload `b5c4edaf5f15` → stopped,
+  port free, sidecar dropped. NOTE: qwen3.8 reasoning-mode auto ate the
+  first probe's tokens as `reasoning_content` (empty `content`) — the
+  known thinking-model caveat; budget max_tokens accordingly.
+  Second runtime family now proven live through vortex (llama-server
+  was the only one before). ds4 catalog entry remains unexercised.
 - **2026-08-21 — Daemon-drift anomaly investigation (findings; fix pending
   CEO go).** Reconstructed from artifacts (`kern.boottime`, boot2/boot3
   logs, sidecar dir mtimes, today's eviction-demo timings):
