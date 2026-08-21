@@ -2,10 +2,9 @@
 
 ## P1 — first milestone candidate
 
-- **Ready-probe fix** (D-174): llama-server answers `/v1/models` 200 while
-  weights still load → first inference returns `503 Loading model`. The
-  spawn probe must not declare a runtime ready on a lying endpoint. First
-  real work item under the plane: spec → freeze → EM → coder → gate.
+- **UI (router phase 2)** — model menu w/ load/unload, RAM meter.
+  Concept drafted (`docs/UI-CONCEPT.md`, form factor A recommended:
+  server-rendered page on `:9000/`) — awaiting CEO sign-off.
 
 ## P2 — prototype hardening (post-milestone-1)
 
@@ -13,7 +12,6 @@
 
 ## P3 — roadmap phases (post-cutover)
 
-- UI (router phase 2) — model menu w/ load/unload, RAM meter.
 - testchat recut (phase 3) — swap `SCRIPT_MODELS` + per-model routing for
   the universal surface; oracle-heavy; refreeze mode question reopens.
 - Cutover (phase 4) — `LLM_ENDPOINT` → `http://127.0.0.1:9000/v1/chat/completions`.
@@ -38,3 +36,6 @@
   session notes.
 - **CLI polish: daemon-less `vortex` UX when `:9000` is down** — done
   2026-08-17 (`2cf8484`).
+- **Ready-probe fix (D-174)** — done 2026-08-16 (`859bfb2`): anneal-load
+  readiness (port ownership + `/v1/models` 200 + real 1-token
+  completion); verified live 2026-08-17, pinned by two regression tests.
