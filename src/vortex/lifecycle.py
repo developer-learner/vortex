@@ -33,15 +33,41 @@ POLL_INTERVAL_SECONDS = 0.25
 SIDECAR_TOLERANCE_SECONDS = 1.0
 
 
+_WARNED_EMPTY_SCAN_PORTS: set[int] = set()
+
+
 def _find_listening_pid(port: int) -> int | None:
+    errored = 0
+    found: int | None = None
     for proc in psutil.process_iter(["pid"]):
         try:
             for conn in proc.net_connections(kind="inet"):
                 if conn.status == psutil.CONN_LISTEN and conn.laddr.port == port:
-                    return proc.pid
+                    found = proc.pid
+                    break
+            if found is not None:
+                break
         except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.Error):
+            errored += 1
             continue
-    return None
+    if errored:
+        # Transient syscall failures here are how a live model silently
+        # flaps to "unloaded" (2026-08-18 anomaly class). An empty result
+        # despite unreadable processes may be a false "unloaded"; warn once
+        # per port per boot — state-flip logging carries the per-event signal.
+        if found is None and port not in _WARNED_EMPTY_SCAN_PORTS:
+            logger.warning(
+                "port %d scan found NO listener but skipped %d process(es) "
+                "(access denied/error) — occupant may be invisible",
+                port,
+                errored,
+            )
+            _WARNED_EMPTY_SCAN_PORTS.add(port)
+        else:
+            logger.debug(
+                "port %d scan: %d process(es) unreadable", port, errored
+            )
+    return found
 
 
 def _process_start_time(pid: int) -> float | None:
@@ -125,17 +151,28 @@ class SidecarStore:
         except OSError:
             pass
 
-    def identifies(self, public_id: str, pid: int) -> bool:
+    def identify_failure(self, public_id: str, pid: int) -> str | None:
+        """Why the sidecar does NOT identify pid, or None if it does."""
         record = self.read(public_id)
-        if not record or record.get("pid") != pid:
-            return False
+        if not record:
+            return "no sidecar record"
+        if record.get("pid") != pid:
+            return f"sidecar pid {record.get('pid')!r} != occupant {pid}"
         recorded = record.get("start_time")
         if not isinstance(recorded, (int, float)):
-            return False
+            return "sidecar start_time malformed"
         actual = _process_start_time(pid)
         if actual is None:
-            return False
-        return abs(actual - recorded) < SIDECAR_TOLERANCE_SECONDS
+            return "occupant start-time unavailable (transient probe failure?)"
+        if abs(actual - recorded) >= SIDECAR_TOLERANCE_SECONDS:
+            return (
+                f"start-time mismatch (recorded {recorded}, live {actual}, "
+                f"delta {abs(actual - recorded):.3f}s)"
+            )
+        return None
+
+    def identifies(self, public_id: str, pid: int) -> bool:
+        return self.identify_failure(public_id, pid) is None
 
 
 def _terminate_pid(pid: int) -> None:
@@ -180,11 +217,12 @@ class Lifecycle:
     """Owns spawn/terminate for the catalog, driven by an operation store."""
 
     def __init__(self, catalog: Catalog, sidecars: SidecarStore,
-                 ready_timeout: Callable[[], float] = lambda: READY_TIMEOUT_SECONDS) -> None:
+                  ready_timeout: Callable[[], float] = lambda: READY_TIMEOUT_SECONDS) -> None:
         self.catalog = catalog
         self.sidecars = sidecars
         self.ready_timeout = ready_timeout
         self.processes: dict[str, subprocess.Popen | None] = {}
+        self._last_status: dict[str, str] = {}
 
     def occupying_pid(self, entry: CatalogEntry) -> int | None:
         return _find_listening_pid(entry.port)
@@ -192,14 +230,33 @@ class Lifecycle:
     def owner_status(self, entry: CatalogEntry, pid: int | None) -> str:
         """'ready' | 'unidentified' | 'foreign' | 'unloaded' for a port."""
         if pid is None:
-            return "unloaded"
-        if self.sidecars.identifies(entry.public_id, pid):
-            return "ready"
-        # We spawned it but never wrote a sidecar? Only case: crashed on write.
-        proc = self.processes.get(entry.public_id)
-        if proc is not None and proc.pid == pid:
-            return "ready"
-        return "unidentified"
+            status = "unloaded"
+            reason = ""
+        elif self.sidecars.identifies(entry.public_id, pid):
+            status = "ready"
+            reason = ""
+        else:
+            # We spawned it but never wrote a sidecar? Only case: crashed on write.
+            proc = self.processes.get(entry.public_id)
+            if proc is not None and proc.pid == pid:
+                status = "ready"
+                reason = ""
+            else:
+                status = "unidentified"
+                reason = (
+                    f" ({self.sidecars.identify_failure(entry.public_id, pid)})"
+                )
+        previous = self._last_status.get(entry.public_id)
+        if previous != status:
+            logger.info(
+                "%s state flip: %s -> %s%s",
+                entry.public_id,
+                previous or "unknown",
+                status,
+                reason,
+            )
+            self._last_status[entry.public_id] = status
+        return status
 
     def _harmonic_ready(self, entry: CatalogEntry) -> bool:
         """Port ownership PLUS a 200 on /v1/models PLUS a real completion."""
@@ -214,7 +271,8 @@ class Lifecycle:
         occupant = self.occupying_pid(entry)
         if occupant is not None and not self.sidecars.identifies(entry.public_id, occupant):
             raise PortConflictError(
-                f"port {entry.port} occupied by unidentified process {occupant} — refusing",
+                f"port {entry.port} occupied by unidentified process {occupant} "
+                f"— refusing ({self.sidecars.identify_failure(entry.public_id, occupant)})",
                 port=entry.port,
                 pid=occupant,
             )
@@ -263,6 +321,32 @@ class PortConflictError(Exception):
         super().__init__(message)
         self.port = port
         self.pid = pid
+
+
+def log_stale_sidecars(sidecars: SidecarStore, catalog: Catalog) -> None:
+    """Boot-time reconciliation: warn on sidecars whose process is gone or
+    was replaced (e.g. after a machine reboot) — never delete, only report."""
+    known = {e.public_id for e in catalog.entries}
+    if not sidecars.dir.is_dir():
+        return
+    for path in sorted(sidecars.dir.glob("*.json")):
+        public_id = path.stem
+        record = sidecars.read(public_id)
+        if record is None:
+            logger.warning("stale sidecar %s: unreadable", path.name)
+            continue
+        pid = record.get("pid")
+        if pid is None:
+            logger.warning("stale sidecar %s: no pid recorded", path.name)
+            continue
+        if _process_start_time(pid) is None:
+            logger.warning(
+                "stale sidecar %s: pid %s no longer running (reboot or exit?)",
+                path.name,
+                pid,
+            )
+        elif public_id not in known:
+            logger.warning("sidecar %s: unknown public_id, not in catalog", path.name)
 
 
 class SpawnError(Exception):

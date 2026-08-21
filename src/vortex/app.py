@@ -16,22 +16,31 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 
 from .catalog import Catalog, load_catalog
-from .lifecycle import Lifecycle, PortConflictError, SidecarStore, SpawnError
+from .lifecycle import (
+    Lifecycle,
+    PortConflictError,
+    SidecarStore,
+    SpawnError,
+    log_stale_sidecars,
+)
 from .manager import Manager, MemoryConflict, estimate_ram_total_gb, estimate_ram_used_gb
 from .operations import OperationStore
 
 logger = logging.getLogger(__name__)
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def build_app(
     catalog: Catalog | None = None,
     sidecar_dir: Path | None = None,
 ) -> FastAPI:
-    catalog = catalog or load_catalog(Path("config/catalog.json"))
-    sidecars = SidecarStore(sidecar_dir or Path("data/sidecars"))
+    catalog = catalog or load_catalog(_REPO_ROOT / "config/catalog.json")
+    sidecars = SidecarStore(sidecar_dir or _REPO_ROOT / "data/sidecars")
     ops = OperationStore()
     lifecycle = Lifecycle(catalog, sidecars)
     manager = Manager(catalog, lifecycle, ops)
+    log_stale_sidecars(sidecars, catalog)
 
     app = FastAPI(title="Vortex", version="0.1.0")
 
