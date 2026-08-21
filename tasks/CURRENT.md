@@ -2,6 +2,15 @@
 
 ## State
 
+- **2026-08-21 — Milestone #1 seats named (D-139 cleared).** TPM =
+  conductor LLM (this seat); EM/coder = `qwen3.8-27b-8bit` served by
+  **mtplx** (`mtplx-qwen38-27b-optimized-quality`, :8001) — CEO corrected
+  the earlier dspark mapping; mtplx is the runtime for the run. Conductor
+  = same chat agent. Run driven by sw-dev-blueprint acting on vortex.
+  Open preflight item: verify clean content-only completions through
+  `llm-call.sh` — mtplx serves qwen3 with `--reasoning-mode auto`, and a
+  live probe showed tokens consumed as `reasoning_content` with empty
+  `content` (thinking-model parsing hazard).
 - **2026-08-21 — CEO architecture ruling: blueprint-driven milestones.**
   Vortex stays **app-only**. `sw-dev-blueprint` is maturing into a
   framework that does the codework itself; the symlink control plane
