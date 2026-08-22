@@ -15,5 +15,8 @@ dist/
 .tpm/
 .claude/
 
+# TPM delta staging — consumed by refreeze.sh, never committed as frozen state
+scripts/.approved/incoming/
+
 # secrets + notebook cache
 .env

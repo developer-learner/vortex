@@ -223,5 +223,5 @@
   `max(workload_peak×2, artifact+budget)` clamped to the needle-validated
   ceiling, write into catalog `ctx_size` + opencode `limit.context`) with a
   compaction-frequency/TTFT watchdog that re-tunes only on >30% signal
-  shift. CEO approval to build pending; raised 2026-08-18. Context choice
+  shift. CEO decision to build pending; raised 2026-08-18. Context choice
   should be a program's decision, not a human's.
