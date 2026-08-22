@@ -1,0 +1,21 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_ui_content.py::test_conflict_card_elements_present",
+    "tests/test_ui_content.py::test_down_state_elements_present",
+    "tests/test_ui_content.py::test_model_menu_elements_present",
+    "tests/test_ui_content.py::test_no_external_assets",
+    "tests/test_ui_content.py::test_ram_bar_zones_present",
+    "tests/test_ui_content.py::test_ram_meter_elements_present",
+    "tests/test_ui_content.py::test_title",
+    "tests/test_ui_route.py::test_dashboard_served",
+    "tests/test_ui_route.py::test_status_route_unshadowed"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": [
+    "src/vortex/ui.py",
+    "src/vortex/app.py"
+  ]
+}
