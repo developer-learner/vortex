@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "specs": {
+    "1": {
+      "tasks": {
+        "T1": {
+          "file": "src/vortex/ui.py",
+          "file_sha256": "a7a1543adb3126b329c37ffcb6e86e3e03421d7959ce7eb06df04b6eb5cf29fd",
+          "fingerprint": "c754353285faa7d820323a46e1782b359adcf710c9fc1d66e6b7a0d0104ab59d"
+        },
+        "T2": {
+          "file": "src/vortex/app.py",
+          "file_sha256": "402479842f45a97ce545fcdc98857ccc18f6d6c51c374596d22267f79cbbde08",
+          "fingerprint": "bdbb65ee2f2eaa7ab03683f6d76455b6ab554f1f7839619a1b237c6d87647c4f"
+        }
+      }
+    }
+  }
+}

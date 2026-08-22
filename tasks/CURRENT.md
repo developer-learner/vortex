@@ -225,3 +225,7 @@
   compaction-frequency/TTFT watchdog that re-tunes only on >30% signal
   shift. CEO decision to build pending; raised 2026-08-18. Context choice
   should be a program's decision, not a human's.
+
+## Results
+
+  Delta-mapped frozen tests green against spec v1 — feature done (verdict scope: mapped tests only, D-112). Feature built and validated.
