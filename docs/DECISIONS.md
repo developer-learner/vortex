@@ -21,6 +21,16 @@
 
 ## Decisions
 
+## D-167 — 2026-08-22 — Initial freeze snapshots the whole-project ERD as its immutable v1 instruction slice
+
+**Decision:** When a v0→v1 freeze does not stage the optional `ERD-DELTA.md`, `refreeze.sh` copies the newly installed complete `ERD.md` to hash-pinned `ERD-DELTA-v1.md`. It does not create the mutable standing `ERD-DELTA.md`. An explicitly staged v1 delta still wins and is snapshotted unchanged. The existing rule remains: a first freeze is a whole-project spec and does not make the TPM duplicate the ERD as a separate delta artifact.
+
+**Alternatives considered:** (a) Require `ERD-DELTA.md` at v1 — rejected because the full initial ERD already is the complete change slice; requiring identical content twice adds a divergence seam and contradicts D-79's deliberate v1 exemption. (b) Let `validate-plan.py` fall back to the mutable standing ERD whenever the v1 snapshot is absent — rejected because D-140 made immutable per-freeze instructions the authority for skipped-freeze recovery; a downstream fallback would conceal a malformed freeze instead of making the producer complete. (c) Special-case v1 out of active-range planning — rejected because v1 contains the entire first milestone and is the least safe version to plan without its instructions.
+
+**Reason:** Vortex's first clean milestone exposed a cross-component contradiction: `refreeze.sh` correctly allowed v1 without a redundant delta, while `validate-plan.py` correctly rejected a meaningful modern `DELTA-v1.json` with no immutable instruction snapshot. The freeze producer now records the fact both consumers need: at v1, the whole-project ERD is the delta. The end-to-end v0→v1 fixture proves the snapshot is created, manifest-pinned, and consumable through the real active-range planner.
+
+**Do not suggest:** requiring duplicate ERD and ERD-delta content at v1; weakening the planner to silently use mutable or current files when an immutable snapshot should exist; creating a standing `ERD-DELTA.md` for v1 when the TPM did not stage one.
+
 ## D-165 — 2026-08-15 — Brownfield adoption: snapshot-plus-go-forward model recorded; generalization deferred as a future feature
 
 **Decision:** Adopting this framework onto an existing working app is theorized (not tested) as a *snapshot-plus-go-forward* model: the legacy test suite is frozen as a hash-pinned snapshot that is explicitly NOT an independent oracle (never the acceptance gate for legacy paths), while all new behavior runs through the normal TPM → refreeze → orchestrate loop. Generalizing the framework for brownfield onboarding is deliberately deferred as a later feature — no adoption tooling is built now and no brownfield run is scheduled.

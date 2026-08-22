@@ -240,12 +240,10 @@
   - v1 freeze crashed twice post-apply (blueprint first-freeze old-contracts
     bug; VM git dubious-ownership). Manual completion missed ERD-DELTA-v1.md
     -> plan gate failed closed. Repaired 83918c0 (+correction row).
-  - Blueprint bugs fixed upstream in parallel session (6f37b21, 438d4c8,
-    bd0231e); selftests 6/6 PASS at bd0231e; vortex pins advanced 38d61eb,
-    2e50523.
-  - Upstream gap FILED, unresolved: refreeze exempts v1 from staging
-    ERD-DELTA.md (:215) while validate-plan requires the versioned snapshot
-    for every modern freeze — clean greenfield freezes die at planning.
+  - Blueprint bugs fixed upstream (6f37b21, 438d4c8, bd0231e, 8a247f8).
+    The last fix closes the v1 ERD-delta contradiction by snapshotting the
+    full initial ERD as ERD-DELTA-v1.md; all 467 control-plane selftests pass.
+    Vortex's control-plane pin is aligned to 8a247f8.
 
   Open: CEO browser eyeball of the served dashboard (Playwright-green is
-  necessary, never sufficient); upstream ERD-DELTA-v1 exemption fix.
+  necessary, never sufficient).
