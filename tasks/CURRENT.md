@@ -229,3 +229,23 @@
 ## Results
 
   Delta-mapped frozen tests green against spec v1 — feature done (verdict scope: mapped tests only, D-112). Feature built and validated.
+
+## Session 2026-08-22 (afternoon) — M1 run complete
+
+  Milestone #1 (Router Phase 2 UI dashboard) executed end-to-end by the
+  pipeline: freeze v1 -> plan -> T1+T2 attempt-1 green -> [success] a6f6ec6.
+  Full frozen suite re-verified on host: 27/27. Dashboard live-serves 200.
+
+  Incident trail (all resolved):
+  - v1 freeze crashed twice post-apply (blueprint first-freeze old-contracts
+    bug; VM git dubious-ownership). Manual completion missed ERD-DELTA-v1.md
+    -> plan gate failed closed. Repaired 83918c0 (+correction row).
+  - Blueprint bugs fixed upstream in parallel session (6f37b21, 438d4c8,
+    bd0231e); selftests 6/6 PASS at bd0231e; vortex pins advanced 38d61eb,
+    2e50523.
+  - Upstream gap FILED, unresolved: refreeze exempts v1 from staging
+    ERD-DELTA.md (:215) while validate-plan requires the versioned snapshot
+    for every modern freeze — clean greenfield freezes die at planning.
+
+  Open: CEO browser eyeball of the served dashboard (Playwright-green is
+  necessary, never sufficient); upstream ERD-DELTA-v1 exemption fix.
