@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>vortex · model menu</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #0d1117; color: #c9d1d9; margin: 0; padding: 24px; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 16px; display: flex; align-items: center; gap: 12px; }
+  .ram { font-size: 13px; color: #8b949e; margin-left: auto; }
+  .bar { height: 10px; background: #21262d; border-radius: 5px; overflow: hidden; margin-bottom: 24px; }
+  .fill { height: 100%; background: #2f81f7; transition: width .4s ease; }
+  .fill.warn { background: #d29922; }
+  .fill.danger { background: #f85149; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: #8b949e; font-weight: normal; padding: 6px 8px; border-bottom: 1px solid #21262d; }
+  td { padding: 8px; border-bottom: 1px solid #161b22; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+  .ready { background: #3fb950; } .loading, .unloading { background: #d29922; animation: pulse 1s infinite; } .idle { background: #30363d; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .st { color: #8b949e; font-size: 11px; text-transform: uppercase; }
+  .muted { color: #8b949e; }
+  button { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  button:hover:not(:disabled) { background: #30363d; }
+  button:disabled { opacity: .4; cursor: default; }
+  button.danger:hover:not(:disabled) { background: #da3633; border-color: #da3633; }
+  .card { border: 1px solid #f0883e; background: #1c1408; border-radius: 8px; padding: 14px; margin-top: 16px; font-size: 13px; display: none; }
+  .card h3 { margin: 0 0 8px; color: #f0883e; font-size: 13px; }
+  .down { border-color: #f85149; background: #1c0a0a; color: #f85149; padding: 14px; border-radius: 8px; margin-top: 16px; font-size: 13px; display: none; }
+  footer { margin-top: 20px; color: #8b949e; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>vortex <span class="muted">model menu</span>
+    <span class="ram" id="ramlabel">—</span>
+  </h1>
+  <div class="bar"><div class="fill" id="ramfill"></div></div>
+  <table>
+    <thead><tr><th>model</th><th>state</th><th>runtime</th><th>port</th><th>ram</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="card" id="conflict"><h3>conflict</h3><div id="conflictbody"></div></div>
+  <div class="down" id="down">vortex daemon is not reachable on :9000 — start it from the vortex repo:<br>
+    <span class="muted">.venv/bin/uvicorn vortex.app:build_app --factory --port 9000</span></div>
+  <footer>polls /api/status + /api/catalog every 2s · actions POST to the live :9000 API · preview of form factor A (real build mounts this at :9000/)</footer>
+</div>
+
+<script>
+"use strict";
+const ops = new Map();
+
+function esc(s) { const d = document.createElement("i"); d.textContent = s ?? ""; return d.innerHTML; }
+
+async function jget(p) { const r = await fetch(p); if (!r.ok) throw new Error(r.status); return r.json(); }
+
+async function refresh() {
+  let status, catalog;
+  try { [status, catalog] = await Promise.all([jget("/api/status"), jget("/api/catalog")]); }
+  catch (e) { document.getElementById("down").style.display = "block"; return; }
+  document.getElementById("down").style.display = "none";
+
+  const used = status.ram_used_gb, total = status.ram_total_gb;
+  const pct = Math.min(100, Math.round(used / total * 100));
+  document.getElementById("ramlabel").textContent = `RAM ${used.toFixed(1)}/${total.toFixed(1)} GB (${pct}%)`;
+  const fill = document.getElementById("ramfill");
+  fill.style.width = pct + "%";
+  fill.className = "fill" + (pct > 85 ? " danger" : pct > 70 ? " warn" : "");
+
+  const rows = document.getElementById("rows");
+  rows.innerHTML = "";
+  for (const e of catalog.entries) {
+    const polling = ops.has(e.public_id);
+    const busy = polling || e.state === "loading" || e.state === "unloading";
+    const tr = document.createElement("tr");
+    const btn = e.state === "ready"
+      ? `<button class="danger" data-act="unload" data-id="${esc(e.public_id)}"${busy ? " disabled" : ""}>unload</button>`
+      : `<button data-act="load" data-id="${esc(e.public_id)}"${busy ? " disabled" : ""}>${busy ? esc(e.state) : "load"}</button>`;
+    tr.innerHTML = `<td><span class="dot ${esc(e.state)}"></span>${esc(e.public_id)}</td>`
+      + `<td class="st">${esc(e.state)}</td>`
+      + `<td class="muted">${esc(e.runtime)}</td><td class="muted">:${e.port}</td>`
+      + `<td class="muted">~${e.ram_estimate_gb} GB</td>`
+      + `<td style="text-align:right">${btn}</td>`;
+    rows.appendChild(tr);
+  }
+}
+
+async function pollOp(id) {
+  const opId = ops.get(id);
+  if (!opId) { refresh(); return; }
+  try {
+    const o = await jget(`/api/operations/${opId}`);
+    if (!["loading", "unloading"].includes(o.state)) ops.delete(id);
+  } catch (e) { ops.delete(id); }
+  setTimeout(() => pollOp(id), 500);
+}
+
+async function act(id, what) {
+  document.getElementById("conflict").style.display = "none";
+  let r;
+  try {
+    r = await fetch(`/api/models/${encodeURIComponent(id)}/${what}`, { method: "POST" });
+  } catch (e) { document.getElementById("down").style.display = "block"; return; }
+  if (r.status === 409) {
+    const detail = (await r.json()).detail || {};
+    document.getElementById("conflictbody").innerHTML =
+      `${esc(detail.message || "")}<br>` +
+      `<span class="muted">required ~${esc(detail.required_gb)} GB · candidates: ` +
+      `${(detail.eviction_candidates || []).map(esc).join(", ") || "none"} · ` +
+      `eviction is never automatic — unload a candidate by name first.</span>`;
+    document.getElementById("conflict").style.display = "block";
+    refresh(); return;
+  }
+  if (!r.ok) { refresh(); return; }
+  ops.set(id, (await r.json()).operation);
+  refresh();
+  pollOp(id);
+}
+
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-act]");
+  if (b && !b.disabled) act(b.dataset.id, b.dataset.act);
+});
+
+setInterval(refresh, 2000);
+refresh();
+</script>
+</body>
+</html>
