@@ -25,6 +25,7 @@ from .lifecycle import (
 )
 from .manager import Manager, MemoryConflict, estimate_ram_total_gb, estimate_ram_used_gb
 from .operations import OperationStore
+from .ui import UI_PAGE
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,11 @@ def build_app(
     log_stale_sidecars(sidecars, catalog)
 
     app = FastAPI(title="Vortex", version="0.1.0")
+
+    @app.get("/")
+    def dashboard() -> Response:
+        """Operator dashboard shell; JS polls /api/* client-side."""
+        return Response(content=UI_PAGE, media_type="text/html")
 
     @app.get("/v1/models")
     def list_v1_models() -> dict:
