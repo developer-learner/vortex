@@ -2,6 +2,20 @@
 
 ## State
 
+- **2026-08-21 — Milestone #1 preflight WIRED AND SMOKED (all green).**
+  dev-vm started; gateway verified from guest (`host.lima.internal` →
+  vortex :9000 ✅ mtplx :8001 ✅). VM-side config written
+  (`~/.config/sw-dev-blueprint/models.env`: EM/coder =
+  `mtplx-qwen38-27b-optimized-quality`, SANDBOX_LLM_HOST/PORT set;
+  `model-profiles.toml`: 32k context em/coder). **Key finding: mtplx
+  honors `chat_template_kwargs.enable_thinking=false`** — reasoning_content
+  empty, content clean (without it, --reasoning-mode auto separates
+  reasoning into its own field; safe but burns budget). Smoke tests
+  through real `llm-call.sh` FROM INSIDE THE VM: (a) plumbing round-trip
+  → "SMOKE-OK", finish=stop, rc=0; (b) coder sentinel micro-task →
+  byte-exact `=== FILE: … END FILE ===` block. mtplx left loaded (~30GB)
+  for the run. Remaining to launch: TPM spec authoring → refreeze →
+  orchestrate (blueprint-driven).
 - **2026-08-21 — Milestone #1 seats named (D-139 cleared).** TPM =
   conductor LLM (this seat); EM/coder = `qwen3.8-27b-8bit` served by
   **mtplx** (`mtplx-qwen38-27b-optimized-quality`, :8001) — CEO corrected
