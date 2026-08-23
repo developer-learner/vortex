@@ -1,0 +1,12 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_lifecycle_scan.py::test_scan_port_clean_empty_returns_none",
+    "tests/test_lifecycle_scan.py::test_scan_port_reports_unknown_on_transient_errors",
+    "tests/test_lifecycle_scan.py::test_scan_port_skips_access_denied_as_clean"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": []
+}

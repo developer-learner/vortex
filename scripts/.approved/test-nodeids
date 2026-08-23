@@ -5,6 +5,9 @@ tests/test_catalog.py::test_catalog_rejects_empty_launch_command
 tests/test_catalog.py::test_catalog_rejects_bad_public_id
 tests/test_catalog.py::test_load_catalog_from_json
 tests/test_catalog.py::test_load_catalog_invalid_json_raises
+tests/test_lifecycle_scan.py::test_scan_port_reports_unknown_on_transient_errors
+tests/test_lifecycle_scan.py::test_scan_port_clean_empty_returns_none
+tests/test_lifecycle_scan.py::test_scan_port_skips_access_denied_as_clean
 tests/test_serve.py::test_unidentified_occupant_refused
 tests/test_serve.py::test_adopt_surviving_runtime_and_load
 tests/test_serve.py::test_proxy_non_streaming
