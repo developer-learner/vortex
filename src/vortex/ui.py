@@ -309,7 +309,7 @@ footer {
           return r.json();
         })
         .then(function (op) {
-          if (op.state === "done" || op.state === "error") {
+          if (op.state === "ready" || op.state === "unloaded" || op.state === "error") {
             if (opTimer) {
               clearInterval(opTimer);
               opTimer = null;
