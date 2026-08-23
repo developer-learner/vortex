@@ -21,7 +21,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import httpx
-import psutil
+import psutil  # type: ignore[import-untyped]
 
 from .catalog import Catalog, CatalogEntry
 
@@ -262,7 +262,7 @@ class Lifecycle:
         """Port ownership PLUS a 200 on /v1/models PLUS a real completion."""
         return _responds_ready(entry.ready_url) and _anneal_probe(entry.chat_endpoint)
 
-    def spawn(self, entry: CatalogEntry) -> tuple[subprocess.Popen, bool]:
+    def spawn(self, entry: CatalogEntry) -> tuple[subprocess.Popen | None, bool]:
         """Spawn the entry's launch command. Returns (process, became_ready).
 
         The single-owner invariant is enforced here: if the port is already
