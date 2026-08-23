@@ -1,8 +1,7 @@
 {
-  "erd_version": 6,
+  "erd_version": 7,
   "files": [
-    "src/vortex/ui.py",
-    "src/vortex/app.py"
+    "src/vortex/ui.py"
   ],
   "entry_points": [
     "src.vortex.ui",
@@ -13,19 +12,24 @@
   "changed_files": [
     "src/vortex/ui.py"
   ],
-  "no_edit_files": [
-    "src/vortex/app.py"
-  ],
+  "no_edit_files": [],
   "test_mapping": {
+    "tests/test_ui_api_contract.py::test_catalog_response_is_enveloped": "src/vortex/ui.py",
+    "tests/test_ui_api_contract.py::test_ui_only_reads_catalog_fields_the_api_returns": "src/vortex/ui.py",
+    "tests/test_ui_api_contract.py::test_ui_only_reads_status_fields_the_api_returns": "src/vortex/ui.py",
+    "tests/test_ui_api_contract.py::test_ui_operation_completion_uses_real_terminal_states": "src/vortex/ui.py",
+    "tests/test_ui_api_contract.py::test_ui_uses_the_api_loaded_state_token": "src/vortex/ui.py",
+    "tests/test_ui_api_contract.py::test_ui_uses_the_operation_field_the_api_returns": "src/vortex/ui.py",
+    "tests/test_ui_conflict_card.py::test_conflict_card_reads_the_409_detail": "src/vortex/ui.py",
+    "tests/test_ui_conflict_card.py::test_conflict_no_longer_read_from_status": "src/vortex/ui.py",
+    "tests/test_ui_conflict_card.py::test_conflict_clears_on_successful_action": "src/vortex/ui.py",
     "tests/test_ui_content.py::test_title": "src/vortex/ui.py",
     "tests/test_ui_content.py::test_ram_meter_elements_present": "src/vortex/ui.py",
     "tests/test_ui_content.py::test_model_menu_elements_present": "src/vortex/ui.py",
     "tests/test_ui_content.py::test_conflict_card_elements_present": "src/vortex/ui.py",
     "tests/test_ui_content.py::test_down_state_elements_present": "src/vortex/ui.py",
     "tests/test_ui_content.py::test_ram_bar_zones_present": "src/vortex/ui.py",
-    "tests/test_ui_content.py::test_no_external_assets": "src/vortex/ui.py",
-    "tests/test_ui_route.py::test_dashboard_served": "src/vortex/app.py",
-    "tests/test_ui_route.py::test_status_route_unshadowed": "src/vortex/app.py"
+    "tests/test_ui_content.py::test_no_external_assets": "src/vortex/ui.py"
   },
   "routes": [
     {
