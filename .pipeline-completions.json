@@ -14,6 +14,20 @@
           "fingerprint": "bdbb65ee2f2eaa7ab03683f6d76455b6ab554f1f7839619a1b237c6d87647c4f"
         }
       }
+    },
+    "2": {
+      "tasks": {
+        "T1": {
+          "file": "src/vortex/ui.py",
+          "file_sha256": "27f8c1f0e6d28f58f5716e14d6a3228e0dd92f508bdb68e75673b7c95fd4ca52",
+          "fingerprint": "66aea9d1b15ed484f43312624dec872b81f24cffc6b87028142b608b200d213f"
+        },
+        "T2": {
+          "file": "src/vortex/app.py",
+          "file_sha256": "402479842f45a97ce545fcdc98857ccc18f6d6c51c374596d22267f79cbbde08",
+          "fingerprint": "b528444522ca8769a253528611617baf65239e7a94ffe156a8dc3c622b601c3e"
+        }
+      }
     }
   }
 }

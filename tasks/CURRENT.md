@@ -247,3 +247,7 @@
 
   Open: CEO browser eyeball of the served dashboard (Playwright-green is
   necessary, never sufficient).
+
+## Results
+
+  Delta-mapped frozen tests green against spec v2 — feature done (verdict scope: mapped tests only, D-112). Feature built and validated.
