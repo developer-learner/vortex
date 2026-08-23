@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/check-spec-delta.py
+../../sw-dev-blueprint/scripts/check-spec-delta.py

@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/standing-summary.py
+../../sw-dev-blueprint/scripts/standing-summary.py

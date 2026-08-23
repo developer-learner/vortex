@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/regen-manifest.sh
+../../sw-dev-blueprint/scripts/regen-manifest.sh

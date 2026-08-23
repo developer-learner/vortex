@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/check-prd-additive.py
+../../sw-dev-blueprint/scripts/check-prd-additive.py

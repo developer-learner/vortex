@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/metrics-report.py
+../../sw-dev-blueprint/scripts/metrics-report.py

@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/teardown.sh
+../../sw-dev-blueprint/scripts/teardown.sh

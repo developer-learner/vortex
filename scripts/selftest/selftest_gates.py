@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/selftest/selftest_gates.py
+../../../sw-dev-blueprint/scripts/selftest/selftest_gates.py

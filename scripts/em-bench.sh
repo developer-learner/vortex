@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/em-bench.sh
+../../sw-dev-blueprint/scripts/em-bench.sh

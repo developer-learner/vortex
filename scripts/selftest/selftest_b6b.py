@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/selftest/selftest_b6b.py
+../../../sw-dev-blueprint/scripts/selftest/selftest_b6b.py

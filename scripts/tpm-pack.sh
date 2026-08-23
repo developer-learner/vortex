@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/tpm-pack.sh
+../../sw-dev-blueprint/scripts/tpm-pack.sh

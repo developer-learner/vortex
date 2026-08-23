@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/selftest/drive-verdict.sh
+../../../sw-dev-blueprint/scripts/selftest/drive-verdict.sh

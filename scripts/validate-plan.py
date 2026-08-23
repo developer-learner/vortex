@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/validate-plan.py
+../../sw-dev-blueprint/scripts/validate-plan.py

@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/check-swallowed-errors.py
+../../sw-dev-blueprint/scripts/check-swallowed-errors.py

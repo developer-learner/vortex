@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/refreeze.sh
+../../sw-dev-blueprint/scripts/refreeze.sh

@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/doc-consistency.sh
+../../sw-dev-blueprint/scripts/doc-consistency.sh

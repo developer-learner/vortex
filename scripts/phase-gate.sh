@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/phase-gate.sh
+../../sw-dev-blueprint/scripts/phase-gate.sh

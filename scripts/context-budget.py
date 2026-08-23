@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/context-budget.py
+../../sw-dev-blueprint/scripts/context-budget.py

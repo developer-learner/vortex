@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/llm-call.sh
+../../sw-dev-blueprint/scripts/llm-call.sh

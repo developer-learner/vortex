@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/check-drift.sh
+../../sw-dev-blueprint/scripts/check-drift.sh

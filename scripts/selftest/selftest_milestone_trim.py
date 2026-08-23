@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/selftest/selftest_milestone_trim.py
+../../../sw-dev-blueprint/scripts/selftest/selftest_milestone_trim.py

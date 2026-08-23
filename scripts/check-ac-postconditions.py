@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/check-ac-postconditions.py
+../../sw-dev-blueprint/scripts/check-ac-postconditions.py

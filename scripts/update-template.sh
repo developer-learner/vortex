@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/update-template.sh
+../../sw-dev-blueprint/scripts/update-template.sh

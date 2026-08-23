@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/contracts-delta.py
+../../sw-dev-blueprint/scripts/contracts-delta.py

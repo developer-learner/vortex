@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/selftest/selftest_context_budgets.py
+../../../sw-dev-blueprint/scripts/selftest/selftest_context_budgets.py

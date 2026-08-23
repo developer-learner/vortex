@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/check-test-direction.py
+../../sw-dev-blueprint/scripts/check-test-direction.py

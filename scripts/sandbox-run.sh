@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/sandbox-run.sh
+../../sw-dev-blueprint/scripts/sandbox-run.sh

@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/selftest/drive-runtime.sh
+../../../sw-dev-blueprint/scripts/selftest/drive-runtime.sh

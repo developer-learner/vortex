@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/tpm-view.sh
+../../sw-dev-blueprint/scripts/tpm-view.sh

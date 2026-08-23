@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/tpm-agent.sh
+../../sw-dev-blueprint/scripts/tpm-agent.sh

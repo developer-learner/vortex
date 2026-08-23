@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/spec_artifacts.py
+../../sw-dev-blueprint/scripts/spec_artifacts.py

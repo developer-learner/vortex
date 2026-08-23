@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/feature-summary.py
+../../sw-dev-blueprint/scripts/feature-summary.py

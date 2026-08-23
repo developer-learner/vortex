@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/new-project.sh
+../../sw-dev-blueprint/scripts/new-project.sh

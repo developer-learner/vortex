@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/flake-ledger.py
+../../sw-dev-blueprint/scripts/flake-ledger.py

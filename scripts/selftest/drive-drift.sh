@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/selftest/drive-drift.sh
+../../../sw-dev-blueprint/scripts/selftest/drive-drift.sh

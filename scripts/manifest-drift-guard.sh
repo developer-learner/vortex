@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/manifest-drift-guard.sh
+../../sw-dev-blueprint/scripts/manifest-drift-guard.sh

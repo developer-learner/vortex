@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/selftest/verify-sandbox-in-vm.sh
+../../../sw-dev-blueprint/scripts/selftest/verify-sandbox-in-vm.sh

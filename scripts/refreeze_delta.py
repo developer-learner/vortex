@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/refreeze_delta.py
+../../sw-dev-blueprint/scripts/refreeze_delta.py

@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/check-test-surface.py
+../../sw-dev-blueprint/scripts/check-test-surface.py

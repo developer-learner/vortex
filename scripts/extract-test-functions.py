@@ -1,1 +1,1 @@
-/Users/arc.elixir/dev/sw-dev-blueprint/scripts/extract-test-functions.py
+../../sw-dev-blueprint/scripts/extract-test-functions.py
