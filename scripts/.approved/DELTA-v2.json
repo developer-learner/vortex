@@ -1,0 +1,19 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_ui_api_contract.py::test_catalog_response_is_enveloped",
+    "tests/test_ui_api_contract.py::test_ui_only_reads_catalog_fields_the_api_returns",
+    "tests/test_ui_api_contract.py::test_ui_only_reads_status_fields_the_api_returns",
+    "tests/test_ui_api_contract.py::test_ui_uses_the_api_loaded_state_token",
+    "tests/test_ui_api_contract.py::test_ui_uses_the_operation_field_the_api_returns"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [
+    "src/vortex/ui.py"
+  ],
+  "inventory_files": [
+    "src/vortex/ui.py",
+    "src/vortex/app.py"
+  ]
+}
