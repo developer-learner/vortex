@@ -334,13 +334,16 @@ footer {
     var path = "/api/models/" + encodeURIComponent(id) + "/" + act;
     fetch(path, { method: "POST" })
       .then(function (r) {
-        if (r.status === 409) {
-          return r.json().then(function (d) {
-            setConflict(d.detail || "conflict");
-          });
-        }
-        if (!r.ok) throw new Error(act + " " + r.status);
-        return r.json();
+        return r.json().then(function (body) {
+          if (r.status === 409) {
+            var d = body.detail;
+            var candidates = (d.eviction_candidates && d.eviction_candidates.length) ? d.eviction_candidates.join(", ") : "none";
+            setConflict(d.message + " — requires " + d.required_gb + " GiB; candidates: " + candidates);
+            return null;
+          }
+          if (!r.ok) throw new Error(act + " " + r.status);
+          return body;
+        });
       })
       .then(function (op) {
         if (!op) return;
