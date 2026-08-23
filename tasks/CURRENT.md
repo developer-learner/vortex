@@ -292,6 +292,33 @@
 
   Delta-mapped frozen tests green against spec v3 — feature done (verdict scope: mapped tests only, D-112). Feature built and validated.
 
+## Session 2026-08-23 — conflict-card milestone and D-168 child live-fire
+
+  **Product closure:** the dashboard conflict card now consumes the real
+  model-load `409` detail, clears after a successful action, and no longer
+  reads nonexistent `s.conflict` status data. The low-RAM VM also exposed and
+  closed an idempotency defect: requesting an already-ready model no longer
+  reports that same model as an eviction conflict. Spec v10 completed at
+  `5f32f10` on plane `c66fa5779ab1`; 36/36 frozen tests and whole-source mypy
+  were independently replayed green in the dev VM.
+
+  **Control-plane closure:** Vortex live use exposed five child/composition
+  defects after the original D-168 repair: real non-dry-run re-exec state,
+  child working-directory preservation, child-repo sandbox mounting, stale
+  one-file brief carry-forward, and future-DAG-file mypy coupling. Each was
+  fixed upstream with a focused regression, the complete Blueprint suite was
+  green before publication, and Vortex adopted the final published ref
+  `c66fa57` in `526262d`. Blueprint reports 487/487 selftests at that ref.
+
+  **Strict evidence still open:** Blueprint advanced from `6f8b6e8` to
+  `9d431cd` during the real v4 run while the run remained pinned to its
+  starting plane, proving the immutable/same-SHA behavior through that point.
+  The run later halted on separate planning/product defects, so D-168 still
+  needs one uninterrupted successful multi-task run that crosses a mid-run
+  Blueprint advancement and records the unchanged starting SHA in both the
+  success subject and metrics. Do not infer that proof from the later v10
+  success, which began directly on `c66fa57`.
+
 ## Results
 
   Full frozen TPM suite green against spec v10 (on-demand regression check, D-112). Feature built and validated.

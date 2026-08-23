@@ -2,52 +2,62 @@
 
 ## Canonical pending-work register
 
-> Reconciled by **Codex (GPT-5), 2026-08-22** against the current Blueprint,
+> Reconciled by **Codex (GPT-5), 2026-08-23** against the current Blueprint,
 > Vortex, and Testchat trees. This is the deduplicated current list. All
 > agent-authored entries below remain untouched as historical source notes;
 > where a historical note conflicts with current repository state, this
 > section controls status.
 
-### P0 — close D-168 before another milestone claim
+### P0 closure — release repaired; one strict live-fire proof remains
 
-1. [ ] **Blueprint — repair and prove the D-168 release.** Initialize
-   `PLANE_DIR` in every extracted harness; update obsolete source-shape
-   assertions; add a whole-entrypoint dry-run/re-exec test; add correction-log
-   coverage for the launch-order, dark-`main()`, dry-run fallthrough, harness,
-   false-green, and generated-path interpolation failures; then make the exact
-   full-suite command green: `pytest scripts/selftest/selftest_*.py -q`.
-2. [ ] **Blueprint — prevent another unverified publication.** Require the full
-   control-plane suite through branch protection, a release/pre-push gate, or
-   an equivalent mechanical control before a green release claim can land.
-3. [ ] **Blueprint → Vortex — publish and adopt the corrected successor.** After
-   items 1–2 are green, publish the new Blueprint ref, adopt it in Vortex via
-   `update-template`, and regenerate and verify both manifests. Vortex's
-   current `042a74e` pin contains the D-168 mechanism fixes but not this
-   full-suite closure.
+1. [x] **Blueprint — repair and prove the D-168 release.** The original 47
+   failures and the child-only defects subsequently exposed by Vortex are
+   repaired. Blueprint's exact full suite is green at **487/487** on published
+   ref `c66fa57`; the whole-entrypoint, child-cwd, child sandbox-mount, current
+   one-file brief, and per-task mypy boundaries all have regressions.
+2. [x] **Blueprint — prevent another unverified publication.** The pre-push
+   release gate checks the exact commit being published in an isolated copy,
+   fails closed for an unavailable SHA, and has dogfooded every corrected
+   Blueprint publication.
+3. [x] **Blueprint → Vortex — publish and adopt the corrected successor.** The
+   corrected Blueprint is published at `c66fa57`; Vortex adoption commit
+   `526262d` pins that exact ref and both manifest checks are green.
 4. [ ] **Vortex — collect the remaining D-168 live-fire evidence.** The
-   mechanism checks and VM dry-launch proof are already reported complete.
-   On the next real multi-task milestone, advance the Blueprint mid-run and
-   verify immutable helper execution, same-SHA resume, and the plane SHA in
-   the success commit and measurements.
+   mechanism, non-dry-run, child-tree, and VM proofs are complete. Blueprint
+   was advanced from `6f8b6e8` to `9d431cd` during the real v4 run and the run
+   remained pinned to `6f8b6e8`, but that run later halted on unrelated
+   planning/product defects. The strict proof still owed is one successful
+   real multi-task run that crosses a mid-run Blueprint advancement and records
+   the unchanged starting plane SHA in both its success commit and metrics.
 
 ### P1/P2 — product and control-plane hardening
 
-5. [ ] **Vortex — fix the dashboard conflict card.** Drive the existing card
-   from the real model-load `409` response and remove the dead
-   `GET /api/status` `s.conflict` read.
+5. [x] **Vortex — fix the dashboard conflict card.** Spec v10 success
+   `5f32f10` includes the real model-load `409` detail path, clears the card on
+   success, and removes the dead `GET /api/status` `s.conflict` read. The
+   complete frozen suite is green at **36/36** and whole-source mypy is green.
 6. [ ] **Vortex — close M1 review and reconcile status docs.** Complete the CEO
-   browser eyeball, then retire the obsolete UI-sign-off, memory,
-   Lima/model-wiring, v1 legacy-test, and UI route/slicing statements while
-   preserving the completed v1/v2/v3 evidence.
-7. [ ] **Blueprint — execute D-161's report-only oracle-strength measurement.**
-8. [ ] **Blueprint — A/B the denser EM diagnosis brief** against archived
-   diagnosis transcripts.
-9. [ ] **Blueprint — validate the first organic two-strike ladder climb.**
-10. [ ] **Blueprint — finish the pending D-44/Rule-5 acceptance wording.**
-11. [ ] **Blueprint — live-probe D-47's OpenCode permission behavior** for
-    glob-versus-compound-command matching.
-12. [ ] **Blueprint docs — close stale Linux-VM acceptance bookkeeping** using
-    the completed unattended Vortex milestone evidence.
+   live acceptance. Conductor browser QA and the status-document reconciliation
+   are complete; only the non-delegable CEO acceptance required by D-44 remains.
+7. [x] **Blueprint — execute D-161's report-only oracle-strength measurement.**
+   Completed in `492b8f0`; report and raw mutant results are under
+   `docs/research/` and the runner is regression-tested.
+8. [x] **Blueprint — A/B the denser EM diagnosis brief** against archived
+   diagnosis transcripts. Completed in `2eb2809`; the dense wording was not
+   shipped because both variants exposed the same missing transient verdict.
+9. [ ] **Blueprint — validate the first organic two-strike ladder climb.** The
+   Vortex repair run produced schema-valid `brief_wrong` diagnosis and a
+   materially revised brief, and later produced a usable TPM batch. Keep this
+   open until one uninterrupted organic run exercises the complete intended
+   ladder and its outcome is explicitly accepted against D-70/D-69.
+10. [x] **Blueprint — finish the pending D-44/Rule-5 acceptance wording.**
+    Reconciled in `3225106`; D-44 remains a human acceptance gate, not a test
+    claim.
+11. [x] **Blueprint — live-probe D-47's OpenCode permission behavior** for
+    glob-versus-compound-command matching. Completed in `f3a2ba1`; evidence is
+    recorded in `docs/research/2026-08-22-d47-permission-probe.md`.
+12. [x] **Blueprint docs — close stale Linux-VM acceptance bookkeeping.**
+    Completed in `3380371` using the unattended Vortex milestone evidence.
 13. [ ] **Blueprint → Vortex — decide model-specific Git provenance.** If
     approved, use a trusted commit broker, author/committer separation,
     provenance trailers, prompt/reply hashes, and pipeline attestation; an
