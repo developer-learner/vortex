@@ -15,6 +15,15 @@
         }
       }
     },
+    "10": {
+      "tasks": {
+        "T1": {
+          "file": "src/vortex/manager.py",
+          "file_sha256": "abbfd39ecc19c5bc5717818b88501aa46d07e3d5c6dedaad09f97ee551eb4db6",
+          "fingerprint": "5d9be6c58220c433a06ff229cedac92459dfa02e97957fcd5e721821ff5f5351"
+        }
+      }
+    },
     "2": {
       "tasks": {
         "T1": {
