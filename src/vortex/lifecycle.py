@@ -11,6 +11,7 @@ invariant is the spine:
 
 from __future__ import annotations
 
+import enum
 import json
 import logging
 import os
@@ -33,17 +34,21 @@ POLL_INTERVAL_SECONDS = 0.25
 SIDECAR_TOLERANCE_SECONDS = 1.0
 
 
-class _ScanUnknown:
-    """Sentinel: the port scan could not be completed (unreadable processes)."""
+class _ScanState(enum.Enum):
+    """Sentinel: the port scan could not be completed (unreadable processes).
 
-    def __repr__(self) -> str:
-        return "<port-scan-unknown>"
+    An enum member (not a bare object) so that ``x is SCAN_UNKNOWN`` narrows
+    the union away under mypy — the runtime guards were always present; this
+    lets the type checker see them.
+    """
+
+    UNKNOWN = "unknown"
 
 
-SCAN_UNKNOWN = _ScanUnknown()
+SCAN_UNKNOWN = _ScanState.UNKNOWN
 
 
-def _scan_port(port: int, retries: int = 2) -> int | None | _ScanUnknown:
+def _scan_port(port: int, retries: int = 2) -> int | None | _ScanState:
     """Scan for a listener on port.
 
     Returns the listener's pid, None when a CLEAN scan found no listener, or
@@ -100,7 +105,7 @@ def _find_listening_pid(port: int) -> int | None:
     return None if result is SCAN_UNKNOWN else result
 
 
-def as_pid(result: int | None | _ScanUnknown) -> int | None:
+def as_pid(result: int | None | _ScanState) -> int | None:
     """API-facing view of a scan result: an incomplete scan shows no occupant."""
     return None if result is SCAN_UNKNOWN else result
 
@@ -269,10 +274,10 @@ class Lifecycle:
         self.processes: dict[str, subprocess.Popen | None] = {}
         self._last_status: dict[str, str] = {}
 
-    def occupying_pid(self, entry: CatalogEntry) -> int | None | _ScanUnknown:
+    def occupying_pid(self, entry: CatalogEntry) -> int | None | _ScanState:
         return _scan_port(entry.port)
 
-    def owner_status(self, entry: CatalogEntry, pid: int | None | _ScanUnknown) -> str:
+    def owner_status(self, entry: CatalogEntry, pid: int | None | _ScanState) -> str:
         """'ready' | 'unidentified' | 'foreign' | 'unloaded' for a port."""
         if pid is SCAN_UNKNOWN:
             # Incomplete scan: never flip state on evidence we couldn't
