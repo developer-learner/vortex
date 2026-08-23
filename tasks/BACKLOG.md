@@ -3,7 +3,8 @@
 ## Canonical pending-work register
 
 > Reconciled by **Codex (GPT-5), 2026-08-23** against the current Blueprint,
-> Vortex, and Testchat trees. This is the deduplicated current list. All
+> Vortex, and Testchat trees; refreshed after Testchat's final adoption proof.
+> This is the deduplicated current list. All
 > agent-authored entries below remain untouched as historical source notes;
 > where a historical note conflicts with current repository state, this
 > section controls status.
@@ -11,17 +12,20 @@
 ### P0 closure — release repaired; one strict live-fire proof remains
 
 1. [x] **Blueprint — repair and prove the D-168 release.** The original 47
-   failures and the child-only defects subsequently exposed by Vortex are
-   repaired. Blueprint's exact full suite is green at **487/487** on published
-   ref `c66fa57`; the whole-entrypoint, child-cwd, child sandbox-mount, current
-   one-file brief, and per-task mypy boundaries all have regressions.
+   failures and the child-only defects subsequently exposed by Vortex and
+   Testchat are repaired. Blueprint's exact full suite is green at **490/490**
+   on published ref `3d5a5e6`; the copied-child whole-entrypoint, child-cwd,
+   child sandbox-mount, current one-file brief, and per-task mypy boundaries
+   all have regressions.
 2. [x] **Blueprint — prevent another unverified publication.** The pre-push
    release gate checks the exact commit being published in an isolated copy,
    fails closed for an unavailable SHA, and has dogfooded every corrected
    Blueprint publication.
-3. [x] **Blueprint → Vortex — publish and adopt the corrected successor.** The
-   corrected Blueprint is published at `c66fa57`; Vortex adoption commit
-   `526262d` pins that exact ref and both manifest checks are green.
+3. [x] **Blueprint → Vortex — publish and adopt the corrected successor.**
+   Vortex advanced through `2a32945`, then adopted the final published
+   Blueprint `3d5a5e6` in `8f8984e`; both manifest checks are green. Its
+   inherited **490/490** suite was green at `5d4969c`; the final adoption adds
+   the copied-child regression that Testchat subsequently proved.
 4. [ ] **Vortex — collect the remaining D-168 live-fire evidence.** The
    mechanism, non-dry-run, child-tree, and VM proofs are complete. Blueprint
    was advanced from `6f8b6e8` to `9d431cd` during the real v4 run and the run
@@ -36,9 +40,10 @@
    `5f32f10` includes the real model-load `409` detail path, clears the card on
    success, and removes the dead `GET /api/status` `s.conflict` read. The
    complete frozen suite is green at **36/36** and whole-source mypy is green.
-6. [ ] **Vortex — close M1 review and reconcile status docs.** Complete the CEO
-   live acceptance. Conductor browser QA and the status-document reconciliation
-   are complete; only the non-delegable CEO acceptance required by D-44 remains.
+6. [x] **Vortex — close M1 review and reconcile status docs.** Conductor
+   browser QA and status-document reconciliation are complete. CEO live
+   acceptance followed on 2026-08-23: dashboard load/unload was exercised and
+   reported working, closing the D-44 human acceptance boundary.
 7. [x] **Blueprint — execute D-161's report-only oracle-strength measurement.**
    Completed in `492b8f0`; report and raw mutant results are under
    `docs/research/` and the runner is regression-tested.
@@ -70,9 +75,10 @@
 
 ### P3 — roadmap and CEO-gated work
 
-14. [ ] **Testchat — adopt the current control plane first.** Testchat still
-    pins Blueprint `7446a3a`; update it only from a clean tree and verify the
-    resulting manifest before beginning the recut.
+14. [x] **Testchat — adopt the current control plane first.** Testchat adopted
+    published Blueprint `3d5a5e6` in `e831315`; both manifest checks and the
+    complete inherited suite are green at **490/490**. Adoption evidence is
+    recorded in `bb8f7cd`, published on Testchat `main`.
 15. [ ] **Vortex/Testchat — roadmap phase 3:** recut Testchat onto Vortex's
     universal surface; settle the reopened oracle/refreeze-mode question.
 16. [ ] **Vortex/Testchat — roadmap phase 4:** cut `LLM_ENDPOINT` over to
@@ -146,8 +152,8 @@ final closure ref.
 - **Merge `experiment/symlink-control-plane` into `main`:** no such local
   branch currently exists; Vortex is already on `main` at `f7257c7` with the
   adoption history. Retained below only as a historical agent note.
-- **UI awaiting initial sign-off:** superseded by the shipped M1 dashboard.
-  The remaining work is the browser eyeball/document reconciliation in item 6.
+- **UI awaiting initial sign-off:** superseded by the shipped M1 dashboard,
+  completed browser/document reconciliation, and CEO live acceptance in item 6.
 
 ## P0 — control-plane release blocker
 
