@@ -33,41 +33,76 @@ POLL_INTERVAL_SECONDS = 0.25
 SIDECAR_TOLERANCE_SECONDS = 1.0
 
 
-_WARNED_EMPTY_SCAN_PORTS: set[int] = set()
+class _ScanUnknown:
+    """Sentinel: the port scan could not be completed (unreadable processes)."""
+
+    def __repr__(self) -> str:
+        return "<port-scan-unknown>"
+
+
+SCAN_UNKNOWN = _ScanUnknown()
+
+
+def _scan_port(port: int, retries: int = 2) -> int | None | _ScanUnknown:
+    """Scan for a listener on port.
+
+    Returns the listener's pid, None when a CLEAN scan found no listener, or
+    SCAN_UNKNOWN when some processes were unreadable and no listener was
+    found. An incomplete scan must never be reported as "empty": transient
+    per-process psutil failures under memory pressure are how a live model
+    silently flapped to "unloaded" (2026-08-18 anomaly class).
+    """
+    for attempt in range(retries + 1):
+        errored = 0
+        found: int | None = None
+        for proc in psutil.process_iter(["pid"]):
+            try:
+                for conn in proc.net_connections(kind="inet"):
+                    if conn.status == psutil.CONN_LISTEN and conn.laddr.port == port:
+                        found = proc.pid
+                        break
+                if found is not None:
+                    break
+            except (psutil.AccessDenied, psutil.NoSuchProcess):
+                # AccessDenied: another user's process — cannot be the model
+                # (modelmux spawns as the current user); permanent on macOS,
+                # not incompleteness. NoSuchProcess: exited mid-scan; it is
+                # gone, so it cannot hold the port. Both are safe to skip.
+                continue
+            except psutil.Error:
+                # Transient syscall failure on a visible process: this scan
+                # may have missed the model — count it as incompleteness.
+                errored += 1
+                continue
+        if found is not None or errored == 0:
+            return found
+        if attempt < retries:
+            logger.warning(
+                "port %d scan incomplete (%d process(es) unreadable) — retry %d/%d",
+                port, errored, attempt + 1, retries,
+            )
+            time.sleep(POLL_INTERVAL_SECONDS)
+    logger.warning(
+        "port %d scan still incomplete after %d attempt(s) — reporting unknown; "
+        "callers must fail closed",
+        port, retries + 1,
+    )
+    return SCAN_UNKNOWN
 
 
 def _find_listening_pid(port: int) -> int | None:
-    errored = 0
-    found: int | None = None
-    for proc in psutil.process_iter(["pid"]):
-        try:
-            for conn in proc.net_connections(kind="inet"):
-                if conn.status == psutil.CONN_LISTEN and conn.laddr.port == port:
-                    found = proc.pid
-                    break
-            if found is not None:
-                break
-        except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.Error):
-            errored += 1
-            continue
-    if errored:
-        # Transient syscall failures here are how a live model silently
-        # flaps to "unloaded" (2026-08-18 anomaly class). An empty result
-        # despite unreadable processes may be a false "unloaded"; warn once
-        # per port per boot — state-flip logging carries the per-event signal.
-        if found is None and port not in _WARNED_EMPTY_SCAN_PORTS:
-            logger.warning(
-                "port %d scan found NO listener but skipped %d process(es) "
-                "(access denied/error) — occupant may be invisible",
-                port,
-                errored,
-            )
-            _WARNED_EMPTY_SCAN_PORTS.add(port)
-        else:
-            logger.debug(
-                "port %d scan: %d process(es) unreadable", port, errored
-            )
-    return found
+    """Binary view of _scan_port (tests, diagnostics, port-free polling).
+
+    An incomplete scan is reported as None here — safe only for "is the port
+    free" polling, never for state decisions (use _scan_port / occupying_pid).
+    """
+    result = _scan_port(port)
+    return None if result is SCAN_UNKNOWN else result
+
+
+def as_pid(result: int | None | _ScanUnknown) -> int | None:
+    """API-facing view of a scan result: an incomplete scan shows no occupant."""
+    return None if result is SCAN_UNKNOWN else result
 
 
 def _process_start_time(pid: int) -> float | None:
@@ -141,7 +176,17 @@ class SidecarStore:
         try:
             with open(self._path(public_id), encoding="utf-8") as f:
                 record = json.load(f)
+        except FileNotFoundError:
+            return None
         except (OSError, ValueError):
+            # Present but unreadable: a transient I/O failure must not read as
+            # "no sidecar record" (that path 409s a live, byte-exact model).
+            # Callers fail closed either way; the log distinguishes the cases.
+            logger.warning(
+                "sidecar %s present but unreadable (transient I/O?) — "
+                "treating as unidentified",
+                public_id,
+            )
             return None
         return record if isinstance(record, dict) else None
 
@@ -224,11 +269,20 @@ class Lifecycle:
         self.processes: dict[str, subprocess.Popen | None] = {}
         self._last_status: dict[str, str] = {}
 
-    def occupying_pid(self, entry: CatalogEntry) -> int | None:
-        return _find_listening_pid(entry.port)
+    def occupying_pid(self, entry: CatalogEntry) -> int | None | _ScanUnknown:
+        return _scan_port(entry.port)
 
-    def owner_status(self, entry: CatalogEntry, pid: int | None) -> str:
+    def owner_status(self, entry: CatalogEntry, pid: int | None | _ScanUnknown) -> str:
         """'ready' | 'unidentified' | 'foreign' | 'unloaded' for a port."""
+        if pid is SCAN_UNKNOWN:
+            # Incomplete scan: never flip state on evidence we couldn't
+            # gather — hold the last known status (2026-08-18 anomaly class).
+            previous = self._last_status.get(entry.public_id)
+            logger.warning(
+                "%s: port %d scan incomplete — holding status %r",
+                entry.public_id, entry.port, previous or "unknown",
+            )
+            return previous or "unloaded"
         if pid is None:
             status = "unloaded"
             reason = ""
@@ -269,6 +323,13 @@ class Lifecycle:
         held by a process we do NOT identify, spawning is refused.
         """
         occupant = self.occupying_pid(entry)
+        if occupant is SCAN_UNKNOWN:
+            raise PortConflictError(
+                f"port {entry.port} scan incomplete — refusing to spawn "
+                f"(cannot verify the port is free)",
+                port=entry.port,
+                pid=None,
+            )
         if occupant is not None and not self.sidecars.identifies(entry.public_id, occupant):
             raise PortConflictError(
                 f"port {entry.port} occupied by unidentified process {occupant} "
@@ -304,6 +365,14 @@ class Lifecycle:
     def terminate(self, entry: CatalogEntry) -> bool:
         """Terminate the entry's process IF positively identified; else False."""
         occupant = self.occupying_pid(entry)
+        if occupant is SCAN_UNKNOWN:
+            # Incomplete scan: the port may still hold a live model — never
+            # drop the sidecar or report "already unloaded" on unknown.
+            logger.warning(
+                "refusing to terminate %s: port %d scan incomplete",
+                entry.public_id, entry.port,
+            )
+            return False
         if occupant is None:
             self.processes[entry.public_id] = None
             self.sidecars.drop(entry.public_id)
@@ -319,7 +388,7 @@ class Lifecycle:
 
 
 class PortConflictError(Exception):
-    def __init__(self, message: str, *, port: int, pid: int) -> None:
+    def __init__(self, message: str, *, port: int, pid: int | None) -> None:
         super().__init__(message)
         self.port = port
         self.pid = pid

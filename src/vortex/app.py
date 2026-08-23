@@ -21,6 +21,7 @@ from .lifecycle import (
     PortConflictError,
     SidecarStore,
     SpawnError,
+    as_pid,
     log_stale_sidecars,
 )
 from .manager import Manager, MemoryConflict, estimate_ram_total_gb, estimate_ram_used_gb
@@ -105,7 +106,7 @@ def build_app(
                 {
                     **e.model_dump(),
                     "state": manager.entry_state(e, active_by_id.get(e.public_id)),
-                    "port_pid": lifecycle.occupying_pid(e),
+                    "port_pid": as_pid(lifecycle.occupying_pid(e)),
                 }
                 for e in catalog.entries
             ]

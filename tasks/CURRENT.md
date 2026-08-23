@@ -2,6 +2,21 @@
 
 ## State
 
+- **2026-08-23 — Flaky-probe fix landed (2026-08-18 anomaly class closed).**
+  Port scan is now tri-state (`_scan_port` in `lifecycle.py`): pid /
+  confirmed-empty `None` / `SCAN_UNKNOWN` after 2 retries. Only transient
+  `psutil.Error` counts as incompleteness — `AccessDenied` (other users'
+  processes, permanent on macOS) and `NoSuchProcess` are safe skips. All
+  callers fail closed on unknown: `owner_status` holds last status (no
+  state flip), `spawn` refuses (`PortConflictError`), `terminate` refuses
+  and never drops the sidecar (the old false-`None` path that caused the
+  `409 unidentified process` despite byte-exact match). `SidecarStore.read`
+  now distinguishes absent from present-but-unreadable. `app.py` sanitizes
+  `port_pid` via `as_pid()`. Tri-state regression tests were drafted but
+  NOT committed (INV-1: agents don't author frozen-suite tests) — to be
+  pinned via refreeze.sh with a named TPM seat. Full product suite green
+  (36 passed, all 6 test files); ruff clean.
+
 - **2026-08-21 — Milestone #1 preflight WIRED AND SMOKED (all green).**
   dev-vm started; gateway verified from guest (`host.lima.internal` →
   vortex :9000 ✅ mtplx :8001 ✅). VM-side config written
