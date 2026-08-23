@@ -1,23 +1,12 @@
 {
-  "version": 7,
-  "erd_version": 7,
+  "version": 1,
+  "erd_version": 8,
   "tasks": [
-    {
-      "brief": "File: src/vortex/app.py (NO EDIT this delta \u2014 contracts-delta lists it in no_edit_files). This task exists only to carry the frozen route tests that pin the dashboard route and the unshadowed status route; make no code changes. Acceptance: the two pinned route tests pass against the existing app.",
-      "contracts": [],
-      "depends_on": [],
-      "file": "src/vortex/app.py",
-      "id": "T2",
-      "tests": [
-        "tests/test_ui_route.py::test_dashboard_served",
-        "tests/test_ui_route.py::test_status_route_unshadowed"
-      ]
-    },
     {
       "id": "T1",
       "file": "src/vortex/ui.py",
       "depends_on": [],
-      "brief": "File: src/vortex/ui.py (EDIT \u2014 anchored SEARCH/REPLACE only; the coder receives the full current file). Change ONLY the client-JS field/shape/state reads named below; leave all CSS, element ids, fetch URLs, poll intervals, the escaping helper, and event wiring untouched.\n\n1. Catalog envelope: GET /api/catalog returns {\"entries\": [...]}. In the catalog poll, render rows from data.entries, not from the response object itself.\n2. Catalog entry fields (each entry: public_id, runtime, engine, port, ram_estimate_gb, ctx_size, state; NO id/name/size_gib). In the row renderer: model column shows m.public_id (was m.name); size column shows m.ram_estimate_gb (was m.size_gib); the load/unload button data-id uses m.public_id (was m.id).\n3. Loaded-state token: a serving model's state is \"ready\" (never \"loaded\"). The row's loaded test becomes m.state === \"ready\"; the \"loading\" test is unchanged. Keep the existing loaded / loading CSS class names.\n4. Status fields: GET /api/status returns ram_used_gb and ram_total_gb (GB, not _gib) and no ram_pct. The RAM meter reads s.ram_used_gb / s.ram_total_gb and computes the percent itself (total > 0 ? used / total * 100 : 0); the warn (>70) / danger (>85) zones and the label format are unchanged.\n5. Operation handle: POST /api/models/{id}/load|unload returns {\"operation\": <id>, \"model\": <id>}. After a click, poll op.operation (was op.id).\n\nDo NOT touch the conflict card (out of scope this delta). No new imports, no external assets, no print/logging. Acceptance: the five pinned field-contract tests pass and the carried ui_content tests still pass.",
+      "brief": "File: `src/vortex/ui.py`. Use anchored SEARCH/REPLACE edits only. In the\nload/unload click handler, parse the response body once. When the response\nstatus is 409, read `body.detail.message`, `body.detail.required_gb`, and\n`body.detail.eviction_candidates`; construct a readable string containing the\nmessage, required RAM in GiB, and the candidate model ids (use `none` when the\narray is empty), pass that string to `setConflict`, and return no operation.\nFor any other non-success status, keep throwing the existing action error. For\na successful response, return the parsed operation body; in the following\nhandler call `setConflict(null)` before `pollOperation(op.operation)`. Keep the\nexisting removal of the dead `s.conflict` status read. Do not change CSS,\nelement ids, fetch URLs, polling intervals, imports, or unrelated JS. Verify\nthe three `tests/test_ui_conflict_card.py` node-ids pass along with the carried\nUI contract/content tests.",
       "contracts": [],
       "tests": [
         "tests/test_ui_api_contract.py::test_catalog_response_is_enveloped",
