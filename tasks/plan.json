@@ -1,6 +1,6 @@
 {
-  "version": 6,
-  "erd_version": 4,
+  "version": 7,
+  "erd_version": 7,
   "tasks": [
     {
       "brief": "File: src/vortex/app.py (NO EDIT this delta \u2014 contracts-delta lists it in no_edit_files). This task exists only to carry the frozen route tests that pin the dashboard route and the unshadowed status route; make no code changes. Acceptance: the two pinned route tests pass against the existing app.",
