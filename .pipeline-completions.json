@@ -28,6 +28,20 @@
           "fingerprint": "b528444522ca8769a253528611617baf65239e7a94ffe156a8dc3c622b601c3e"
         }
       }
+    },
+    "3": {
+      "tasks": {
+        "T1": {
+          "file": "src/vortex/ui.py",
+          "file_sha256": "0d9dfe160ccbfddf488d7fb2674b7e16d57d2a3eff72f702bbf8c5638d580cb4",
+          "fingerprint": "4da9645ea0ff01519a7c546814dd191a14527ef639e497889378d4cc64bdb40b"
+        },
+        "T2": {
+          "file": "src/vortex/app.py",
+          "file_sha256": "402479842f45a97ce545fcdc98857ccc18f6d6c51c374596d22267f79cbbde08",
+          "fingerprint": "b528444522ca8769a253528611617baf65239e7a94ffe156a8dc3c622b601c3e"
+        }
+      }
     }
   }
 }
