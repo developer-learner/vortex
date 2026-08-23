@@ -1,6 +1,6 @@
 {
-  "version": 5,
-  "erd_version": 3,
+  "version": 6,
+  "erd_version": 4,
   "tasks": [
     {
       "brief": "File: src/vortex/app.py (NO EDIT this delta \u2014 contracts-delta lists it in no_edit_files). This task exists only to carry the frozen route tests that pin the dashboard route and the unshadowed status route; make no code changes. Acceptance: the two pinned route tests pass against the existing app.",
@@ -26,6 +26,9 @@
         "tests/test_ui_api_contract.py::test_ui_operation_completion_uses_real_terminal_states",
         "tests/test_ui_api_contract.py::test_ui_uses_the_api_loaded_state_token",
         "tests/test_ui_api_contract.py::test_ui_uses_the_operation_field_the_api_returns",
+        "tests/test_ui_conflict_card.py::test_conflict_card_reads_the_409_detail",
+        "tests/test_ui_conflict_card.py::test_conflict_clears_on_successful_action",
+        "tests/test_ui_conflict_card.py::test_conflict_no_longer_read_from_status",
         "tests/test_ui_content.py::test_conflict_card_elements_present",
         "tests/test_ui_content.py::test_down_state_elements_present",
         "tests/test_ui_content.py::test_model_menu_elements_present",
