@@ -61,6 +61,8 @@ class Manager:
         if amount is None or not entry.exclusive:
             return []
         loaded = self.all_ready()
+        if any(e.public_id == entry.public_id for e in loaded):
+            return []
         used = sum((e.ram_estimate_gb or 0) for e in loaded)
         available = max(0.0, psutil.virtual_memory().total / (1024**3) * 0.8 - used)
         if amount <= available:
