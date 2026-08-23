@@ -291,9 +291,11 @@ class Lifecycle:
         self.sidecars.write(entry, proc)
         deadline = time.monotonic() + self.ready_timeout()
         while time.monotonic() < deadline:
-            if self.owner_status(entry, self.occupying_pid(entry)) == "ready":
-                if self._harmonic_ready(entry):
-                    return proc, True
+            if (
+                self.owner_status(entry, self.occupying_pid(entry)) == "ready"
+                and self._harmonic_ready(entry)
+            ):
+                return proc, True
             if proc.poll() is not None:
                 raise SpawnError(f"{entry.public_id} exited early rc={proc.returncode}", rc=proc.returncode)
             time.sleep(POLL_INTERVAL_SECONDS)
