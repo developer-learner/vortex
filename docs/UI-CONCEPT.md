@@ -81,13 +81,18 @@ Rules baked into the design:
 
 ## Deliverables
 
-1. Concept sign-off (this doc) — CEO
+1. ~~Concept sign-off (this doc) — CEO~~ SIGNED OFF 2026-08-21
+   (form factor A, `984a0ee`); shipped by M1 (`[success] spec v1..v3`,
+   2026-08-22).
 2. Implementation: one HTML template + one static route + polling JS; the
    daemon's existing test surface covers the API side (no new TPM scope:
    UI is presentation over a frozen-ish surface, no new acceptance)
 
 ## Open questions
 
-- Serve at `:9000/` root, or `:9000/ui` (keep `/api` namespace clean)?
-- Do we want the RAM meter alone first (dashboard-only), with load/unload
-  in a second slice?
+- ~~Serve at `:9000/` root, or `:9000/ui` (keep `/api` namespace clean)?~~
+  SETTLED: served at `:9000/` root (frozen route tests pin it,
+  `tests/test_ui_route.py`).
+- ~~Do we want the RAM meter alone first (dashboard-only), with
+  load/unload in a second slice?~~ SETTLED: shipped in one milestone
+  (menu + RAM meter + conflict card together, specs v1–v3).

@@ -187,31 +187,37 @@
 
 ## Halt notes
 
-- **HALT lifted — seat named.** First milestone (ready-probe fix, `503
-  Loading model` class) may proceed: spec authored by the TPM seat
-  (conductor), frozen via `refreeze.sh`, run via `orchestrate.sh`.
-- Orchestrate pre-flight requires: Lima `dev-vm` running, **model reachable
-  from inside the VM** (vortex daemon currently binds 127.0.0.1 only —
-  VM/host-gateway wiring + VM `models.env` (`qwen3.8-27b-8bit`,
-  `SANDBOX_LLM_HOST/PORT`) is orchestrate prep), working tree clean.
+- ~~HALT lifted — seat named.~~ Consumed: the first milestone ran
+  end-to-end 2026-08-22 (freeze v1 → plan → tasks → `[success]`).
+- ~~Orchestrate pre-flight requires: Lima `dev-vm` running, model
+  reachable from inside the VM, working tree clean.~~ Met and consumed
+  by the real M1 run (gateway + VM `models.env` wired and verified
+  2026-08-21; run green 2026-08-22). These are standing pre-flight
+  checks for FUTURE runs, not open work.
 
 ## Open questions
 
-- Refreeze-mode question (D-165): at the first freeze, are the 16 legacy
-  tests carried into the frozen suite or retired? (Milestone 1 decides.)
+- ~~Refreeze-mode question (D-165): at the first freeze, are the 16
+  legacy tests carried into the frozen suite or retired? (Milestone 1
+  decides.)~~ ANSWERED by freeze v1 (`73eb737`): the legacy tests were
+  CARRIED into the frozen suite (test-nodeids v1 = 27 = legacy catalog+serve
+  plus the 9 new UI tests; v3 = 33 after ui_api_contract joined at v2).
+  The `legacy-pin.json` snapshot remains as provenance only (NOT an
+  oracle). Refreeze mode going forward is the standard delta machinery.
 - OSS brownfield subject for adoption run #2 — candidate search parked
   (D-1 "do not suggest": only after vortex mechanics are proven).
 
 ## Next actions
 
-1. CEO names TPM seat → author first spec (ready-probe fix) → freeze →
-   orchestrate — **blocked: milestone runs deferred until memory freed**
+1. ~~CEO names TPM seat → author first spec → freeze → orchestrate~~
+   DONE 2026-08-22 (M1 complete, three freezes v1–v3 all `[success]`).
 2. ~~Verify installed plane's selftests pass on this machine~~ — DONE
    2026-08-17 (456/456, 74s)
-3. Stand up Lima + models.env when the first milestone launches — blocked
-   with item 1
-4. Exercise mtplx/vmlx catalog entries live once a model slot is free
-   (BACKLOG)
+3. ~~Stand up Lima + models.env when the first milestone launches~~ —
+   DONE 2026-08-21; exercised for real by the M1 run.
+4. Exercise the vmlx catalog entry live once a model slot is free
+   (BACKLOG Wave E item 17 — serialized runtime exercise, never a
+   worktree job)
 
 ## Backlog
 
@@ -225,6 +231,35 @@
   compaction-frequency/TTFT watchdog that re-tunes only on >30% signal
   shift. CEO decision to build pending; raised 2026-08-18. Context choice
   should be a program's decision, not a human's.
+
+## Session 2026-08-23 — M1 close-out: browser eyeball + status-doc reconciliation
+
+  **Browser eyeball DONE (conductor, real headless Chrome at
+  1280×900, screenshot reviewed).** Daemon served the dashboard on
+  :9000 from this tree (`uvicorn vortex.app:build_app --factory`);
+  findings:
+  - Title bar "vortex · model menu" renders; dark theme, layout clean.
+  - RAM meter live and consistent with `/api/status` (50.4 / 128 GiB,
+    39.4%; blue fill ~40% of track).
+  - Model menu lists all five catalog entries (deepseek-v4-flash-0731,
+    Flash_IQ3XXS, qwen3.8-27b-8bit, mtplx-qwen38-27b-optimized-quality,
+    vmlx-dsv4-configi-mlx) with idle status dots, per-model size column,
+    and a `load` action button each — matches catalog.json exactly.
+  - Down-state banner correctly ABSENT (daemon up); conflict card
+    correctly dormant (no conflict active). Footer poll note present.
+  - Known residual (not M1 scope): the conflict card only ever shows via
+    `s.conflict`, which `GET /api/status` never carries — BACKLOG item 5.
+  Eyeball evidence: screenshot retained in session record; daemon shut
+  down after verification, port freed.
+
+  **Status-document reconciliation** (this commit):
+  - Retired: "milestone launch memory-blocked" (M1 ran green
+    2026-08-22), "Lima gateway wiring + VM models.env unmet" (met and
+    consumed by the real run), D-165 refreeze-mode open question
+    (answered below), UI route/slicing open decision (settled by plan).
+  - Preserved verbatim: all v1/v2/v3 freeze/plan/task/success evidence.
+  - CLAUDE.md tech-stack testing line updated (16-legacy-test snapshot
+    → frozen suite); `.manifest-project` re-pinned.
 
 ## Results
 
@@ -245,8 +280,9 @@
     full initial ERD as ERD-DELTA-v1.md; all 467 control-plane selftests pass.
     Vortex's control-plane pin is aligned to 8a247f8.
 
-  Open: CEO browser eyeball of the served dashboard (Playwright-green is
-  necessary, never sufficient).
+  Open: CEO live acceptance of the served dashboard (Playwright-green and
+  conductor visual QA are necessary, never sufficient under D-44). Conductor
+  visual QA completed 2026-08-23; CEO acceptance remains pending.
 
 ## Results
 
