@@ -278,7 +278,6 @@ footer {
         var total = s.ram_total_gb || 0;
         var pct = total > 0 ? (used / total) * 100 : 0;
         setRam(pct, used, total);
-        setConflict(s.conflict || null);
       })
       .catch(function () {
         document.getElementById("down").style.display = "block";
@@ -335,10 +334,17 @@ footer {
     var path = "/api/models/" + encodeURIComponent(id) + "/" + act;
     fetch(path, { method: "POST" })
       .then(function (r) {
+        if (r.status === 409) {
+          return r.json().then(function (d) {
+            setConflict(d.detail || "conflict");
+          });
+        }
         if (!r.ok) throw new Error(act + " " + r.status);
         return r.json();
       })
       .then(function (op) {
+        if (!op) return;
+        setConflict(null);
         pollOperation(op.operation);
       })
       .catch(function () {});
