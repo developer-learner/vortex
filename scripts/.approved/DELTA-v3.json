@@ -1,0 +1,15 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_ui_api_contract.py::test_ui_operation_completion_uses_real_terminal_states"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [
+    "src/vortex/ui.py"
+  ],
+  "inventory_files": [
+    "src/vortex/ui.py",
+    "src/vortex/app.py"
+  ]
+}

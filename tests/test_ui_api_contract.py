@@ -82,3 +82,13 @@ def test_ui_uses_the_operation_field_the_api_returns() -> None:
     # load/unload return {"operation": <id>, "model": <id>}; the demo read op.id.
     assert "op.operation" in UI_PAGE
     assert "pollOperation(op.id)" not in UI_PAGE
+
+
+def test_ui_operation_completion_uses_real_terminal_states() -> None:
+    # A finished operation's state is "ready" (load), "unloaded" (unload), or
+    # "error"; the backend never emits state "done" (that is the op's phase).
+    # The progress poll must stop on the real terminal states so it does not
+    # spin forever after a successful action.
+    assert 'op.state === "done"' not in UI_PAGE
+    assert 'op.state === "ready"' in UI_PAGE
+    assert 'op.state === "unloaded"' in UI_PAGE

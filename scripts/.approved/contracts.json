@@ -1,5 +1,5 @@
 {
-  "erd_version": 2,
+  "erd_version": 3,
   "files": [
     "src/vortex/ui.py",
     "src/vortex/app.py"
