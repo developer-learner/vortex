@@ -45,6 +45,11 @@
 8. [x] **Blueprint — A/B the denser EM diagnosis brief** against archived
    diagnosis transcripts. Completed in `2eb2809`; the dense wording was not
    shipped because both variants exposed the same missing transient verdict.
+   The follow-up taxonomy is also complete: D-169 shipped at Blueprint
+   `5d4969c` with positive-evidence-only classification and a hard
+   operator-review halt—no automatic retry, re-probe, plan change, or TPM
+   escalation. Vortex adopted that exact ref in `2a32945`; its inherited
+   control-plane suite is green at 490/490.
 9. [ ] **Blueprint — validate the first organic two-strike ladder climb.** The
    Vortex repair run produced schema-valid `brief_wrong` diagnosis and a
    materially revised brief, and later produced a usable TPM batch. Keep this

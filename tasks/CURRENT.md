@@ -319,6 +319,15 @@
   success subject and metrics. Do not infer that proof from the later v10
   success, which began directly on `c66fa57`.
 
+## Session 2026-08-23 — D-169 diagnosis taxonomy adoption
+
+  Blueprint `5d4969c` adds the positive-evidence-only
+  `transient_or_environmental` diagnosis and routes it to a preserved
+  operator-review record plus a hard halt. The shell never automatically
+  retries, re-probes, rewrites the plan, or sends the case to the TPM. Vortex
+  adopted that exact published ref in `2a32945`; its inherited control-plane
+  suite passed 490/490 in this child tree.
+
 ## Results
 
   Full frozen TPM suite green against spec v10 (on-demand regression check, D-112). Feature built and validated.
