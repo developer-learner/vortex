@@ -1,36 +1,16 @@
 {
   "version": 1,
-  "erd_version": 9,
+  "erd_version": 10,
   "tasks": [
     {
       "id": "T1",
-      "file": "src/vortex/lifecycle.py",
+      "file": "src/vortex/manager.py",
       "depends_on": [],
-      "brief": "File: `src/vortex/lifecycle.py`. Use anchored SEARCH/REPLACE edits only. Add\nthe targeted mypy suppression `# type: ignore[import-untyped]` to the existing\n`import psutil` line. Change `Lifecycle.spawn`'s return annotation from\n`tuple[subprocess.Popen, bool]` to `tuple[subprocess.Popen | None, bool]` so it\nmatches the existing `(None, True)` adoption return. Change no runtime logic,\nimports, constants, or control flow. Verify the mapped lifecycle tests pass\nand mypy reports no error for this file.",
+      "brief": "File: `src/vortex/manager.py`. Use one anchored SEARCH/REPLACE edit in\n`Manager.eviction_required`. After collecting `loaded = self.all_ready()`, if\nthe requested `entry` is already present in `loaded`, return an empty conflict\nlist immediately because an idempotent adoption consumes no additional RAM.\nKeep the existing RAM calculation and eviction candidates unchanged for every\nother requested model. Change no API shapes, operation states, imports,\nlogging, or unrelated methods. Verify\n`tests/test_serve.py::test_load_conflict_reports_eviction` and\n`tests/test_serve.py::test_adopt_surviving_runtime_and_load` pass in the VM.",
       "contracts": [],
       "tests": [
         "tests/test_serve.py::test_adopt_surviving_runtime_and_load",
-        "tests/test_serve.py::test_spawn_fails_when_chat_never_succeeds",
-        "tests/test_serve.py::test_spawn_from_launch_command",
-        "tests/test_serve.py::test_spawn_waits_for_anneal_before_ready",
-        "tests/test_serve.py::test_unidentified_occupant_refused",
-        "tests/test_serve.py::test_unload_terminates_child"
-      ]
-    },
-    {
-      "id": "T2",
-      "file": "src/vortex/manager.py",
-      "depends_on": [
-        "T1"
-      ],
-      "brief": "File: `src/vortex/manager.py`. Use one anchored SEARCH/REPLACE edit to add the\ntargeted mypy suppression `# type: ignore[import-untyped]` to the existing\n`import psutil` line. Change no runtime logic, imports, annotations, or control\nflow. Verify the mapped manager tests pass and mypy reports no error for this\nfile.",
-      "contracts": [],
-      "tests": [
-        "tests/test_serve.py::test_load_conflict_reports_eviction",
-        "tests/test_serve.py::test_proxy_non_streaming",
-        "tests/test_serve.py::test_proxy_streaming_passthrough",
-        "tests/test_serve.py::test_proxy_unloaded_model_404",
-        "tests/test_serve.py::test_unknown_model_load_404"
+        "tests/test_serve.py::test_load_conflict_reports_eviction"
       ]
     }
   ]
