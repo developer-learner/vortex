@@ -6,7 +6,7 @@ import re
 import subprocess
 import threading
 
-import psutil
+import psutil  # type: ignore[import-untyped]
 
 from .catalog import Catalog, CatalogEntry
 from .lifecycle import Lifecycle, PortConflictError, SpawnError
