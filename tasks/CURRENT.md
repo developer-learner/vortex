@@ -280,8 +280,9 @@
     full initial ERD as ERD-DELTA-v1.md; all 467 control-plane selftests pass.
     Vortex's control-plane pin is aligned to 8a247f8.
 
-  Open: ~~CEO browser eyeball of the served dashboard (Playwright-green is
-  necessary, never sufficient)~~ — CLOSED 2026-08-23, see next session.
+  Open: CEO live acceptance of the served dashboard (Playwright-green and
+  conductor visual QA are necessary, never sufficient under D-44). Conductor
+  visual QA completed 2026-08-23; CEO acceptance remains pending.
 
 ## Results
 
