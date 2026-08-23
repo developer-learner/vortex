@@ -1,0 +1,17 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_ui_conflict_card.py::test_conflict_card_reads_the_409_detail",
+    "tests/test_ui_conflict_card.py::test_conflict_clears_on_successful_action",
+    "tests/test_ui_conflict_card.py::test_conflict_no_longer_read_from_status"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [
+    "src/vortex/ui.py"
+  ],
+  "inventory_files": [
+    "src/vortex/ui.py",
+    "src/vortex/app.py"
+  ]
+}
