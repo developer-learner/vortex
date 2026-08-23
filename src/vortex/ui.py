@@ -246,20 +246,20 @@ footer {
     var html = "";
     for (var i = 0; i < models.length; i++) {
       var m = models[i];
-      var loaded = m.state === "loaded";
+      var loaded = m.state === "ready";
       var loading = m.state === "loading";
       var dotCls = loaded ? "loaded" : loading ? "loading" : "";
       var dot = '<span class="status-dot ' + dotCls + '"></span>';
       var actBtn = "";
       if (loaded) {
-        actBtn = '<button data-act="unload" data-id="' + esc(m.id) + '">unload</button>';
+        actBtn = '<button data-act="unload" data-id="' + esc(m.public_id) + '">unload</button>';
       } else if (!loading) {
-        actBtn = '<button data-act="load" data-id="' + esc(m.id) + '">load</button>';
+        actBtn = '<button data-act="load" data-id="' + esc(m.public_id) + '">load</button>';
       }
       html += "<tr>";
       html += "<td>" + dot + (loading ? "loading…" : loaded ? "loaded" : "idle") + "</td>";
-      html += "<td>" + esc(m.name) + "</td>";
-      html += "<td>" + esc(m.size_gib) + " GiB</td>";
+      html += "<td>" + esc(m.public_id) + "</td>";
+      html += "<td>" + esc(m.ram_estimate_gb) + " GiB</td>";
       html += "<td>" + actBtn + "</td>";
       html += "</tr>";
     }
@@ -274,7 +274,10 @@ footer {
       })
       .then(function (s) {
         document.getElementById("down").style.display = "none";
-        setRam(s.ram_pct || 0, s.ram_used_gib || 0, s.ram_total_gib || 0);
+        var used = s.ram_used_gb || 0;
+        var total = s.ram_total_gb || 0;
+        var pct = total > 0 ? (used / total) * 100 : 0;
+        setRam(pct, used, total);
         setConflict(s.conflict || null);
       })
       .catch(function () {
@@ -288,8 +291,8 @@ footer {
         if (!r.ok) throw new Error("catalog " + r.status);
         return r.json();
       })
-      .then(function (models) {
-        renderRows(models);
+      .then(function (data) {
+        renderRows(data.entries);
       })
       .catch(function () {});
   }
@@ -336,7 +339,7 @@ footer {
         return r.json();
       })
       .then(function (op) {
-        pollOperation(op.id);
+        pollOperation(op.operation);
       })
       .catch(function () {});
   });
