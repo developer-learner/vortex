@@ -32,7 +32,9 @@ Database:     none (catalog = config/catalog.json, config-first)
 Auth:         none — local-only daemon on 127.0.0.1
 Hosting:      local macOS (Apple Silicon); Lima VM for pipeline runs
 CI/CD:        (not yet connected — plan for after remote exists)
-Testing:      pytest (16 legacy tests, hash-pinned snapshot, NOT an oracle)
+Testing:      pytest (frozen suite, 33 node-ids across 5 files, hash-pinned
+              in scripts/.approved/frozen-manifest; legacy 16-test snapshot
+              pinned separately in scripts/.approved/legacy-pin.json — NOT an oracle)
 ```
 
 ---
