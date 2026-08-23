@@ -1,7 +1,6 @@
 {
-  "erd_version": 9,
+  "erd_version": 10,
   "files": [
-    "src/vortex/lifecycle.py",
     "src/vortex/manager.py"
   ],
   "entry_points": [
@@ -11,22 +10,12 @@
     "src.vortex.app:build_app"
   ],
   "changed_files": [
-    "src/vortex/lifecycle.py",
     "src/vortex/manager.py"
   ],
   "no_edit_files": [],
   "test_mapping": {
-    "tests/test_serve.py::test_unidentified_occupant_refused": "src/vortex/lifecycle.py",
-    "tests/test_serve.py::test_adopt_surviving_runtime_and_load": "src/vortex/lifecycle.py",
-    "tests/test_serve.py::test_unload_terminates_child": "src/vortex/lifecycle.py",
-    "tests/test_serve.py::test_spawn_from_launch_command": "src/vortex/lifecycle.py",
-    "tests/test_serve.py::test_spawn_waits_for_anneal_before_ready": "src/vortex/lifecycle.py",
-    "tests/test_serve.py::test_spawn_fails_when_chat_never_succeeds": "src/vortex/lifecycle.py",
     "tests/test_serve.py::test_load_conflict_reports_eviction": "src/vortex/manager.py",
-    "tests/test_serve.py::test_unknown_model_load_404": "src/vortex/manager.py",
-    "tests/test_serve.py::test_proxy_non_streaming": "src/vortex/manager.py",
-    "tests/test_serve.py::test_proxy_streaming_passthrough": "src/vortex/manager.py",
-    "tests/test_serve.py::test_proxy_unloaded_model_404": "src/vortex/manager.py"
+    "tests/test_serve.py::test_adopt_surviving_runtime_and_load": "src/vortex/manager.py"
   },
   "routes": [
     {
