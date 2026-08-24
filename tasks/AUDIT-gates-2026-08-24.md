@@ -312,3 +312,93 @@ Honest limit: this proves *wiring*, not *execution history*. 'Last run' per scri
 ## tpm-lint.sh — DOC-ONLY
 - purpose: tpm-lint.sh — pre-ship mechanical lint for a staged TPM bundle (D-38).
 - provenance (DECISIONS.md): NONE
+
+---
+
+# Pass 2 — teeth-vs-liveness classification (2026-08-24)
+
+Pass 1 answered "running?" (40/41 wired to live paths). This pass answers the
+first half of "useful?": for each gate, does a control-plane selftest already
+build a violating or known input and assert the gate's detection behavior?
+
+Method (one-shot, static; no new machinery): for every script, the selftest
+suite (scripts/selftest/* in the Blueprint) was scanned for references; each
+reference was mapped to its enclosing test and the test's docstring + assert
+lines. Classification:
+
+- **TEETH** — a selftest builds a violating/known input and asserts the gate
+  detects it (fires, warns, refuses, or produces the correct output).
+- **PARTIAL** — referenced only from fixtures/helpers (installed into test
+  repos, or a module-level constant) with no dedicated assertion found.
+- **NONE** — no selftest reference.
+
+Honest limits: (a) this is an inventory of teeth we already own, read from
+test intent — it is not a live mutation run; a gate can pass its fixture test
+and still miss a real-world variant (that residual is what the standing
+catch-ledger + gate mutation pass, held for the direction call, would cover).
+(b) A few references were attributed to the enclosing test statically; where
+the evidence is a helper rather than a named test, it is said so.
+
+## Result: 38 TEETH / 3 PARTIAL / 2 NONE
+
+### TEETH (38) — teeth already proven by the selftest suite
+- apply-edit-blocks.py — the REAL applier is exercised end-to-end by drive-coder.sh + selftest_gates.py
+- bootstrap.sh — onboarding test asserts it names the model overrides and leaves git config clean
+- check-drift.sh — exercised in the tamper-detection selftest (evidence via the tamper fixture; weakest TEETH in the list)
+- check-prd-additive.py — the PRD-guard helper is exercised by the refreeze selftests (additive vs non-additive)
+- check-spec-delta.py — ERD-delta validation exercised in the refreeze preflight selftests
+- check-swallowed-errors.py — dedicated teeth: missing contracts is a usage error; other filetypes ignored; exercised by drive-coder.sh
+- context-budget.py — dedicated selftest_context_budgets.py + b4a pack fixtures
+- contracts-delta.py — asserts the correct interface-index output on a fixture
+- contracts-merge.py — asserts a staged UI change reaches the merged delta
+- doc-consistency.sh — warns on a stale retired-decision token; silent without staged change (full teeth for a warning-only gate)
+- em-bench.sh — manual replay tool (backlog item); no per-run gate, no selftest needed
+- extract-test-functions.py — the extractor is used by selftest_b6a.py against fixtures
+- feature-summary.py — asserts it names UNACCOUNTED time on a silent crash
+- link-template.sh — dedicated selftest_linked_template.py asserts the link preview + match
+- llm-call.sh — asserts the edit-mode budget reaches the llm-call invocation
+- manifest-drift-guard.sh — warns on staged control-plane change; silent without; shasum-only still warns (full teeth for a warning-only gate)
+- metrics-report.py — asserts metrics persist before teardown and the report is produced
+- mutation-pass.sh — dedicated selftest_mutation_pass.py (the teeth-measurer has its own teeth test)
+- new-project.sh — onboarding output names the model overrides llm-call reads
+- orchestrate.sh — multiple teeth: pack-strip is pack-only, context surfaces wired to the budget tool, scoped-swallow changed lines
+- phase-gate.sh — gate-runner helper + shasum-only tamper still detected
+- refreeze.sh — the largest selftest surface: freezable/stageable repo fixtures, diff/apply paths, VERSION bump, manifest regen
+- refreeze_delta.py — delta computation asserted via the refreeze fixtures
+- regen-manifest.sh — tamper test + shasum-only output asserted
+- sandbox-run.sh — asserts full-suite execution is confined to the tests directory
+- spec_artifacts.py — shared policy asserted across all shuttle boundaries (bypass is a test failure)
+- standing-summary.py — asserts the distinct-accumulated-architecture output
+- status.sh — housekeeping selftests: read-only invariant (tree not mutated), section output asserted
+- teardown.sh — housekeeping selftests: nothing defaults to destructive; --dry-run asserted
+- tpm-agent.sh — covered by the shared spec-artifact-policy test
+- tpm-pack.py — dedicated selftest_b4a.py (air-gapped pack fixtures) + context-budget wiring
+- tpm-unpack.sh — asserts the ERD delta is carried end-to-end through the shuttle
+- tpm-view.sh — sanitizes src lines; rebuild is deterministic; missing-PRD error asserted
+- update-template.sh — template pull-pair fixtures; trivial-plan auto-approval asserted
+- validate-plan.py — dedicated selftest_b6b.py + plan-ok / rejection assertions
+
+### PARTIAL (3) — the real gap: wired and running, teeth unproven
+- check-ac-postconditions.py — appears only in refreeze fixture helpers (installed into test repos); no dedicated violating-AC assertion found
+- check-test-direction.py — same shape: fixture-helper references only; no dedicated reversed-test assertion found
+- flake-ledger.py — module-level reference + drive-drift.sh only; no dedicated ledger-correctness assertion found
+
+These three are the shortlist for the cheap next step: write one violating
+fixture test each (the pattern already exists in selftest_gates.py), or find
+the existing assertion this static pass missed. Either way they stop being
+"unproven."
+
+### NONE (2)
+- tpm-lint.sh — the paper-only item from pass 1. Settlement: the refreeze
+  preflights do their staged-bundle linting inline; tpm-lint.sh is not called
+  by any live path. Candidate for retirement (or wire it into the refreeze
+  preflight if the inline checks are meant to live there) — direction-
+  independent, CEO/operator call.
+- em-bench.sh — manual research tool; classified, not a gap.
+
+## What this changes about the direction call
+"Cut the dead weight" was not actionable because dead and dormant looked
+identical. Now: 38/41 have proven teeth, 3 are the named unproven shortlist,
+2 are settled (one retire candidate, one manual tool). The standing
+catch-ledger (real-world catches over time) is still the held instrument —
+but the direction call no longer needs it to get started.
