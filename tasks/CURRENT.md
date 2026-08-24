@@ -2,6 +2,22 @@
 
 ## State
 
+- **2026-08-24 — Steady state. Flap-bug thread fully closed; direction settled (D-170).**
+  Refreeze v11 (`8097f33`) pinned the tri-state regression; refreeze v12
+  (`85f0cbd`) added the frozen CLI tests (`test_cli.py`, TPM seat: CEO);
+  coverage 88.15% ≥ 80% floor; full product suite green; CI +
+  check-drift green. Gate audit landed in two passes: `b3f040f`
+  (wiring: 40/41 live, 1 doc-only, 0 orphan) + `65da200` (teeth by
+  static read: 38 proven / 3 unproven / 2 settled) — report at
+  `tasks/AUDIT-gates-2026-08-24.md`. Decision memo at
+  `tasks/DECISION-MEMO-builder-vs-template-2026-08-24.md` (`6c07c49`).
+  **Direction settled (D-170 in Blueprint `docs/DECISIONS.md`): both —
+  template at seed (born-linked), builder for life.** Open work:
+  combined TODO in Blueprint `tasks/TODO.md` (Group A foundation batch,
+  2b mutation sweep, catch ledger, tiering, born-linked seed path;
+  vortex product debt — memory-figure mismatch + `_anneal_probe`
+  hardening — each pairs with a refreeze, D-139 named seat).
+
 - **2026-08-23 — Flaky-probe fix landed (2026-08-18 anomaly class closed).**
   Port scan is now tri-state (`_scan_port` in `lifecycle.py`): pid /
   confirmed-empty `None` / `SCAN_UNKNOWN` after 2 retries. Only transient
@@ -13,9 +29,10 @@
   `409 unidentified process` despite byte-exact match). `SidecarStore.read`
   now distinguishes absent from present-but-unreadable. `app.py` sanitizes
   `port_pid` via `as_pid()`. Tri-state regression tests were drafted but
-  NOT committed (INV-1: agents don't author frozen-suite tests) — to be
-  pinned via refreeze.sh with a named TPM seat. Full product suite green
-  (36 passed, all 6 test files); ruff clean.
+  NOT committed here (INV-1: agents don't author frozen-suite tests) —
+  SUPERSEDED 2026-08-24: pinned in refreeze v11 (`8097f33`) with a named
+  TPM seat. Full product suite green (36 passed, all 6 test files);
+  ruff clean.
 
 - **2026-08-21 — Milestone #1 preflight WIRED AND SMOKED (all green).**
   dev-vm started; gateway verified from guest (`host.lima.internal` →

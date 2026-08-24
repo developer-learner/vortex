@@ -1,5 +1,9 @@
 # Decision Memo — Builder vs Template (2026-08-24)
 
+**RESOLVED 2026-08-24 — both: template at seed, builder for life.** The
+fork below is preserved as the evidence base; the decision record is
+D-170 in the Blueprint's `docs/DECISIONS.md`.
+
 **Decision requested:** where future control-plane effort lives — commit to the
 Blueprint as a **builder** (living product; projects are linked children that
 track it) or **freeze as template v1.0** (snapshot; copy to seed new projects;
