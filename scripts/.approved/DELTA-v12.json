@@ -1,0 +1,18 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_cli.py::test_load_conflict_returns_2",
+    "tests/test_cli.py::test_load_failure_returns_1",
+    "tests/test_cli.py::test_load_success_polls_to_ready",
+    "tests/test_cli.py::test_main_returns_3_when_daemon_unreachable",
+    "tests/test_cli.py::test_models_table_marks_and_sort",
+    "tests/test_cli.py::test_status_no_models",
+    "tests/test_cli.py::test_status_with_loaded_models",
+    "tests/test_cli.py::test_unload_failure_returns_1",
+    "tests/test_cli.py::test_unload_success"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": []
+}

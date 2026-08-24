@@ -5,6 +5,15 @@ tests/test_catalog.py::test_catalog_rejects_empty_launch_command
 tests/test_catalog.py::test_catalog_rejects_bad_public_id
 tests/test_catalog.py::test_load_catalog_from_json
 tests/test_catalog.py::test_load_catalog_invalid_json_raises
+tests/test_cli.py::test_main_returns_3_when_daemon_unreachable
+tests/test_cli.py::test_status_no_models
+tests/test_cli.py::test_status_with_loaded_models
+tests/test_cli.py::test_models_table_marks_and_sort
+tests/test_cli.py::test_load_conflict_returns_2
+tests/test_cli.py::test_load_success_polls_to_ready
+tests/test_cli.py::test_load_failure_returns_1
+tests/test_cli.py::test_unload_success
+tests/test_cli.py::test_unload_failure_returns_1
 tests/test_lifecycle_scan.py::test_scan_port_reports_unknown_on_transient_errors
 tests/test_lifecycle_scan.py::test_scan_port_clean_empty_returns_none
 tests/test_lifecycle_scan.py::test_scan_port_skips_access_denied_as_clean
