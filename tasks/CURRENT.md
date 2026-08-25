@@ -2,6 +2,40 @@
 
 ## State
 
+- **2026-08-25 — Handoff before pi restart. Group A fully landed; sweep verified NOT run.**
+  - **Done + pushed (through pre-push gates):** Group A — 3 fixture tests (2a
+    shortlist closed), tpm-lint retired (D-171), 6 provenance backfills.
+    Blueprint at `9a5ac32`, vortex at `e074bfa`, both at origin.
+  - **2b mutation sweep — verified not running, no output.** Checked: no
+    mutation-pass/pytest process on host, no `swbp-mutation.*` temp clone,
+    no output file in either repo / /tmp / home, both repos clean, Lima
+    `dev-vm` **Stopped** (not running in the VM either). The "other LLM"
+    run died before its first incremental append. Only mutation artifact
+    on disk: `2026-08-23-d161-vortex-mutation-report.md` (6 mutants:
+    4 killed / 2 survived). **Next session: author the mutants file for
+    the ambiguous gates and run `scripts/mutation-pass.sh` against
+    Blueprint HEAD, incremental `--out` to
+    `docs/research/2026-08-24-d161-gates-mutation-report.md`.**
+  - **pi routing (host config, not repo):** `~/.pi/agent/models.json` now
+    has a `vortex` provider → `http://localhost:9000/v1`, model
+    `qwen3.8-27b-mtplxopt-dspark` (endpoint verified live, 200). Existing
+    `local` :8002 provider untouched (A/B possible). Switch via `/model`.
+  - **Throughput measured (same day):** dspark :9000 ≈ 24 tok/s agent /
+    40.6 code / 30.3 prose; mtplx :8002 (the model running this session)
+    ≈ 30 tok/s avg at ~50k ctx; lookup (drafter-free) strictly worse
+    (≈16, tok/chunk ~1.05 — n-gram drafter never matches); dflash
+    unavailable (no drafter registered; hybrid markov_rank=256 head
+    unsupported by mlx-dspark). Verdict: dspark mode is the ceiling for
+    this 27B-8bit locally; only levers left = smaller model or
+    purpose-trained drafter.
+  - **Minor flags still open:** (1) audit report header still reads
+    "38 TEETH" — correction (35/3/2/1=41) is buried in the Post-report
+    addendum; a casual reader meets the wrong number first. (2) 5 of the
+    6 provenance backfills live in the audit report only, not
+    `DECISIONS.md` (tpm-lint got D-171) — decide if acceptable.
+  - **Optional, unconfirmed:** launchd agent so the :9000 daemon + model
+    survive reboot (not set up).
+
 - **2026-08-24 — Steady state. Flap-bug thread fully closed; direction settled (D-170).**
   Refreeze v11 (`8097f33`) pinned the tri-state regression; refreeze v12
   (`85f0cbd`) added the frozen CLI tests (`test_cli.py`, TPM seat: CEO);
