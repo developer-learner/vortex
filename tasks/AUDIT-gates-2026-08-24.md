@@ -402,3 +402,53 @@ identical. Now: 38/41 have proven teeth, 3 are the named unproven shortlist,
 2 are settled (one retire candidate, one manual tool). The standing
 catch-ledger (real-world catches over time) is still the held instrument —
 but the direction call no longer needs it to get started.
+
+---
+
+## Provenance backfill — the 6 scripts without a DECISIONS.md birth record (2026-08-24)
+
+Pass 1 flagged six scripts with no birth record in `docs/DECISIONS.md`. This
+section lifts the provenance from existing evidence — first-addition commits
+(verbatim subjects) and the correction log — without authoring new narrative.
+
+| script | first-add commit (current history) | date | commit subject (verbatim) |
+|---|---|---|---|
+| doc-consistency.sh | `23fbe0a` | 2026-08-07 | guard (warning, CEO 2026-08-07): doc-consistency.sh — retired-decision prose scan in pre-commit |
+| em-bench.sh | `5bcc412` | 2026-07-19 | feat(orchestrate): archive every EM prompt/reply pair; add em-bench replay harness |
+| extract-test-functions.py | `29a8fe6` | 2026-08-10 | checkpoint: batch 3 in flight — B3 mechanical plan synthesis (validate-plan.py --synthesize-plan + orchestrate.sh ensure_plan fast path), batch B4a/B6a selftests and back-ports; selftest_gates.py reconciliation still pending |
+| flake-ledger.py | `fffca49` | 2026-08-01 | feat: ship D-108 through D-113 reliability hardening |
+| manifest-drift-guard.sh | `7847cfd` | 2026-08-08 | guard: warning-only manifest-drift advisory (pre-hook de-risk of the twice-recurred CLAUDE.md re-pin) |
+| tpm-lint.sh | `e9c2473` | 2026-08-09 | fix: restore D-131 control-plane content force-pushed out of history (d2e869ac) + ruff 0.16 isort-safe S6 selftest fixtures |
+
+Notes (lifted, not authored):
+- **doc-consistency.sh** is the only one of the six with a correction-log
+  entry (CLAUDE.md, 2026-08-07): its first run caught a stale `README.md`
+  still instructing the removed D-121 approval step — the guard earning its
+  keep on day one.
+- **tpm-lint.sh**: `e9c2473` is a history-restore commit, not the original
+  birth; the script header cites D-38 as its origin. Retired 2026-08-24
+  (D-171) — the capability lives in `refreeze.sh --diff`.
+- **flake-ledger.py**: first-add subject names D-108 through D-113; the
+  ledger's own decision is D-111 (CLAUDE.md tree comment: durable cross-run
+  bookkeeping, D-108/D-111/D-126).
+- **extract-test-functions.py**: arrived in a checkpoint commit (batch 3,
+  mechanical plan synthesis) — no dedicated decision; it is a freeze-door
+  helper of `refreeze.sh` (CLAUDE.md tree).
+
+## Post-report status (same day, 2026-08-24)
+
+1. **The 3 PARTIAL gates now have dedicated violating-fixture tests** in
+   `selftest_gates.py` (violation + clean companion each): the 2a shortlist
+   is closed — they stop being "unproven" at tier 2a.
+2. **tpm-lint.sh retired (D-171)** — the "retire candidate" above is
+   settled; the wrapped capability (`refreeze.sh --diff`) stays live and
+   selftested.
+3. **Pass-2 arithmetic correction.** The TEETH list as printed contains 35
+   entries, not the 38 the header claims; `check-test-surface.py` and
+   `completion-ledger.py` were omitted from the pass-2 classification (both
+   have dedicated selftest sections: selftest_gates.py:1416, :5418 — 2a
+   status deferred to the 2b sweep, TODO section 3); `em-bench.sh` was
+   double-listed (TEETH + NONE). Corrected tally: **35 TEETH / 3 PARTIAL /
+   2 unverified / 1 NONE = 41**, em-bench counted once (TEETH, classified
+   manual tool).
+
