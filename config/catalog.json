@@ -4,7 +4,9 @@
       "public_id": "deepseek-v4-flash-0731",
       "runtime": "ds4",
       "engine": "mtplx",
-      "launch_command": ["/Users/arc.elixir/dev/ds4/run-server-0731.sh"],
+      "launch_command": [
+        "/Users/arc.elixir/dev/ds4/run-server-0731.sh"
+      ],
       "port": 8005,
       "ready_url": "http://127.0.0.1:8005/v1/models",
       "chat_endpoint": "http://127.0.0.1:8005/v1/chat/completions",
@@ -16,7 +18,9 @@
       "public_id": "Flash_IQ3XXS",
       "runtime": "llama-server",
       "engine": "llama.cpp",
-      "launch_command": ["/Users/arc.elixir/dev/testchat/scripts/run-server-0731-ud.sh"],
+      "launch_command": [
+        "/Users/arc.elixir/dev/testchat/scripts/run-server-0731-ud.sh"
+      ],
       "port": 8102,
       "ready_url": "http://127.0.0.1:8102/v1/models",
       "chat_endpoint": "http://127.0.0.1:8102/v1/chat/completions",
@@ -28,7 +32,9 @@
       "public_id": "qwen3.8-27b-8bit",
       "runtime": "dspark",
       "engine": "mlx-dspark",
-      "launch_command": ["/Users/arc.elixir/dev/mlx-dspark/run-server-8103.sh"],
+      "launch_command": [
+        "/Users/arc.elixir/dev/mlx-dspark/run-server-8103.sh"
+      ],
       "port": 8103,
       "ready_url": "http://127.0.0.1:8103/v1/models",
       "chat_endpoint": "http://127.0.0.1:8103/v1/chat/completions",
@@ -40,7 +46,14 @@
       "public_id": "mtplx-qwen38-27b-optimized-quality",
       "runtime": "mtplx",
       "engine": "mtplx",
-      "launch_command": ["/Users/arc.elixir/.mtplx/bin/mtplx", "quickstart", "--model", "Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality", "--port", "8001"],
+      "launch_command": [
+        "/Users/arc.elixir/.mtplx/bin/mtplx",
+        "quickstart",
+        "--model",
+        "Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality",
+        "--port",
+        "8001"
+      ],
       "port": 8001,
       "ready_url": "http://127.0.0.1:8001/v1/models",
       "chat_endpoint": "http://127.0.0.1:8001/v1/chat/completions",
@@ -52,13 +65,52 @@
       "public_id": "vmlx-dsv4-configi-mlx",
       "runtime": "vmlx",
       "engine": "vmlx",
-      "launch_command": ["/opt/homebrew/bin/vmlx", "serve", "/Users/arc.elixir/.cache/huggingface/hub/DeepSeek-V4-Flash-ConfigI-MLX", "--port", "8104"],
+      "launch_command": [
+        "/opt/homebrew/bin/vmlx",
+        "serve",
+        "/Users/arc.elixir/.cache/huggingface/hub/DeepSeek-V4-Flash-ConfigI-MLX",
+        "--port",
+        "8104"
+      ],
       "port": 8104,
       "ready_url": "http://127.0.0.1:8104/v1/models",
       "chat_endpoint": "http://127.0.0.1:8104/v1/chat/completions",
       "upstream_alias": "DeepSeek-V4-Flash-ConfigI-MLX",
       "ram_estimate_gb": 100.8,
       "exclusive": true
+    },
+    {
+      "public_id": "qwen3.8-27b-mtplxopt-dspark",
+      "runtime": "dspark",
+      "engine": "mlx-dspark",
+      "launch_command": [
+        "/Users/arc.elixir/dev/mlx-dspark/run-server-8106-mtplxopt.sh"
+      ],
+      "port": 8106,
+      "ready_url": "http://127.0.0.1:8106/v1/models",
+      "chat_endpoint": "http://127.0.0.1:8106/v1/chat/completions",
+      "upstream_alias": "Qwen3.8-27B-MTPLX-Optimized-Quality",
+      "ram_estimate_gb": 48.0,
+      "exclusive": false
+    },
+    {
+      "public_id": "mlx-community--Qwen3.8-27B-4bit",
+      "runtime": "omlx",
+      "engine": "mlx-dflash2",
+      "launch_command": [
+        "/Users/arc.elixir/.omlx/bin/omlx",
+        "serve",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "port": 8000,
+      "ready_url": "http://127.0.0.1:8000/v1/models",
+      "chat_endpoint": "http://127.0.0.1:8000/v1/chat/completions",
+      "upstream_alias": "Qwen3.8-27B-4bit + DFlash2 draft (oMLX)",
+      "ram_estimate_gb": 20.0,
+      "exclusive": false
     }
   ]
 }
