@@ -251,6 +251,21 @@
   **No load-threshold rule**: high-occupancy loads (e.g. the 3-bit at
   ~126GB) are legitimate; the DSpark failure was GPU working-set, not RAM.
 
+- **2026-08-25 — Product debt landed: named memory source + bounded anneal retry
+  (refreeze v13 `697cc17` + src fix `6884ae1`, CEO-ordered direct, TPM seat: this
+  agent).** (1) `/api/status` now carries `ram_source` (`vm_stat` | `psutil`) —
+  the 2026-08-17 silent-basis flip is closed; AM figure stays the truth,
+  eviction math untouched. (2) `_anneal_probe` retries transport EXCEPTIONS up
+  to ANNEAL_ATTEMPTS=3 (0.5s gap); a loading-503 stays single-shot so the spawn
+  poll cadence governs load waits (D-174 chat-call counts preserved). Freeze ran
+  inside dev-vm after syncing the linked plane to blueprint `cd58d3b`
+  (`dc6e678`) — the sync was forced by D-170's refreeze.sh catch-ledger wiring
+  changing bytes under the child's pinned manifest ("control plane tampered"
+  fail-closed). Red-check properly red pre-implementation. Caveats: mypy/coverage
+  gates not runnable on host (no plugins installed; no CI remote yet); D-56
+  advisory warning on fake 127.0.0.1 URLs in test_anneal_retry.py (monkeypatched,
+  no network). VM stopped after the freeze.
+
 ## Halt notes
 
 - ~~HALT lifted — seat named.~~ Consumed: the first milestone ran
