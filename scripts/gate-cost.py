@@ -1,0 +1,1 @@
+../../sw-dev-blueprint/scripts/gate-cost.py
