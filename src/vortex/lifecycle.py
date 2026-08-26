@@ -124,6 +124,10 @@ def _responds_ready(ready_url: str) -> bool:
         return False
 
 
+ANNEAL_ATTEMPTS = 3
+ANNEAL_RETRY_DELAY_SECONDS = 0.5
+
+
 def _anneal_probe(chat_endpoint: str) -> bool:
     """A real inference anneal: the runtime must serve a 1-token completion.
 
@@ -131,24 +135,34 @@ def _anneal_probe(chat_endpoint: str) -> bool:
     200 while weights still load) must not count as ready until a completion
     actually succeeds — otherwise the first client chat receives the
     upstream's 503 Loading model (finding #1, D-174).
+
+    Bounded retry: a transport-level blip (connection reset the instant the
+    listener comes up) must not fail an otherwise-loaded model's readiness
+    cycle. Only EXCEPTIONS retry — a non-200 answer (503 Loading model) is
+    the upstream speaking and stays a single-shot False, so the spawn loop's
+    own polling cadence, not this probe, governs load waits.
     """
-    try:
-        resp = httpx.post(
-            chat_endpoint,
-            json={
-                "model": "__ready_probe__",
-                "messages": [{"role": "user", "content": "ping"}],
-                "max_tokens": 1,
-                "stream": False,
-            },
-            timeout=5,
-        )
-        if resp.status_code != 200:
-            return False
-        body = resp.json()
-        return bool(body.get("choices"))
-    except Exception:  # noqa: BLE001 — probe must swallow any failure
-        return False
+    for attempt in range(ANNEAL_ATTEMPTS):
+        try:
+            resp = httpx.post(
+                chat_endpoint,
+                json={
+                    "model": "__ready_probe__",
+                    "messages": [{"role": "user", "content": "ping"}],
+                    "max_tokens": 1,
+                    "stream": False,
+                },
+                timeout=5,
+            )
+            if resp.status_code != 200:
+                return False
+            body = resp.json()
+            return bool(body.get("choices"))
+        except Exception:  # noqa: BLE001 — probe must swallow any failure
+            if attempt == ANNEAL_ATTEMPTS - 1:
+                return False
+            time.sleep(ANNEAL_RETRY_DELAY_SECONDS)
+    return False
 
 
 class SidecarStore:

@@ -117,8 +117,29 @@ class Manager:
             raise
 
 
+def _ram_used() -> tuple[float, str]:
+    """The displayed memory figure with its source named.
+
+    One source of truth (CEO ruling, tasks/CURRENT.md 2026-08-17): the
+    Activity Monitor figure — vm_stat's wired+compressor+active+inactive+
+    speculative pages — is what the UI reports, because that matches what
+    `top`/Activity Monitor show the operator. psutil-used (~15GB lower on
+    macOS: it excludes inactive/compressor/wired overheads) remains ONLY as
+    an explicitly-labeled degraded source for hosts without vm_stat (Linux);
+    it is never silently blended into the same number.
+    """
+    vm_stat_gb = _activity_monitor_used_gb()
+    if vm_stat_gb > 0.0:
+        return vm_stat_gb, "vm_stat"
+    return psutil.virtual_memory().used / (1024**3), "psutil"
+
+
 def estimate_ram_used_gb() -> float:
-    return _activity_monitor_used_gb() or psutil.virtual_memory().used / (1024**3)
+    return _ram_used()[0]
+
+
+def ram_used_source() -> str:
+    return _ram_used()[1]
 
 
 def _activity_monitor_used_gb() -> float:

@@ -24,7 +24,13 @@ from .lifecycle import (
     as_pid,
     log_stale_sidecars,
 )
-from .manager import Manager, MemoryConflict, estimate_ram_total_gb, estimate_ram_used_gb
+from .manager import (
+    Manager,
+    MemoryConflict,
+    estimate_ram_total_gb,
+    estimate_ram_used_gb,
+    ram_used_source,
+)
 from .operations import OperationStore
 from .ui import UI_PAGE
 
@@ -117,6 +123,7 @@ def build_app(
         return {
             "ram_used_gb": round(estimate_ram_used_gb(), 1),
             "ram_total_gb": round(estimate_ram_total_gb(), 1),
+            "ram_source": ram_used_source(),
             "loaded": [
                 {
                     "id": e.public_id,
