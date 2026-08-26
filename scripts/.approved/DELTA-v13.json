@@ -1,0 +1,19 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_anneal_retry.py::test_anneal_bounds_are_bounded",
+    "tests/test_anneal_retry.py::test_anneal_does_not_retry_a_loading_503",
+    "tests/test_anneal_retry.py::test_anneal_gives_up_after_bounded_attempts",
+    "tests/test_anneal_retry.py::test_anneal_retries_a_transport_blip_and_succeeds",
+    "tests/test_anneal_retry.py::test_anneal_still_rejects_a_completion_without_choices",
+    "tests/test_memory_figure.py::test_activity_monitor_missing_keys_report_zero",
+    "tests/test_memory_figure.py::test_activity_monitor_parse_matches_the_vm_stat_arithmetic",
+    "tests/test_memory_figure.py::test_psutil_fallback_is_labeled_never_silent",
+    "tests/test_memory_figure.py::test_ram_used_prefers_vm_stat_and_names_it",
+    "tests/test_memory_figure.py::test_status_api_names_the_memory_source"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": []
+}
