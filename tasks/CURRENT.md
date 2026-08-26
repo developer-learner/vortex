@@ -2,6 +2,26 @@
 
 ## State
 
+- **2026-08-26 (2) — Catch-ledger hook landed + vmlx path live-verified.**
+  - **Catch-ledger recording hook (combined TODO item, done):** the wiring was
+    already inherited — the shared `refreeze.sh` (symlink) carries `record_catch`
+    at all 8 hard-gate die sites (best-effort, never masks the verdict). The
+    real gap was hygiene: `.catch-ledger.json` (CWD-relative runtime witness)
+    was unignored here, so a caught refreeze would dirty the tree and could ride
+    `git add -A` into a freeze commit. Now gitignored (mirrored upstream in the
+    Blueprint template for future children). Live-fire in a throwaway clone:
+    capsule-altering staged PRD → `check-prd-additive` catch recorded (spec v14)
+    → proper die; ledger in child root, tree clean.
+  - **vmlx path live-verified up to the memory gate:**
+    `POST /api/models/vmlx-dsv4-configi-mlx/load` → **409** `required_gb: 100.8`,
+    `eviction_candidates: [mlx-community--Qwen3.8-27B-4bit]` — pre-spawn (port
+    8104 never bound, no vmlx process; same shape as the 08-21 eviction demo).
+    Full load→ready→proxy→unload is blocked in a sharper sense than "a slot is
+    free": the sole eviction candidate is the 4-bit model serving the working
+    session (unloading it kills the session), and physical RAM (≈62 GB baseline
+    + 100.8 GB ≈ 163 GB > 128 GB) would swap even after eviction. Backlog #17
+    annotated; needs the CEO to free ~35 GB+ of app memory and drive the
+    exercise from outside the session.
 - **2026-08-26 — Standing verification executed (pi session; both standing TODO items).**
   - **[V] Post-blueprint-landing verification:** since the `cd58d3b` sync, the two blueprint commits (`2f79fd6`, `d9cf066`) touched `tasks/TODO.md` only — not linked, so no verification was strictly owed. Ran the full baseline anyway; it caught a real defect: the 2026-08-25 batch had left the CI selftest lint red (6 ruff errors in `selftest_gates.py`; origin's CI selftest job red since `560850ab`). Fixed upstream in blueprint `ffebfe9`; pin advanced here in `4f1c441`; check-drift IN_SYNC. Full re-verify green: ruff scripts+src clean, mypy clean, control-plane selftests 525/525, full product suite 58/58 across all 10 test files (scope: `tests/`, never a subset), coverage 88.71% ≥ 80 floor.
   - **[B] Gate-tiering + catch ledger (blueprint, report-only):** 41 gates → T1=14 / T2=2 / T3=0 / n-a=25 (T2 = `doc-consistency` + `manifest-drift-guard`, both advisory by design). Catch ledger empty — zero in-the-wild catches recorded. Nothing flagged for human review.
@@ -299,9 +319,13 @@
    2026-08-17 (456/456, 74s)
 3. ~~Stand up Lima + models.env when the first milestone launches~~ —
    DONE 2026-08-21; exercised for real by the M1 run.
-4. Exercise the vmlx catalog entry live once a model slot is free
-   (BACKLOG Wave E item 17 — serialized runtime exercise, never a
-   worktree job)
+4. ~~Exercise the vmlx catalog entry live once a model slot is free~~ —
+   PARTIAL 2026-08-26: the load path is live-verified to the memory gate (409,
+   `required_gb: 100.8`, eviction candidate = the session's own 4-bit model,
+   pre-spawn). The full load→ready→proxy→unload remains blocked: the eviction
+   candidate is the model serving the working session, and ≈163 GB > 128 GB
+   physical would swap even after eviction. CEO must free ~35 GB+ of app memory
+   and drive the exercise from outside the session (BACKLOG #17 annotated).
 
 ## Backlog
 

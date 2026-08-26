@@ -85,6 +85,15 @@
     `http://127.0.0.1:9000/v1/chat/completions`.
 17. [ ] **Vortex — roadmap phase 5:** provisioning and tuning v2, including a
     real vmlx load → ready → proxy → unload exercise.
+    Status 2026-08-26: the vmlx path is live-verified up to the memory gate —
+    `POST /api/models/vmlx-dsv4-configi-mlx/load` → 409 `required_gb: 100.8`,
+    `eviction_candidates: [mlx-community--Qwen3.8-27B-4bit]`, pre-spawn (port
+    8104 never bound, no vmlx process). The full exercise is memory-blocked in
+    a sharper sense than "a slot is free": the sole eviction candidate is the
+    4-bit model serving the working session (unloading it kills the session),
+    and physical RAM (≈62 GB baseline + 100.8 GB ≈ 163 GB > 128 GB) would swap
+    even after eviction. Needs the CEO to free ~35 GB+ of app memory and drive
+    the exercise from OUTSIDE the session (or switch the session's model first).
 18. [ ] **Vortex — choose and run CEO-approved mature OSS adoption subject #2.**
 19. [ ] **Vortex — decide whether to build `vortex ctx-tune <model>`.**
 
