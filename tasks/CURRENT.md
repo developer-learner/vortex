@@ -2,6 +2,9 @@
 
 ## State
 
+- **2026-08-26 — Standing verification executed (pi session; both standing TODO items).**
+  - **[V] Post-blueprint-landing verification:** since the `cd58d3b` sync, the two blueprint commits (`2f79fd6`, `d9cf066`) touched `tasks/TODO.md` only — not linked, so no verification was strictly owed. Ran the full baseline anyway; it caught a real defect: the 2026-08-25 batch had left the CI selftest lint red (6 ruff errors in `selftest_gates.py`; origin's CI selftest job red since `560850ab`). Fixed upstream in blueprint `ffebfe9`; pin advanced here in `4f1c441`; check-drift IN_SYNC. Full re-verify green: ruff scripts+src clean, mypy clean, control-plane selftests 525/525, full product suite 58/58 across all 10 test files (scope: `tests/`, never a subset), coverage 88.71% ≥ 80 floor.
+  - **[B] Gate-tiering + catch ledger (blueprint, report-only):** 41 gates → T1=14 / T2=2 / T3=0 / n-a=25 (T2 = `doc-consistency` + `manifest-drift-guard`, both advisory by design). Catch ledger empty — zero in-the-wild catches recorded. Nothing flagged for human review.
 - **2026-08-25 — Handoff before pi restart. Group A fully landed; sweep verified NOT run.**
   - **Done + pushed (through pre-push gates):** Group A — 3 fixture tests (2a
     shortlist closed), tpm-lint retired (D-171), 6 provenance backfills.
