@@ -9,6 +9,7 @@ Two surfaces:
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 import httpx
@@ -16,6 +17,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 
 from .catalog import Catalog, load_catalog
+from .discovery import Wrapper, discover_wrappers
 from .lifecycle import (
     Lifecycle,
     PortConflictError,
@@ -42,6 +44,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 def build_app(
     catalog: Catalog | None = None,
     sidecar_dir: Path | None = None,
+    wrapper_discovery=discover_wrappers,
 ) -> FastAPI:
     catalog = catalog or load_catalog(_REPO_ROOT / "config/catalog.json")
     sidecars = SidecarStore(sidecar_dir or _REPO_ROOT / "data/sidecars")
@@ -49,6 +52,7 @@ def build_app(
     lifecycle = Lifecycle(catalog, sidecars)
     manager = Manager(catalog, lifecycle, ops)
     log_stale_sidecars(sidecars, catalog)
+    wrapper_cache: dict[str, tuple[float, list[Wrapper]]] = {}
 
     app = FastAPI(title="Vortex", version="0.1.0")
 
@@ -169,5 +173,28 @@ def build_app(
         if snapshot is None:
             raise HTTPException(status_code=404, detail="unknown operation")
         return snapshot
+
+    def _get_wrappers() -> list[Wrapper]:
+        now = time.time()
+        cached = wrapper_cache.get("default")
+        if cached is not None and now - cached[0] <= 60.0:
+            return cached[1]
+        findings = wrapper_discovery(catalog_entries=catalog.entries)
+        wrapper_cache["default"] = (now, findings)
+        return findings
+
+    @app.get("/api/engine-wrappers")
+    def engine_wrappers() -> dict:
+        wrappers = [dict(w) for w in _get_wrappers() if w.installed]
+        return {"wrappers": wrappers}
+
+    @app.post("/api/engine-wrappers/discover")
+    def engine_wrappers_discover() -> dict:
+        wrapper_cache.clear()
+        findings = wrapper_discovery(catalog_entries=catalog.entries)
+        wrapper_cache["default"] = (time.time(), findings)
+        wrappers = [dict(w) for w in findings if w.installed]
+        newly_found = [w.name for w in findings if w.installed and not w.in_catalog]
+        return {"wrappers": wrappers, "newly_found": newly_found}
 
     return app

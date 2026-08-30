@@ -155,6 +155,16 @@ button[data-act="load"] { border-color: var(--ok); color: var(--ok); }
 button[data-act="load"]:hover:not(:disabled) { border-color: var(--ok); color: var(--ok); background: rgba(63, 185, 80, 0.1); }
 button[data-act="unload"] { border-color: var(--danger); color: var(--danger); }
 button[data-act="unload"]:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); background: rgba(248, 81, 73, 0.1); }
+.open-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  background: var(--dim);
+}
+.open-dot.open { background: var(--ok); }
+tr.newly-found td { background: rgba(88, 166, 255, 0.12); }
 footer {
   padding: 12px 20px;
   border-top: 1px solid var(--line);
@@ -201,6 +211,29 @@ footer {
       <tr class="empty"><td colspan="4">loading…</td></tr>
     </tbody>
   </table>
+  <section id="enginewrappers">
+    <h2>Engine wrappers</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Kind</th>
+          <th>Binary</th>
+          <th>Version</th>
+          <th>Port</th>
+          <th>Live</th>
+          <th>Catalog</th>
+        </tr>
+      </thead>
+      <tbody id="wrapperrows">
+        <tr class="empty"><td colspan="7">loading…</td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+      <span id="wrapperstatus"></span>
+      <button data-act="discover">Discover</button>
+    </div>
+  </section>
 </main>
 <footer>served at :9000/ by the daemon · polls /api/* every 2s</footer>
 <script>
@@ -296,6 +329,42 @@ footer {
       .catch(function () {});
   }
 
+  function renderWrappers(wrappers) {
+    var rows = document.getElementById("wrapperrows");
+    if (!wrappers || !wrappers.length) {
+      rows.innerHTML = '<tr class="empty"><td colspan="7">no engine wrappers found</td></tr>';
+      return;
+    }
+    var html = "";
+    for (var i = 0; i < wrappers.length; i++) {
+      var w = wrappers[i];
+      var dotCls = w.port_open ? "open" : "";
+      var dot = '<span class="open-dot ' + dotCls + '"></span>';
+      html += "<tr>";
+      html += "<td>" + esc(w.name) + "</td>";
+      html += "<td>" + esc(w.kind) + "</td>";
+      html += "<td>" + esc(w.binary_path) + "</td>";
+      html += "<td>" + esc(w.version) + "</td>";
+      html += "<td>" + esc(w.port) + "</td>";
+      html += "<td>" + dot + (w.port_open ? "open" : "closed") + "</td>";
+      html += "<td>" + (w.in_catalog ? "yes" : "no") + "</td>";
+      html += "</tr>";
+    }
+    rows.innerHTML = html;
+  }
+
+  function pollWrappers() {
+    fetch("/api/engine-wrappers")
+      .then(function (r) {
+        if (!r.ok) throw new Error("wrappers " + r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        renderWrappers(data.wrappers);
+      })
+      .catch(function () {});
+  }
+
   function pollOperation(opId) {
     if (opTimer) {
       clearInterval(opTimer);
@@ -353,10 +422,38 @@ footer {
       .catch(function () {});
   });
 
+  document.getElementById("enginewrappers").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    var act = btn.getAttribute("data-act");
+    if (act !== "discover") return;
+    fetch("/api/engine-wrappers/discover", { method: "POST" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("discover " + r.status);
+        return r.json();
+      })
+      .then(function (res) {
+        pollWrappers();
+        var newly = res.newly_found || [];
+        if (newly.length) {
+          var rows = document.getElementById("wrapperrows").querySelectorAll("tr");
+          for (var i = 0; i < rows.length; i++) {
+            var nameCell = rows[i].cells[0];
+            if (nameCell && newly.indexOf(nameCell.textContent) !== -1) {
+              rows[i].classList.add("newly-found");
+            }
+          }
+        }
+      })
+      .catch(function () {});
+  });
+
   pollStatus();
   pollCatalog();
+  pollWrappers();
   setInterval(pollStatus, POLL_MS);
   setInterval(pollCatalog, POLL_MS);
+  setInterval(pollWrappers, POLL_MS);
 })();
 </script>
 </body>
