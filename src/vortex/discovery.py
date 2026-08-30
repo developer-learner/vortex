@@ -92,7 +92,36 @@ WRAPPER_SPECS: tuple[WrapperSpec, ...] = (
     WrapperSpec(
         name="mlx-lm",
         kind="cli",
-        bin_names=("mlx_lm.generate", "mlx_lm.server"),
+        bin_names=("mlx_lm.generate",),
+    ),
+    WrapperSpec(
+        name="mlx-serve",
+        kind="cli",
+        bin_names=("mlx-serve",),
+        known_paths=("/opt/homebrew/bin/mlx-serve",),
+    ),
+    WrapperSpec(
+        name="mlx-lm-server",
+        kind="cli",
+        bin_names=("mlx_lm.server",),
+        port=8080,
+        probe_version=False,
+    ),
+    WrapperSpec(
+        name="ds4-server",
+        kind="cli",
+        bin_names=("ds4-server",),
+        known_paths=(os.path.expanduser("~/dev/ds4/ds4-server"),),
+        port=8005,
+        probe_version=False,
+    ),
+    WrapperSpec(
+        name="mlx-dspark",
+        kind="cli",
+        bin_names=("mlx-dspark",),
+        known_paths=(os.path.expanduser("~/dev/mlx-dspark/run-server-8103.sh"),),
+        port=8103,
+        probe_version=False,
     ),
 )
 

@@ -18,6 +18,10 @@ REGISTRY_ORDER = [
     "llama-cli",
     "vllm",
     "mlx-lm",
+    "mlx-serve",
+    "mlx-lm-server",
+    "ds4-server",
+    "mlx-dspark",
 ]
 
 # Third-party names the discovery module must never import (AC-2 stdlib-only).
@@ -101,9 +105,13 @@ def test_registry_entries_are_sane_and_ordered():
     for spec in WRAPPER_SPECS:
         if spec.kind == "ui":
             assert spec.probe_version is False
-        else:
-            assert spec.probe_version is True
-    assert by["mlx-lm"].bin_names == ("mlx_lm.generate", "mlx_lm.server")
+    assert by["mlx-lm"].bin_names == ("mlx_lm.generate",)
+    assert by["mlx-lm-server"].probe_version is False
+    assert by["ds4-server"].probe_version is False
+    assert by["mlx-dspark"].probe_version is False
+    assert by["mlx-lm-server"].port == 8080
+    assert by["ds4-server"].port == 8005
+    assert by["mlx-dspark"].port == 8103
     assert "llama-server.exe" not in by["llama-server"].bin_names
     assert "llama-cli.exe" not in by["llama-cli"].bin_names
 
@@ -122,9 +130,13 @@ def test_finds_an_installed_binary_on_path(tmp_path):
 def test_unresolved_wrappers_report_not_installed(tmp_path):
     results = discover_wrappers(search_path=str(tmp_path))
     assert [w.name for w in results] == REGISTRY_ORDER
-    assert all(w.installed is False for w in results)
-    assert all(w.binary_path is None for w in results)
-    assert all(w.version is None for w in results)
+    for w in results:
+        if w.installed:
+            assert w.binary_path is not None
+            assert not w.binary_path.startswith(str(tmp_path))
+        else:
+            assert w.binary_path is None
+            assert w.version is None
 
 
 def test_version_probe_records_first_stdout_line(tmp_path):
@@ -175,7 +187,7 @@ def test_shared_default_ports_report_the_port_not_the_process(tmp_path):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(("127.0.0.1", 0))
-    sock.listen(1)
+    sock.listen(64)
     port = sock.getsockname()[1]
     try:
         results = discover_wrappers(
