@@ -1,0 +1,45 @@
+{
+  "changed_contract_ids": [
+    "route:GET /api/engine-wrappers",
+    "route:POST /api/engine-wrappers/discover",
+    "src.vortex.discovery",
+    "src.vortex.discovery:WRAPPER_SPECS",
+    "src.vortex.discovery:Wrapper",
+    "src.vortex.discovery:WrapperSpec",
+    "src.vortex.discovery:discover_wrappers"
+  ],
+  "changed_tests": [
+    "tests/test_discovery.py::test_discovery_module_is_stdlib_only",
+    "tests/test_discovery.py::test_failed_version_probe_reports_empty",
+    "tests/test_discovery.py::test_finds_an_installed_binary_on_path",
+    "tests/test_discovery.py::test_in_catalog_reflects_catalog_entries",
+    "tests/test_discovery.py::test_only_probe_subprocess_is_the_version_check",
+    "tests/test_discovery.py::test_port_check_reports_open_and_closed",
+    "tests/test_discovery.py::test_registry_covers_the_named_wrappers",
+    "tests/test_discovery.py::test_registry_entries_are_sane_and_ordered",
+    "tests/test_discovery.py::test_unresolved_wrappers_report_not_installed",
+    "tests/test_discovery.py::test_version_probe_records_first_stdout_line",
+    "tests/test_engine_wrappers_api.py::test_build_app_defaults_to_real_discovery",
+    "tests/test_engine_wrappers_api.py::test_discover_post_flags_newly_found",
+    "tests/test_engine_wrappers_api.py::test_get_lists_only_installed_wrappers",
+    "tests/test_engine_wrappers_api.py::test_wire_schema_carries_all_wrapper_fields",
+    "tests/test_ui_engine_wrappers.py::test_discover_button_posts_to_rescan",
+    "tests/test_ui_engine_wrappers.py::test_poll_wrappers_runs_on_the_existing_cadence",
+    "tests/test_ui_engine_wrappers.py::test_ui_fetches_the_inventory_endpoint",
+    "tests/test_ui_engine_wrappers.py::test_ui_has_engine_wrappers_section",
+    "tests/test_ui_engine_wrappers.py::test_ui_renders_wrapper_fields_from_the_api"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [
+    "src/vortex/discovery.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ],
+  "inventory_files": [
+    "src/vortex/manager.py",
+    "src/vortex/discovery.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ]
+}

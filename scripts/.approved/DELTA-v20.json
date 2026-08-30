@@ -1,0 +1,13 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": [
+    "src/vortex/manager.py",
+    "src/vortex/discovery.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ]
+}

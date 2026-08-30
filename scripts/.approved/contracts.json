@@ -1,21 +1,31 @@
 {
-  "erd_version": 10,
+  "erd_version": 20,
   "files": [
-    "src/vortex/manager.py"
+    "src/vortex/manager.py",
+    "src/vortex/discovery.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
   ],
   "entry_points": [
     "src.vortex.ui",
     "src.vortex.ui:UI_PAGE",
     "src.vortex.app",
-    "src.vortex.app:build_app"
+    "src.vortex.app:build_app",
+    "src.vortex.discovery",
+    "src.vortex.discovery:discover_wrappers",
+    "src.vortex.discovery:Wrapper",
+    "src.vortex.discovery:WrapperSpec",
+    "src.vortex.discovery:WRAPPER_SPECS"
   ],
-  "changed_files": [
+  "no_edit_files": [
     "src/vortex/manager.py"
   ],
-  "no_edit_files": [],
   "test_mapping": {
     "tests/test_serve.py::test_load_conflict_reports_eviction": "src/vortex/manager.py",
     "tests/test_serve.py::test_adopt_surviving_runtime_and_load": "src/vortex/manager.py"
+  },
+  "smoke_checks": {
+    "src/vortex/manager.py": "python3 -c \"compile(open('src/vortex/manager.py').read(), 'src/vortex/manager.py', 'exec')\""
   },
   "routes": [
     {
@@ -57,6 +67,18 @@
       "id": "route:GET /api/operations/{op_id}",
       "method": "GET",
       "path": "/api/operations/{op_id}"
+    },
+    {
+      "id": "route:GET /api/engine-wrappers",
+      "method": "GET",
+      "path": "/api/engine-wrappers",
+      "file": "src/vortex/app.py"
+    },
+    {
+      "id": "route:POST /api/engine-wrappers/discover",
+      "method": "POST",
+      "path": "/api/engine-wrappers/discover",
+      "file": "src/vortex/app.py"
     }
   ]
 }

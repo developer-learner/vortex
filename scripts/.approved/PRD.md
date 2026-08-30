@@ -42,3 +42,53 @@ The frozen test suite is the binding definition (D-54). Informally: the
 CEO opens `http://127.0.0.1:9000/` in a browser and can see machine state
 at a glance and load/unload models with one click; conflicts explain
 themselves; a stopped daemon explains itself too.
+
+## v14 scope (engine wrappers inventory)
+
+The operator's machine holds inference engine wrappers beyond what
+`config/catalog.json` happens to reference — oMLX, mtplx, ollama, LM
+Studio, llama-server/llama-cli, vLLM, mlx-lm. The daemon should report,
+read-only, which of those wrappers are installed on the host, and surface
+any that are installed but not yet referenced by any catalog entry, so the
+owner can tell at a glance what Vortex could be pointed at.
+
+- **Discovery module**: a vetted registry of wrappers is probed
+  read-only. A wrapper counts as installed when its binary/app resolves on
+  PATH or at a known install path. Detection never launches, loads, or
+  alters any wrapper; the only subprocess ever spawned is a bounded
+  version probe.
+- **Inventory route**: `GET /api/engine-wrappers` returns the installed
+  wrappers with name, kind, binary path, version string, default service
+  port, live-port flag, and whether a catalog entry already references it.
+- **Rescan route**: `POST /api/engine-wrappers/discover` forces a fresh
+  scan and reports which installed wrappers are NOT referenced by any
+  catalog entry (`newly_found`).
+- **Dashboard section**: a second table on the same dashboard page lists
+  installed wrappers; a Discover control triggers a rescan and flags
+  newly-found wrappers.
+
+## v14 acceptance criteria
+
+- **AC-1:** the daemon exposes an engine-wrapper inventory at
+  `GET /api/engine-wrappers` such that the response lists every installed
+  wrapper defined by the vetted registry, each carrying name, kind,
+  installed (always true for listed wrappers), binary_path, version, port,
+  port_open, and in_catalog.
+- **AC-2:** wrapper detection consults only the vetted registry (omlx,
+  mtplx, ollama, lmstudio, llama-server, llama-cli, vllm, mlx-lm) such
+  that no process or binary outside the registry is ever reported and the
+  new module has no third-party dependencies.
+- **AC-3:** `POST /api/engine-wrappers/discover` forces a fresh scan such
+  that the response includes newly_found, the names of installed wrappers
+  referenced by no catalog entry.
+- **AC-4:** discovery never launches, loads, or alters any wrapper such
+  that the only subprocess ever spawned is a bounded version probe (≤3s
+  timeout) and repeated inventory reads are served from a short-lived
+  cache.
+- **AC-5:** the dashboard renders an "Engine wrappers" section such that
+  each installed wrapper shows kind, binary path, version, port (with a
+  live/open indication), and catalog status, refreshed on the existing
+  poll cadence.
+- **AC-6:** the dashboard provides a Discover control such that clicking
+  it calls `POST /api/engine-wrappers/discover` and marks installed
+  wrappers that are absent from the vortex catalog.
