@@ -15,6 +15,7 @@ dist/
 .cache/
 .tpm/
 .claude/
+!.claude/launch.json
 
 # In-the-wild catch ledger — runtime witness written by refreeze.sh record_catch
 # (linked from the Blueprint); per-repo state, never committed (missing = empty).

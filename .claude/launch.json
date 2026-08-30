@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vortex",
+      "runtimeExecutable": ".venv/bin/uvicorn",
+      "runtimeArgs": ["vortex.app:build_app", "--factory", "--port", "9000"],
+      "port": 9000
+    }
+  ]
+}
