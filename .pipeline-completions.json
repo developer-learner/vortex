@@ -38,6 +38,30 @@
         }
       }
     },
+    "20": {
+      "tasks": {
+        "T1": {
+          "file": "src/vortex/manager.py",
+          "file_sha256": "22dc1cd80d847c3332c7cd44495c7bb49f9f8b3c4c931d891a8c2dd10aad99a6",
+          "fingerprint": "6ab3a6da177e4bfd4945f410eb5f1fa225aff80a42e9c1f6fec65940274ccf6b"
+        },
+        "T2": {
+          "file": "src/vortex/discovery.py",
+          "file_sha256": "abd5ea89af01421ee4dc393bd50217ddec1220c1831a5800fdb531472cf97d9a",
+          "fingerprint": "315a2038f952cbe50d5141a1b4ce9627ad42a0b82677a344b2be167fa14b75f9"
+        },
+        "T3": {
+          "file": "src/vortex/app.py",
+          "file_sha256": "99a141b3442a48a9dd4bdb7577dec0de36a70bc5c5018d9ac6e44ed441773c91",
+          "fingerprint": "58cbca3b7ad1365ad01555cb61c20d21e9e5b50535a51a2e005e71cda60b92d8"
+        },
+        "T4": {
+          "file": "src/vortex/ui.py",
+          "file_sha256": "8913239d68382ec1db015b6e1f66cbd47c913920edeeea1913b4d77421b53ed2",
+          "fingerprint": "4656f57d15b3278a2fc752a506e52e4483ef039b72c48847ef1fd8b36f3767b3"
+        }
+      }
+    },
     "3": {
       "tasks": {
         "T1": {

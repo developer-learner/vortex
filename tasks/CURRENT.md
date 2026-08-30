@@ -439,3 +439,7 @@
 ## Results
 
   Full frozen TPM suite green against spec v10 (on-demand regression check, D-112). Feature built and validated.
+
+## Results
+
+  Delta-mapped frozen tests green against spec v20 — feature done (verdict scope: mapped tests only, D-112). Feature built and validated.
