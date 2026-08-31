@@ -83,12 +83,15 @@ def build_app(
         if entry is None or manager.entry_state(entry, ops.active_for(entry.public_id)) != "ready":
             raise HTTPException(status_code=404, detail=f"model {model!r} is not loaded")
         stream = bool(body.get("stream", False))
+        # The client addresses the model by its public_id; the runtime knows it
+        # by its own upstream_alias. Remap before forwarding (both paths).
+        forwarded = {**body, "model": entry.upstream_alias or entry.public_id}
 
         if stream:
             async def passthrough():
                 async with (
                     httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client,
-                    client.stream("POST", entry.chat_endpoint, json=body) as upstream,
+                    client.stream("POST", entry.chat_endpoint, json=forwarded) as upstream,
                 ):
                     async for chunk in upstream.aiter_bytes():
                         yield chunk
@@ -100,7 +103,7 @@ def build_app(
             )
 
         async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client:
-            upstream = await client.post(entry.chat_endpoint, json=body, headers={"Content-Type": "application/json"})
+            upstream = await client.post(entry.chat_endpoint, json=forwarded, headers={"Content-Type": "application/json"})
         return Response(
             content=upstream.content,
             status_code=upstream.status_code,
