@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 MODEL_STATES = Literal["unloaded", "loading", "ready", "unloading", "error"]
 
@@ -45,11 +45,55 @@ class CatalogEntry(BaseModel):
             raise ValueError("launch_command must be a non-empty argv")
         return v
 
+    @field_validator("ready_url", "chat_endpoint")
+    @classmethod
+    def _valid_url(cls, v: str) -> str:
+        if not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("URL must start with http:// or https://")
+        from urllib.parse import urlparse
+
+        if not urlparse(v).netloc:
+            raise ValueError("URL missing host")
+        return v
+
+    @field_validator("ram_estimate_gb")
+    @classmethod
+    def _positive_ram(cls, v: float | None) -> float | None:
+        if v is not None and v <= 0:
+            raise ValueError("ram_estimate_gb must be > 0")
+        return v
+
+    @field_validator("ctx_size")
+    @classmethod
+    def _positive_ctx(cls, v: int | None) -> int | None:
+        if v is not None and v <= 0:
+            raise ValueError("ctx_size must be > 0")
+        return v
+
 
 class Catalog(BaseModel):
     """The full set of loadable models (config-first)."""
 
     entries: list[CatalogEntry] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_uniqueness(self) -> Catalog:
+        """Duplicate ids/ports are rejected on ANY construction path — direct
+        construction, model_validate, or load_catalog — not just by a post-hoc
+        assert the caller must remember to run."""
+        seen_ids: dict[str, str] = {}
+        seen_ports: dict[int, str] = {}
+        for e in self.entries:
+            if e.public_id in seen_ids:
+                raise ValueError(
+                    f"duplicate public id {e.public_id!r} "
+                    f"(seen in {seen_ids[e.public_id]} and {e.runtime})"
+                )
+            seen_ids[e.public_id] = e.runtime
+            if e.port in seen_ports:
+                raise ValueError(f"duplicate port {e.port} ({seen_ports[e.port]} and {e.public_id})")
+            seen_ports[e.port] = e.public_id
+        return self
 
     def by_public_id(self, public_id: str) -> CatalogEntry | None:
         for e in self.entries:

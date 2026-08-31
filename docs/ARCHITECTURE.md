@@ -30,28 +30,38 @@ process table. The daemon binds `127.0.0.1:9000` only.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| public_id | str | user-facing model id (`vortex load <public_id>`) |
+| public_id | str | user-facing model id (`vortex load <public_id>`); pattern-validated |
 | runtime | str | engine family: `ds4`/`llama-server` |
 | engine | str | e.g. `mtplx`, `llama.cpp` |
-| launch_command | list[str] | script (and args) that start the runtime server |
-| port | int | runtime's own listen port |
-| ready_url | str | http health probe the daemon polls after launch |
-| chat_endpoint | str | runtime's chat/completions URL that /v1 proxies to |
-| upstream_alias | str | model id sent upstream for this entry |
-| ram_estimate_gb | float | budget line for admission/eviction decisions |
+| launch_command | list[str] | argv that starts the runtime server (non-empty, validated) |
+| port | int | runtime's own listen port (1-65535; unique across the catalog) |
+| ready_url | str | http(s) health probe the daemon polls after launch (validated) |
+| chat_endpoint | str | http(s) runtime chat/completions URL that /v1 proxies to (validated) |
+| upstream_alias | str \| None | model id sent upstream for this entry; `None` → public_id forwarded |
+| ram_estimate_gb | float \| None | budget line for admission/eviction decisions (> 0 when set) |
+| ctx_size | int \| None | context window (> 0 when set) |
 | exclusive | bool | true = only one loaded at a time |
+| pinned | bool | true = never an eviction candidate |
 
 **Relationships:**
-- has one `RuntimeState` while loaded (in-memory, not persisted)
+- has one sidecar owner while loaded (in-memory `Lifecycle.processes` + on-disk sidecar file, not persisted as state)
 
-### RuntimeState (in-memory, one per running entry)
+### In-memory runtime state (dies with the daemon)
 
 | Field | Type | Notes |
 |-------|------|-------|
-| entry_id | str | the CatalogEntry public_id |
-| proc | subprocess.Popen | sidecar owner of the runtime process |
-| ready | bool | poll result of `ready_url` |
-| ops | dict[str, str] | last operations context (e.g. `load`) |
+| `Lifecycle.processes` | dict[str, Popen \| None] | public_id → sidecar owner of the runtime process (vortex-spawned only; adopted runtimes have no Popen) |
+| `Lifecycle._last_status` | dict[str, str] | per-entry owner status; holds the last value on `SCAN_UNKNOWN` (fail-closed) |
+| `Lifecycle._verified` | set[str] | public_ids verified harmonic **this session** (survives restart only by re-verification on adopt) |
+| `OperationStore._ops` | dict[str, Operation] | 202+poll operations; atomic snapshots; retention `MAX_OPS 100` / `RETENTION 1h` |
+
+Two derived sets (Manager):
+- **consuming set** `all_ready()` — entries whose port is held by an identified
+  process and `ready_url` answers 200. This is the admission/eviction
+  accounting set: it must include a restart-surviving runtime that is running
+  but not yet verified this session, or memory would be undercounted.
+- **advertised set** `client_ready()` — consuming ∩ verified (harmonic this
+  session). This is what `/v1/models` lists and what the chat proxy serves.
 
 ---
 
@@ -59,18 +69,19 @@ process table. The daemon binds `127.0.0.1:9000` only.
 
 ```
 # Universal surface (OpenAI Chat Completions — what clients use)
-POST   /v1/chat/completions         proxy to loaded model (also streams SSE)
-GET    /v1/models                   list loaded models
+POST   /v1/chat/completions         proxy to loaded model (model remapped to upstream_alias, streaming preserves upstream status, 502 on connection failure)
+GET    /v1/models                   list advertised models (only harmonic-ready — verified this session)
 
 # Management surface (the daemon's own controls)
-GET    /api/status                  daemon + RAM + loaded-set status
-GET    /api/runtimes                catalog entries + load state
-POST   /api/runtimes/{id}/load      start sidecar, poll ready_url to ready
-POST   /api/runtimes/{id}/unload    graceful terminate, wait port free
-POST   /api/runtimes/{id}/evict     force-kill under RAM pressure
-GET    /api/runtimes/{id}           single-entry detail
+GET    /api/status                  daemon + RAM (vm_stat/psutil labeled) + loaded-set = consuming set (identified + ready, incl. unverified adopted runtimes)
+GET    /api/catalog                 catalog entries + per-entry state (ready|unloaded|loading|unloading|error) + port_pid (SCAN_UNKNOWN→null)
+POST   /api/models/{id}/load        202 + {operation,model}; async via OperationStore (spawning→ready, 409 on memory/port conflict, spawn failure → operation error:failed)
+POST   /api/models/{id}/unload      202 + {operation,model}; async (terminating→unloaded, 404 on unknown)
+GET    /api/operations/{op}         poll operation snapshot (atomic copy, retention 100/1h)
+GET    /api/engine-wrappers         installed wrappers (discover cache 60s)
+POST   /api/engine-wrappers/discover  rescan, returns {wrappers,newly_found}
 
-# CLI (src/modelmux/cli.py) — same verbs: vortex models|load|unload|status
+# CLI (src/modelmux/cli.py) — same verbs: vortex models|load|unload|status (load/unload --wait/--no-wait, poll deadline 310s, controlled exit codes 0/1/2/3)
 ```
 
 ---
@@ -82,29 +93,25 @@ GET    /api/runtimes/{id}           single-entry detail
 
 ### Load
 
-1. `POST /api/runtimes/{id}/load` (or CLI)
-2. Manager checks admission: eviction set computed off `ram_estimate_gb`,
-   exclusive entries evict current first
-3. Lifecycle spawns the launch script as the ONLY process owner (sidecar)
-4. Daemon polls `ready_url` until 200 (10s-interval loop) then marks ready
-5. Runtime becomes visible at `/v1/models` and in `/api/status`
+1. `POST /api/models/{id}/load` → `202 {operation}` promptly (or CLI `vortex load --wait/--no-wait`); the POST never blocks on the spawn
+2. Manager checks admission synchronously: eviction set computed off `ram_estimate_gb` under `0.8*total` budget, never auto-evicts (409 with `required_gb`/`eviction_candidates`); port-conflict checks `SCAN_UNKNOWN` fail-closed, unidentified port never claimed
+3. Operation moves `loading:spawning`; a background worker runs Lifecycle.spawn as ONLY owner (sidecar `pid+start_time`), polls `occupying_pid`==`ready` + `ready_url 200` + `anneal` (real 1-token completion, bounded retry) until deadline (`READY_TIMEOUT 300s`, `POLL_INTERVAL 0.25s`); adoption fast-path requires harmonic before `ready`
+4. On success `ready:done`; on timeout/early exit the just-spawned process is terminated and sidecar dropped so retry cannot adopt a failed runtime; failures go `error:failed/refused`
+5. The runtime enters the consuming set (`/api/status`, admission) when identified + ready; it is advertised at `/v1/models` and served by the chat proxy only when harmonic (verified); `GET /api/catalog` reflects `op.state` while `loading`/`unloading`
 
 ### Chat proxy
 
-1. Client calls `POST /v1/chat/completions` with a loaded public_id
-2. App resolves the entry, forwards body (model id remapped to
-   `upstream_alias`) to `chat_endpoint` via httpx
-3. Non-stream: response relayed with usage passthrough intact
-4. Stream: async generator relays SSE chunks verbatim (`reasoning_content`
-   preserved)
+1. Client calls `POST /v1/chat/completions` with a loaded `public_id` (must be `harmonic-ready` — verified this session — else 404)
+2. App remaps `body.model` to `upstream_alias or public_id` and forwards to `chat_endpoint` via httpx (300s timeout, `Content-Type: application/json`)
+3. Non-stream: upstream `status_code`/`content`/`content-type` preserved, `502` on `RequestError`
+4. Stream: single `client.stream` connection, status preserved (non-200 returns that status immediately, not 200 SSE); on success `text/event-stream` with `Cache-Control: no-cache`, SSE chunks relayed verbatim; `502` on connection failure; `reasoning_content` preserved
 
 ### Unload
 
-1. `POST /api/runtimes/{id}/unload` (or CLI)
-2. Graceful TERM to the sidecar process, wait with timeout (CLI 60s) for
-   port + process exit
-3. RuntimeState cleared; `vortex models` reports unloaded
-4. RAM is released back to the pool for admission
+1. `POST /api/models/{id}/unload` → `202 {operation}` promptly (async `unloading:terminating`)
+2. A background worker runs `Lifecycle.terminate`: verifies `SCAN_UNKNOWN` fail-closed, `unidentified` never killed, otherwise `SIGINT`→`SIGKILL` process group + sidecar drop
+3. Operation moves `unloaded:done` or `error:refused` (`unidentified process`); polling via `GET /api/operations/{id}` (atomic snapshot, `MAX_OPS 100`/`RETENTION 1h`)
+4. `GET /api/catalog` and `/api/status` reflect unloaded; RAM released for admission; CLI `vortex unload` polls to `unloaded` with 310s deadline, `--no-wait` returns immediately
 
 ---
 
@@ -136,10 +143,10 @@ GET    /api/runtimes/{id}           single-entry detail
 > Things the LLM should know to avoid bad suggestions.
 
 - **Local-only, no auth** — daemon binds 127.0.0.1; addresses and payloads are localhost-shaped
-- **Ready ≠ loaded (finding #1, D-174)** — llama-server answers `/v1/models` 200 while weights still load; the first chat after ready can return `503 Loading model`. Milestone-1 target: a stronger probe (anneal/poke before first request)
-- **Process ownership is strict** — a loaded model's sidecar is the single owner; the daemon never spawns clones via health re-polls (orphan adoptable only after restart, per CEO ruling)
-- **No DB** — the catalog is the only persistent truth; runtime state dies with the daemon
-- **RAM is a budget, not a lock** — admission/eviction uses `ram_estimate_gb`; eviction races are structured 409 errors, not silent kills
+- **Ready = harmonic (ownership + /v1/models 200 + 1-token anneal, D-174)** — the *advertised* set (`/v1/models`, chat proxy) is never served without all three; adoption requires harmonic before `ready`. The *consuming* set (admission accounting, `/api/status`) counts identified + ready runtimes even when not yet verified this session — a restart-surviving runtime must count toward the RAM budget before it is re-verified (undercounting it is the failure this split exists to prevent)
+- **Process ownership is strict** — sidecar `pid+start_time` identifies exactly one process; `SCAN_UNKNOWN` (incomplete psutil scan) fail-closed (hold last status, never claim or terminate), unidentified occupant never killed or evicted, only `409` refused
+- **No DB** — catalog is the only persistent truth (validated `public_id` pattern, `http(s)://` URLs, `ram>0`/`ctx>0`/`port 1-65535`, unique ids/ports via any construction path); `OperationStore` is in-memory with atomic snapshots and bounded retention; runtime state dies with daemon
+- **RAM is a budget, not a lock** — admission uses `ram_estimate_gb` under `0.8*total`; eviction set is `409` with `required_gb`/`eviction_candidates`, never silent kills; UI `poll*` failures are operator-visible via `#conflict`/`#wrapperstatus`, CLI timeouts/HTTP/malformed produce controlled `1/2/3` exits with 310s poll deadline and `--wait`/`--no-wait`
 
 ---
 

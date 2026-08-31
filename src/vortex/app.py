@@ -22,7 +22,6 @@ from .lifecycle import (
     Lifecycle,
     PortConflictError,
     SidecarStore,
-    SpawnError,
     as_pid,
     log_stale_sidecars,
 )
@@ -166,7 +165,7 @@ def build_app(
     @app.post("/api/models/{public_id}/load", status_code=202)
     def load(public_id: str) -> dict:
         try:
-            return manager.load(public_id)
+            return manager.load_async(public_id)
         except LookupError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except MemoryConflict as exc:
@@ -180,13 +179,11 @@ def build_app(
             ) from exc
         except PortConflictError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        except SpawnError as exc:
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.post("/api/models/{public_id}/unload", status_code=202)
     def unload(public_id: str) -> dict:
         try:
-            return manager.unload(public_id)
+            return manager.unload_async(public_id)
         except LookupError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
