@@ -168,3 +168,76 @@ def test_unload_failure_returns_1(monkeypatch: pytest.MonkeyPatch) -> None:
 
     _install(monkeypatch, handler)
     assert cli.main(["unload", "m1"]) == 1
+
+
+# --- bounded / normalized failure behavior -------------------------------------
+
+def test_request_timeout_is_controlled_not_traceback(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A request timeout must produce a controlled exit code + message, not an
+    uncaught traceback."""
+    def handler(method: str, path: str, **_kw: object) -> _Resp:
+        raise httpx.TimeoutException("timed out")
+
+    _install(monkeypatch, handler)
+    assert cli.main(["status"]) == 1
+    assert capsys.readouterr().err.strip(), "a timeout must print a message to stderr"
+
+
+def test_http_error_status_is_controlled(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An HTTP error response (500) must exit 1 with a message, not a traceback."""
+    def handler(method: str, path: str, **_kw: object) -> _Resp:
+        return _Resp(status_code=500, text="boom")
+
+    _install(monkeypatch, handler)
+    assert cli.main(["status"]) == 1
+    assert capsys.readouterr().err.strip()
+
+
+def test_malformed_load_response_is_controlled(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A 202 whose body is missing 'operation' must exit 1 with a message."""
+    def handler(method: str, path: str, **_kw: object) -> _Resp:
+        return _Resp(status_code=202, payload={})  # no 'operation'
+
+    _install(monkeypatch, handler)
+    assert cli.main(["load", "m1"]) == 1
+    assert capsys.readouterr().err.strip()
+
+
+def test_poll_has_a_deadline(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A never-completing operation must not poll forever: once the poll deadline
+    is exceeded the CLI exits 1 with a timeout message."""
+    monkeypatch.setattr(cli, "POLL_DEADLINE_SECONDS", 0.0)
+
+    def handler(method: str, path: str, **_kw: object) -> _Resp:
+        if method == "POST":
+            return _Resp(status_code=202, payload={"operation": "op1"})
+        return _Resp(payload={"phase": "load", "state": "loading"})  # never terminal
+
+    _install(monkeypatch, handler)
+    assert cli.main(["load", "m1"]) == 1
+    assert "tim" in capsys.readouterr().err.lower()
+
+
+def test_load_no_wait_skips_polling(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--no-wait fires the load and returns immediately (operation id printed),
+    without polling /api/operations."""
+    seen: list[tuple[str, str]] = []
+
+    def handler(method: str, path: str, **_kw: object) -> _Resp:
+        seen.append((method, path))
+        return _Resp(status_code=202, payload={"operation": "op1"})
+
+    _install(monkeypatch, handler)
+    assert cli.main(["load", "m1", "--no-wait"]) == 0
+    assert not any(p.startswith("/api/operations") for _, p in seen), "no polling under --no-wait"
+    assert "op1" in capsys.readouterr().out
