@@ -589,3 +589,54 @@ def test_unverified_running_model_still_counts_for_admission(tmp_path: Path) -> 
         if proc.poll() is None:
             proc.kill()
         proc.wait(timeout=5)
+
+
+def _spawn_stream_erroring_runtime(port: int, stream_status: int) -> subprocess.Popen:
+    """A runtime healthy for the non-stream anneal probe but which answers a
+    STREAMING chat with `stream_status` (non-200). Waits for /v1/models 200."""
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "tests.fake_server", str(port), "0", str(stream_status)],
+        cwd=TESTS_DIR.parent,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            import httpx
+
+            if httpx.get(f"http://127.0.0.1:{port}/v1/models", timeout=1).status_code == 200:
+                return proc
+        except Exception:  # noqa: BLE001, S110 — readiness polling loop
+            pass
+        time.sleep(0.05)
+    proc.kill()
+    raise RuntimeError("stream-erroring fake runtime did not answer /v1/models")
+
+
+def test_streaming_preserves_upstream_error_status(tmp_path: Path) -> None:
+    """A streaming request whose upstream rejects (non-200) must NOT be delivered
+    to the client as a 200 event-stream — the upstream status is preserved.
+
+    The runtime is healthy for the non-stream anneal (so the model loads), then
+    returns 503 to the streaming chat.
+    """
+    port = _free_port()
+    proc = _spawn_stream_erroring_runtime(port, 503)
+    try:
+        catalog = Catalog(entries=[_entry_for(port)])
+        client = _client(tmp_path, catalog, adopt=[("m1", proc.pid, port)])
+        op = client.post("/api/models/m1/load").json()["operation"]
+        _wait_state(client, op, "ready")
+        resp = client.post("/v1/chat/completions", json={
+            "model": "m1",
+            "stream": True,
+            "messages": [{"role": "user", "content": "hi"}],
+        })
+        assert resp.status_code == 503, "streaming upstream error surfaced as a non-503 status"
+        assert not resp.headers["content-type"].startswith("text/event-stream"), (
+            "an upstream rejection must not be dressed up as an SSE stream"
+        )
+    finally:
+        proc.kill()
+        proc.wait(timeout=5)

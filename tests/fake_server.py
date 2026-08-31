@@ -16,12 +16,18 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class FakeChatServer:
-    def __init__(self, port: int = 0, anneal_failures: int = 0) -> None:
+    def __init__(self, port: int = 0, anneal_failures: int = 0, stream_status: int = 200) -> None:
         """anneal_failures: chat returns 503 (loading) for the first N calls
         while /v1/models keeps answering 200 — the llama-server phantom-ready
         class (D-174). -1 = chat never succeeds.
+
+        stream_status: when != 200, a chat request with stream=True is answered
+        with this status (JSON error, not SSE), while non-stream chats — the
+        anneal probe included — still succeed. Lets a test load a healthy model
+        whose STREAMING path then rejects, to check upstream-status preservation.
         """
         self.anneal_failures = anneal_failures
+        self.stream_status = stream_status
         self.chat_calls = 0
         self.requests: list[dict] = []
 
@@ -53,6 +59,9 @@ class FakeChatServer:
                             self._json(503, {"detail": "Loading model"})
                             return
                     if body.get("stream"):
+                        if self.server.stream_status != 200:
+                            self._json(self.server.stream_status, {"detail": "upstream rejected stream"})
+                            return
                         self._stream()
                     else:
                         self._json(200, {
@@ -91,6 +100,7 @@ class FakeChatServer:
         self.server.requests = []  # exposed to the Handler as self.server.requests
         self.server.chat_calls = 0
         self.server.anneal_failures = self.anneal_failures
+        self.server.stream_status = self.stream_status
         self.requests = self.server.requests
         self.chat_calls = self.server.chat_calls
         self.port = self.server.server_address[1]
@@ -105,8 +115,9 @@ class FakeChatServer:
 def main() -> None:
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     anneal = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-    server = FakeChatServer(port=port, anneal_failures=anneal)
-    print(f"fake server on :{server.port} (anneal_failures={anneal})", flush=True)
+    stream_status = int(sys.argv[3]) if len(sys.argv) > 3 else 200
+    server = FakeChatServer(port=port, anneal_failures=anneal, stream_status=stream_status)
+    print(f"fake server on :{server.port} (anneal_failures={anneal}, stream_status={stream_status})", flush=True)
     server.thread.join()
 
 
