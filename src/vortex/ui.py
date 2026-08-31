@@ -100,6 +100,17 @@ main { padding: 16px 20px 40px; max-width: 960px; margin: 0 auto; }
   color: var(--fg);
   white-space: pre-wrap;
 }
+#uierror {
+  display: none;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+  background: rgba(210, 60, 60, 0.08);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
 table {
   width: 100%;
   border-collapse: collapse;
@@ -211,6 +222,7 @@ footer {
     <strong>Conflict detected</strong>
     <div id="conflictbody"></div>
   </div>
+  <div id="uierror"></div>
   <table>
     <thead>
       <tr>
@@ -283,6 +295,16 @@ footer {
     }
   }
 
+  function setError(msg) {
+    var box = document.getElementById("uierror");
+    if (msg) {
+      box.textContent = msg;
+      box.style.display = "block";
+    } else {
+      box.style.display = "none";
+    }
+  }
+
   function renderRows(models) {
     var rows = document.getElementById("rows");
     if (!models || !models.length) {
@@ -341,9 +363,12 @@ footer {
         return r.json();
       })
       .then(function (data) {
+        setError(null);
         renderRows(data.entries);
       })
-      .catch(function () {});
+      .catch(function (e) {
+        setError("Could not refresh the model list: " + e.message);
+      });
   }
 
   function renderWrappers(wrappers) {
@@ -379,7 +404,9 @@ footer {
       .then(function (data) {
         renderWrappers(data.wrappers);
       })
-      .catch(function () {});
+      .catch(function (e) {
+        setError("Could not refresh engine wrappers: " + e.message);
+      });
   }
 
   function pollOperation(opId) {
@@ -399,15 +426,19 @@ footer {
               clearInterval(opTimer);
               opTimer = null;
             }
+            if (op.state === "error") {
+              setError(op.message || "operation failed");
+            }
             pollCatalog();
             pollStatus();
           }
         })
-        .catch(function () {
+        .catch(function (e) {
           if (opTimer) {
             clearInterval(opTimer);
             opTimer = null;
           }
+          setError("Lost track of the operation: " + e.message);
         });
     }, OP_POLL_MS);
   }
@@ -434,9 +465,12 @@ footer {
       .then(function (op) {
         if (!op) return;
         setConflict(null);
+        setError(null);
         pollOperation(op.operation);
       })
-      .catch(function () {});
+      .catch(function (e) {
+        setError(act + " failed: " + e.message);
+      });
   });
 
   document.getElementById("enginewrappers").addEventListener("click", function (e) {
@@ -450,6 +484,7 @@ footer {
         return r.json();
       })
       .then(function (res) {
+        setError(null);
         pollWrappers();
         var newly = res.newly_found || [];
         if (newly.length) {
@@ -462,7 +497,9 @@ footer {
           }
         }
       })
-      .catch(function () {});
+      .catch(function (e) {
+        setError("Engine-wrapper discovery failed: " + e.message);
+      });
   });
 
   pollStatus();
