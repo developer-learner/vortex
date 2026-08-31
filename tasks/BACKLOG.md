@@ -195,6 +195,16 @@ final closure ref.
   subject self-documents the evidence. No separate work item unless the
   subject is missing or mismatched, which would be a defect.
 
+## Completed milestones
+
+- [x] **v14 (spec v20) — engine-wrapper inventory** *(2026-08-30)*. Added 4
+  new wrapper specs (mlx-serve, mlx-lm-server, ds4-server, mlx-dspark), split
+  mlx-lm server component into its own spec, updated all tests. Dashboard
+  shows 11 of 12 wrappers (vllm not installed on this Mac). 7 orchestrate
+  runs, 3 EM calls (2 wasted on contract-claim rejections), 1 success.
+  Correction log rows and DECISIONS.md entries written retroactively after
+  the maintenance-contract reminder was added to orchestrate.sh.
+
 ## P2 — prototype hardening (post-milestone-1)
 
 - **Dashboard conflict card — wire to the real 409 source** *(filed by
@@ -220,6 +230,24 @@ final closure ref.
   and prompt/reply hashes. A pipeline-owned signature or attestation is the
   strong-evidence layer; an author label alone remains spoofable. Do not use
   `Co-authored-by` as execution provenance.
+
+### Tooling gaps (discovered during v14 milestone audit, 2026-08-30)
+
+- [ ] **Blueprint — stamp model ID into EM archive meta.txt.** `.em-archive/`
+  records call outcomes (prompt, reply, stderr, meta.txt with exit code and
+  outcome) but not which model produced the call. `SWBP_EM_MODEL` is available
+  in the environment; `llm-call.sh` should write it into `meta.txt` so
+  post-hoc analysis can correlate failures with model versions.
+- [ ] **Blueprint — archive coder calls alongside EM calls.** Only EM calls go
+  to `.em-archive/`. Coder calls (the actual code-producing completions) have
+  no durable archive — their transcripts are wiped at success teardown. A
+  parallel `.coder-archive/` (same format as `.em-archive/`) would preserve
+  the evidence chain for correction log attribution.
+- [ ] **Blueprint — add fault_role field to measurement data.** When a
+  milestone fails, `.measurement/counters` records the exit code and phase but
+  not whether the EM, coder, TPM, or pipeline was at fault. A structured
+  `fault_role` field (or a separate attribution log) would make post-hoc
+  analysis mechanical instead of requiring a human to read archived transcripts.
 
 ## P3 — roadmap phases (post-cutover)
 

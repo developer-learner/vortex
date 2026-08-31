@@ -21,6 +21,46 @@
 
 ## Decisions
 
+## D-179 — 2026-08-30 — Test listen backlog raised from 1 to 64 for port-sharing tests
+
+**Decision:** `test_shared_default_ports_report_the_port_not_the_process` sets `sock.listen(64)` instead of `sock.listen(1)`.
+
+**Alternatives considered:** (a) Keep backlog at 1 and serialize port checks — rejected: discovery runs port checks concurrently via ThreadPoolExecutor; serializing would test a different code path than production. (b) Use a per-test ephemeral socket — rejected: the test intentionally shares one socket between two wrappers to test the shared-port scenario.
+
+**Reason:** With 12 wrappers (up from 8), the concurrent port checks between the two test targets (`omlx` and `vllm`) could exhaust a backlog of 1. The kernel silently drops connections beyond the backlog, causing spurious `port_open=False` results. 64 is generous enough for any plausible spec count.
+
+**Do not suggest:** reducing the backlog; removing the shared-port test; making port checks sequential.
+
+## D-178 — 2026-08-30 — New wrapper specs use probe_version=False
+
+**Decision:** The 4 new wrapper specs added in v14 (mlx-serve, mlx-lm-server, ds4-server, mlx-dspark) all set `probe_version=False`.
+
+**Alternatives considered:** (a) Probe all with `--version` — rejected: `mlx_lm.server` launches a server instead of printing a version; `ds4-server` and `mlx-dspark` are custom scripts with no version flag; `mlx-serve` is too new to have a stable version output. (b) Custom version probe per wrapper — rejected: overengineering for discovery-only metadata; version is nice-to-have, not load-bearing.
+
+**Reason:** Probing would produce misleading output (server launch instead of version string), hangs (blocking on stdin), or errors. The discovery system's value is installed/not-installed and port status, not version strings.
+
+**Do not suggest:** enabling version probing for these wrappers without first verifying each binary's `--version` behavior.
+
+## D-177 — 2026-08-30 — mlx-lm server component split into its own spec
+
+**Decision:** `mlx_lm.server` was removed from the `mlx-lm` spec's `bin_names` and given its own `mlx-lm-server` spec with `port=8080` and `probe_version=False`.
+
+**Alternatives considered:** (a) Keep both console scripts bundled in one spec — rejected: `mlx_lm.generate` (batch inference, no port, version-probable) and `mlx_lm.server` (HTTP server, port 8080, version probe launches a server) have different operational profiles; bundling them means the spec's port and probe_version must compromise. (b) Remove `mlx_lm.server` entirely — rejected: it's a real inference endpoint the dashboard should track.
+
+**Reason:** The discovery system models each independently runnable inference endpoint as its own spec. A server and a batch CLI that happen to share a pip package are operationally distinct wrappers.
+
+**Do not suggest:** re-bundling mlx_lm.generate and mlx_lm.server into one spec.
+
+## D-176 — 2026-08-30 — Wrapper discovery uses curated specs, not auto-discovery
+
+**Decision:** New wrappers (mlx-serve, mlx-lm-server, ds4-server, mlx-dspark) were added to `WRAPPER_SPECS` by auditing the host machine manually (`find`, `mdfind`, brew inspection) rather than building programmatic auto-discovery.
+
+**Alternatives considered:** (a) Scan PATH and known directories for anything that looks like an inference server — rejected: too many false positives (generic names like `server`, `run.sh`); no reliable heuristic to distinguish an LLM inference engine from an unrelated binary. (b) Package-manager query (pip, brew, conda) — rejected: misses custom builds, dev checkouts, and standalone binaries; packages don't declare "I am an inference engine." (c) Port scanning — rejected: only finds running servers, not installed-but-idle ones; intrusive.
+
+**Reason:** The wrapper landscape is heterogeneous — pip packages, brew formulas, standalone binaries, dev-repo scripts, Electron apps. No single discovery mechanism covers all of them reliably. Curated specs with `known_paths` fallbacks are more trustworthy and debuggable than heuristic scanning.
+
+**Do not suggest:** replacing curated specs with auto-discovery; the maintenance cost of adding a spec row is lower than the false-positive cost of scanning.
+
 ## D-167 — 2026-08-22 — Initial freeze snapshots the whole-project ERD as its immutable v1 instruction slice
 
 **Decision:** When a v0→v1 freeze does not stage the optional `ERD-DELTA.md`, `refreeze.sh` copies the newly installed complete `ERD.md` to hash-pinned `ERD-DELTA-v1.md`. It does not create the mutable standing `ERD-DELTA.md`. An explicitly staged v1 delta still wins and is snapshotted unchanged. The existing rule remains: a first freeze is a whole-project spec and does not make the TPM duplicate the ERD as a separate delta artifact.
