@@ -88,13 +88,31 @@ def build_app(
         forwarded = {**body, "model": entry.upstream_alias or entry.public_id}
 
         if stream:
+            # Open the upstream and inspect its status BEFORE returning a 200
+            # event-stream: an upstream rejection (404/503) must reach the client
+            # as that status, not as a successful-looking SSE body.
+            client = httpx.AsyncClient(timeout=httpx.Timeout(300.0))
+            try:
+                request = client.build_request("POST", entry.chat_endpoint, json=forwarded)
+                upstream = await client.send(request, stream=True)
+            except httpx.RequestError as exc:
+                await client.aclose()
+                raise HTTPException(status_code=502, detail=f"upstream connection failed: {exc}") from exc
+            if upstream.status_code != 200:
+                await upstream.aread()
+                content, status = upstream.content, upstream.status_code
+                media = upstream.headers.get("content-type", "application/json")
+                await upstream.aclose()
+                await client.aclose()
+                return Response(content=content, status_code=status, media_type=media)
+
             async def passthrough():
-                async with (
-                    httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client,
-                    client.stream("POST", entry.chat_endpoint, json=forwarded) as upstream,
-                ):
+                try:
                     async for chunk in upstream.aiter_bytes():
                         yield chunk
+                finally:
+                    await upstream.aclose()
+                    await client.aclose()
 
             return StreamingResponse(
                 passthrough(),
@@ -102,8 +120,11 @@ def build_app(
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
 
-        async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client:
-            upstream = await client.post(entry.chat_endpoint, json=forwarded, headers={"Content-Type": "application/json"})
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client:
+                upstream = await client.post(entry.chat_endpoint, json=forwarded, headers={"Content-Type": "application/json"})
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail=f"upstream connection failed: {exc}") from exc
         return Response(
             content=upstream.content,
             status_code=upstream.status_code,
