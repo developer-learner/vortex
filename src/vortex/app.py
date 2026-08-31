@@ -62,7 +62,7 @@ def build_app(
 
     @app.get("/v1/models")
     def list_v1_models() -> dict:
-        ready = manager.all_ready()
+        ready = manager.client_ready()
         return {
             "object": "list",
             "data": [

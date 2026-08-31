@@ -37,12 +37,24 @@ class Manager:
         return [e for e in self.catalog.entries if self.lifecycle.occupying_pid(e) is not None]
 
     def all_ready(self) -> list[CatalogEntry]:
+        """Entries held by our identified process — i.e. consuming their estimated
+        RAM. This is the admission/eviction accounting set: it must include a
+        restart-surviving runtime that is running but not yet verified this
+        session, or memory would be undercounted. NOT the client-facing set —
+        see client_ready()."""
         out = []
         for e in self.catalog.entries:
             pid = self.lifecycle.occupying_pid(e)
-            if self.lifecycle.owner_status(e, pid) == "ready" and self.lifecycle.is_verified(e):
+            if self.lifecycle.owner_status(e, pid) == "ready":
                 out.append(e)
         return out
+
+    def client_ready(self) -> list[CatalogEntry]:
+        """Entries a load/adopt verified to serve inference this session — the set
+        advertised to clients (/v1/models). A subset of all_ready(): an identified
+        process consuming RAM is not advertised until its inference path is
+        confirmed (truthful readiness, finding #1)."""
+        return [e for e in self.all_ready() if self.lifecycle.is_verified(e)]
 
     def entry_state(self, entry: CatalogEntry, active_op: str | None) -> str:
         pid = self.lifecycle.occupying_pid(entry)
