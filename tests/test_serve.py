@@ -455,10 +455,9 @@ def test_unhealthy_adoption_never_advertised_ready(tmp_path: Path) -> None:
         client = _client(tmp_path, catalog, adopt=[("m1", proc.pid, port)])
 
         # Fire the load; do not depend on its status or on synchronous completion.
-        try:
-            client.post("/api/models/m1/load")
-        except Exception:  # noqa: BLE001 — load may fail; we assert on state only
-            pass
+        # A failed load returns an HTTP error RESPONSE (not a raised exception),
+        # so no catch is needed — an actual exception should fail the test.
+        client.post("/api/models/m1/load")
 
         deadline = time.monotonic() + 10
         final_state = None
@@ -550,3 +549,46 @@ def test_steady_state_reads_do_not_probe_runtime(
         f"steady-state readiness reads probed the runtime "
         f"({before} -> {after} chat calls)"
     )
+
+
+def test_unverified_running_model_still_counts_for_admission(tmp_path: Path) -> None:
+    """Restart/RAM distinction: a model that is identified and consuming RAM but
+    NOT yet verified this session must still participate in admission/eviction
+    accounting — even though it is not advertised client-ready. Otherwise Vortex
+    undercounts memory and admits a second model the machine cannot hold.
+
+    m1 is adopted (identified, running) but never loaded, so it is unverified:
+    absent from /v1/models, yet its RAM must still block an over-subscribing m2.
+    """
+    total = psutil.virtual_memory().total / (1024 ** 3)
+    port = _free_port()
+    m2_port = _free_port()
+    proc = _spawn_runtime(port)
+    try:
+        catalog = Catalog(entries=[
+            _entry_for(port, public_id="m1", ram_estimate_gb=total * 0.5),
+            # m2's launch_command must bind m2_port (not the default ephemeral
+            # port), so that if the admission bug wrongly lets m2 load, the spawn
+            # becomes ready quickly and the test fails fast instead of blocking on
+            # the ready-timeout.
+            _entry_for(m2_port, public_id="m2", ram_estimate_gb=total * 0.5,
+                       launch_command=[sys.executable, "-m", "tests.fake_server", str(m2_port)]),
+        ])
+        client = _client(tmp_path, catalog, adopt=[("m1", proc.pid, port)])
+        # m1 running but unverified: not client-ready...
+        assert client.get("/v1/models").json()["data"] == [], "unverified m1 must not be advertised"
+        # ...yet it consumes RAM, so m2 (which only fits if m1 is ignored) is refused.
+        resp = client.post("/api/models/m2/load")
+        assert resp.status_code == 409, "running-but-unverified m1 must count against admission"
+        assert "m1" in resp.json()["detail"]["eviction_candidates"]
+    finally:
+        for p in (port, m2_port):
+            pid = _find_listening_pid(p)
+            if pid is not None:
+                try:
+                    psutil.Process(pid).terminate()
+                except psutil.Error:
+                    pass
+        if proc.poll() is None:
+            proc.kill()
+        proc.wait(timeout=5)
