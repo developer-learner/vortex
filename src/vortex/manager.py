@@ -149,6 +149,15 @@ def _activity_monitor_used_gb() -> float:
         ).stdout
     except (subprocess.SubprocessError, OSError):
         return 0.0
+    # vm_stat names its own page size in the header (16384 on Apple Silicon,
+    # 4096 on Intel). The page counts below are in units of THAT size, so parse
+    # it from the output instead of hardcoding — a fixed 16384 scales the whole
+    # figure 4x wrong on an Intel host. A missing header is a malformed vm_stat:
+    # report 0.0 (degraded source), never guess a page size.
+    page_match = re.search(r"page size of (\d+) bytes", out)
+    if page_match is None:
+        return 0.0
+    page_size = int(page_match.group(1))
     pages = {}
     for line in out.splitlines():
         m = re.match(r"\s*([\w ]+):\s+(\d+)\.", line)
@@ -163,7 +172,6 @@ def _activity_monitor_used_gb() -> float:
     ]
     if any(k not in pages for k in keys):
         return 0.0
-    page_size = 16384
     return sum(pages[k] for k in keys) * page_size / (1024**3)
 
 
