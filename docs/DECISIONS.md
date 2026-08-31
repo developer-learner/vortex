@@ -21,6 +21,36 @@
 
 ## Decisions
 
+## D-181 — 2026-08-31 — Lifecycle mutations use one fail-fast async slot
+
+**Decision:** `Manager.load()` and `Manager.unload()` are the only mutation
+entry points. They reserve one daemon-wide slot from `OperationStore.active()`
+under a short admission lock, return an operation promptly, and run
+spawn/terminate in a background worker outside that lock. An exact duplicate
+(same kind and model) returns the existing operation. Any different in-flight
+mutation raises `BusyError`, translated to a structured HTTP `409`. Every
+worker exception moves its operation to a terminal error state. The parallel
+`load_async()`/`unload_async()` methods are removed.
+
+**Alternatives considered:** (a) Keep the v23 worker lock and let later
+requests queue — rejected because a conflicting request could wait behind a
+300-second spawn after already receiving `202`, with no operation representing
+that wait. (b) Allow one operation per model — rejected because lifecycle and
+memory admission are process-wide concerns and concurrent load/unload decisions
+can invalidate each other. (c) Add a general job queue — rejected under YAGNI;
+the product contract needs one truthful slot, not scheduling machinery.
+
+**Reason:** The operation store must describe reality. Making its in-flight
+operation the admission slot gives callers an immediate, observable outcome,
+deduplicates retries, prevents hidden queues, and leaves the long-running
+worker free of admission-lock coupling. Frozen concurrency tests pin prompt
+return, load/load and load/unload conflicts, duplicate reuse, terminal worker
+errors, and observable loading/unloading states.
+
+**Do not suggest:** reintroducing separate synchronous and asynchronous Manager
+methods; holding the admission lock during spawn/terminate; or adding queued or
+multi-slot mutation scheduling before a concrete product requirement needs it.
+
 ## D-180 — 2026-08-31 — TPM receives the engineering-constitution projection in its project-owned role document
 
 **Decision:** Adopt the Blueprint engineering constitution for Vortex through

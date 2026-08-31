@@ -53,7 +53,7 @@ process table. The daemon binds `127.0.0.1:9000` only.
 | `Lifecycle.processes` | dict[str, Popen \| None] | public_id → sidecar owner of the runtime process (vortex-spawned only; adopted runtimes have no Popen) |
 | `Lifecycle._last_status` | dict[str, str] | per-entry owner status; holds the last value on `SCAN_UNKNOWN` (fail-closed) |
 | `Lifecycle._verified` | set[str] | public_ids verified harmonic **this session** (survives restart only by re-verification on adopt) |
-| `OperationStore._ops` | dict[str, Operation] | 202+poll operations; atomic snapshots; retention `MAX_OPS 100` / `RETENTION 1h` |
+| `OperationStore._ops` | dict[str, Operation] | 202+poll operations; atomic snapshots; `active()` exposes the one global mutation slot; retention `MAX_OPS 100` / `RETENTION 1h` |
 
 Two derived sets (Manager):
 - **consuming set** `all_ready()` — entries whose port is held by an identified
@@ -75,8 +75,8 @@ GET    /v1/models                   list advertised models (only harmonic-ready 
 # Management surface (the daemon's own controls)
 GET    /api/status                  daemon + RAM (vm_stat/psutil labeled) + loaded-set = consuming set (identified + ready, incl. unverified adopted runtimes)
 GET    /api/catalog                 catalog entries + per-entry state (ready|unloaded|loading|unloading|error) + port_pid (SCAN_UNKNOWN→null)
-POST   /api/models/{id}/load        202 + {operation,model}; async via OperationStore (spawning→ready, 409 on memory/port conflict, spawn failure → operation error:failed)
-POST   /api/models/{id}/unload      202 + {operation,model}; async (terminating→unloaded, 404 on unknown)
+POST   /api/models/{id}/load        202 + {operation,model}; async via OperationStore (spawning→ready, 409 on busy/memory/port conflict, exact duplicate reuses operation, spawn failure → operation error:failed)
+POST   /api/models/{id}/unload      202 + {operation,model}; async (terminating→unloaded, 409 while another mutation owns the slot, exact duplicate reuses operation, 404 on unknown)
 GET    /api/operations/{op}         poll operation snapshot (atomic copy, retention 100/1h)
 GET    /api/engine-wrappers         installed wrappers (discover cache 60s)
 POST   /api/engine-wrappers/discover  rescan, returns {wrappers,newly_found}
@@ -94,10 +94,11 @@ POST   /api/engine-wrappers/discover  rescan, returns {wrappers,newly_found}
 ### Load
 
 1. `POST /api/models/{id}/load` → `202 {operation}` promptly (or CLI `vortex load --wait/--no-wait`); the POST never blocks on the spawn
-2. Manager checks admission synchronously: eviction set computed off `ram_estimate_gb` under `0.8*total` budget, never auto-evicts (409 with `required_gb`/`eviction_candidates`); port-conflict checks `SCAN_UNKNOWN` fail-closed, unidentified port never claimed
-3. Operation moves `loading:spawning`; a background worker runs Lifecycle.spawn as ONLY owner (sidecar `pid+start_time`), polls `occupying_pid`==`ready` + `ready_url 200` + `anneal` (real 1-token completion, bounded retry) until deadline (`READY_TIMEOUT 300s`, `POLL_INTERVAL 0.25s`); adoption fast-path requires harmonic before `ready`
-4. On success `ready:done`; on timeout/early exit the just-spawned process is terminated and sidecar dropped so retry cannot adopt a failed runtime; failures go `error:failed/refused`
-5. The runtime enters the consuming set (`/api/status`, admission) when identified + ready; it is advertised at `/v1/models` and served by the chat proxy only when harmonic (verified); `GET /api/catalog` reflects `op.state` while `loading`/`unloading`
+2. Manager reserves the single mutation slot under a short admission lock: an exact duplicate load returns the existing operation; any other in-flight load/unload fails immediately with `409 busy` instead of queueing behind it
+3. Manager completes admission synchronously: eviction set computed off `ram_estimate_gb` under `0.8*total` budget, never auto-evicts (409 with `required_gb`/`eviction_candidates`); port-conflict checks `SCAN_UNKNOWN` fail-closed, unidentified port never claimed
+4. Operation moves `loading:spawning`; a background worker (outside the admission lock) runs Lifecycle.spawn as ONLY owner (sidecar `pid+start_time`), polls `occupying_pid`==`ready` + `ready_url 200` + `anneal` (real 1-token completion, bounded retry) until deadline (`READY_TIMEOUT 300s`, `POLL_INTERVAL 0.25s`); adoption fast-path requires harmonic before `ready`
+5. On success `ready:done`; on timeout/early exit the just-spawned process is terminated and sidecar dropped so retry cannot adopt a failed runtime; every worker exception closes the operation as `error:failed/refused`, releasing the slot
+6. The runtime enters the consuming set (`/api/status`, admission) when identified + ready; it is advertised at `/v1/models` and served by the chat proxy only when harmonic (verified); `GET /api/catalog` reflects `op.state` while `loading`/`unloading`
 
 ### Chat proxy
 
@@ -108,8 +109,8 @@ POST   /api/engine-wrappers/discover  rescan, returns {wrappers,newly_found}
 
 ### Unload
 
-1. `POST /api/models/{id}/unload` → `202 {operation}` promptly (async `unloading:terminating`)
-2. A background worker runs `Lifecycle.terminate`: verifies `SCAN_UNKNOWN` fail-closed, `unidentified` never killed, otherwise `SIGINT`→`SIGKILL` process group + sidecar drop
+1. `POST /api/models/{id}/unload` reserves the same single mutation slot and returns `202 {operation}` promptly (async `unloading:terminating`); an exact duplicate reuses the operation and any different in-flight mutation gets `409 busy`
+2. A background worker outside the admission lock runs `Lifecycle.terminate`: verifies `SCAN_UNKNOWN` fail-closed, `unidentified` never killed, otherwise `SIGINT`→`SIGKILL` process group + sidecar drop
 3. Operation moves `unloaded:done` or `error:refused` (`unidentified process`); polling via `GET /api/operations/{id}` (atomic snapshot, `MAX_OPS 100`/`RETENTION 1h`)
 4. `GET /api/catalog` and `/api/status` reflect unloaded; RAM released for admission; CLI `vortex unload` polls to `unloaded` with 310s deadline, `--no-wait` returns immediately
 
@@ -146,6 +147,7 @@ POST   /api/engine-wrappers/discover  rescan, returns {wrappers,newly_found}
 - **Ready = harmonic (ownership + /v1/models 200 + 1-token anneal, D-174)** — the *advertised* set (`/v1/models`, chat proxy) is never served without all three; adoption requires harmonic before `ready`. The *consuming* set (admission accounting, `/api/status`) counts identified + ready runtimes even when not yet verified this session — a restart-surviving runtime must count toward the RAM budget before it is re-verified (undercounting it is the failure this split exists to prevent)
 - **Process ownership is strict** — sidecar `pid+start_time` identifies exactly one process; `SCAN_UNKNOWN` (incomplete psutil scan) fail-closed (hold last status, never claim or terminate), unidentified occupant never killed or evicted, only `409` refused
 - **No DB** — catalog is the only persistent truth (validated `public_id` pattern, `http(s)://` URLs, `ram>0`/`ctx>0`/`port 1-65535`, unique ids/ports via any construction path); `OperationStore` is in-memory with atomic snapshots and bounded retention; runtime state dies with daemon
+- **One lifecycle mutation at a time (D-181)** — `OperationStore.active()` is the global slot; Manager serializes only admission, never the long worker; conflicting mutations fail fast with `409 busy`, while exact duplicates reuse the active operation
 - **RAM is a budget, not a lock** — admission uses `ram_estimate_gb` under `0.8*total`; eviction set is `409` with `required_gb`/`eviction_candidates`, never silent kills; UI `poll*` failures are operator-visible via `#conflict`/`#wrapperstatus`, CLI timeouts/HTTP/malformed produce controlled `1/2/3` exits with 310s poll deadline and `--wait`/`--no-wait`
 
 ---

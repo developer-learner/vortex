@@ -70,6 +70,9 @@ from the bottom up:
 
 - **202 + operation id** — loads/unloads return `202` immediately with an
   operation id; state is read by polling `GET /api/operations/{id}`.
+- **Single mutation slot** — at most one load or unload is in flight. An exact
+  duplicate returns the existing operation; a different concurrent mutation
+  gets `409 busy` immediately and is never silently queued.
 - **Model states** — `unloaded | loading | ready | unloading | error`.
 - An operation carries `phase`, `state`, `message`, `created_at`,
   `updated_at`. v1 is poll-only (no webhook/push).
