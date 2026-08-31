@@ -30,7 +30,11 @@ class FakeChatServer:
                 if self.path == "/v1/models":
                     self._json(200, {"object": "list", "data": [{"id": "fake-model", "object": "model"}]})
                 elif self.path == "/mock/received":
-                    self._json(200, {"chat_calls": self.server.chat_calls, "anneal_failures": self.server.anneal_failures})
+                    self._json(200, {
+                        "chat_calls": self.server.chat_calls,
+                        "anneal_failures": self.server.anneal_failures,
+                        "models": [r.get("model") for r in self.server.requests],
+                    })
                 else:
                     self._json(404, {"detail": "not found"})
 

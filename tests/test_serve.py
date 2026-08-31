@@ -177,6 +177,78 @@ def test_proxy_streaming_passthrough(runtime: tuple[int, subprocess.Popen], tmp_
     assert "DONE" in resp.text
 
 
+def _received_models(port: int) -> list[str]:
+    import httpx
+
+    return httpx.get(f"http://127.0.0.1:{port}/mock/received", timeout=2).json()["models"]
+
+
+def test_proxy_non_streaming_remaps_public_id_to_upstream_alias(
+    runtime: tuple[int, subprocess.Popen], tmp_path: Path
+) -> None:
+    """A client calls the public_id; the runtime must be addressed by upstream_alias.
+
+    public_id and upstream_alias deliberately differ — the audit's regression shape.
+    """
+    port, proc = runtime
+    catalog = Catalog(entries=[_entry_for(port, public_id="pub-x", upstream_alias="up-x")])
+    client = _client(tmp_path, catalog, adopt=[("pub-x", proc.pid, port)])
+    op = client.post("/api/models/pub-x/load").json()["operation"]
+    _wait_state(client, op, "ready")
+
+    before = len(_received_models(port))
+    resp = client.post("/v1/chat/completions", json={
+        "model": "pub-x",
+        "messages": [{"role": "user", "content": "hi"}],
+    })
+    assert resp.status_code == 200
+    forwarded = _received_models(port)[before:]
+    assert "up-x" in forwarded, "runtime must receive the upstream_alias"
+    assert "pub-x" not in forwarded, "the public_id must never reach the runtime"
+
+
+def test_proxy_streaming_remaps_public_id_to_upstream_alias(
+    runtime: tuple[int, subprocess.Popen], tmp_path: Path
+) -> None:
+    """Remapping must hold for the streaming path too, not only non-streaming."""
+    port, proc = runtime
+    catalog = Catalog(entries=[_entry_for(port, public_id="pub-x", upstream_alias="up-x")])
+    client = _client(tmp_path, catalog, adopt=[("pub-x", proc.pid, port)])
+    op = client.post("/api/models/pub-x/load").json()["operation"]
+    _wait_state(client, op, "ready")
+
+    before = len(_received_models(port))
+    resp = client.post("/v1/chat/completions", json={
+        "model": "pub-x",
+        "stream": True,
+        "messages": [{"role": "user", "content": "hi"}],
+    })
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/event-stream")
+    forwarded = _received_models(port)[before:]
+    assert "up-x" in forwarded, "runtime must receive the upstream_alias on the streaming path"
+    assert "pub-x" not in forwarded, "the public_id must never reach the runtime"
+
+
+def test_proxy_forwards_public_id_when_no_upstream_alias(
+    runtime: tuple[int, subprocess.Popen], tmp_path: Path
+) -> None:
+    """With no upstream_alias configured, the forwarded model is the public_id."""
+    port, proc = runtime
+    catalog = Catalog(entries=[_entry_for(port, public_id="solo")])  # upstream_alias defaults to None
+    client = _client(tmp_path, catalog, adopt=[("solo", proc.pid, port)])
+    op = client.post("/api/models/solo/load").json()["operation"]
+    _wait_state(client, op, "ready")
+
+    before = len(_received_models(port))
+    resp = client.post("/v1/chat/completions", json={
+        "model": "solo",
+        "messages": [{"role": "user", "content": "hi"}],
+    })
+    assert resp.status_code == 200
+    assert _received_models(port)[before:] == ["solo"]
+
+
 def test_proxy_unloaded_model_404(tmp_path: Path) -> None:
     """An entry with no occupant and no sidecar is 'unloaded' — proxy rejects."""
     catalog = Catalog(entries=[_entry_for(_free_port())])
