@@ -233,21 +233,24 @@ final closure ref.
 
 ### Tooling gaps (discovered during v14 milestone audit, 2026-08-30)
 
-- [ ] **Blueprint — stamp model ID into EM archive meta.txt.** `.em-archive/`
-  records call outcomes (prompt, reply, stderr, meta.txt with exit code and
-  outcome) but not which model produced the call. `SWBP_EM_MODEL` is available
-  in the environment; `llm-call.sh` should write it into `meta.txt` so
-  post-hoc analysis can correlate failures with model versions.
-- [ ] **Blueprint — archive coder calls alongside EM calls.** Only EM calls go
-  to `.em-archive/`. Coder calls (the actual code-producing completions) have
-  no durable archive — their transcripts are wiped at success teardown. A
-  parallel `.coder-archive/` (same format as `.em-archive/`) would preserve
-  the evidence chain for correction log attribution.
-- [ ] **Blueprint — add fault_role field to measurement data.** When a
-  milestone fails, `.measurement/counters` records the exit code and phase but
-  not whether the EM, coder, TPM, or pipeline was at fault. A structured
-  `fault_role` field (or a separate attribution log) would make post-hoc
-  analysis mechanical instead of requiring a human to read archived transcripts.
+- [x] **Blueprint — stamp model ID into EM archive meta.txt.** *(done 2026-08-31,
+  blueprint `09aec03`)* `.em-archive/*/meta.txt` now carries `em_model=` —
+  stamped by `archive_em` from `SWBP_EM_MODEL` (the D-105 runtime contract;
+  `em_model=unset` when absent), so archived failures can be correlated with
+  model versions post-hoc. Selftest: functional archive_em meta check
+  (model set + unset).
+- [x] **Blueprint — archive coder calls alongside EM calls.** *(stale entry —
+  already implemented; closed 2026-08-31)* The parallel `.coder-archive/`
+  shipped with the P3-1 coder-evidence work: `orchestrate.sh` captures every
+  coder attempt there (same self-ignoring pattern as `.em-archive/`,
+  survives the success teardown). Nothing to build; entry retired.
+- [x] **Blueprint — add fault_role field to measurement data.** *(done
+  2026-08-31, blueprint `09aec03`)* The terminal measurement row now carries
+  `fault_role=` — set at each terminal halt site: `none` (success), `coder`
+  (fail-fast task halt), `em` (plan/diagnosis schema-invalid after budget),
+  `tpm` (batch halt at the escalation rung), `environment` (D-169 transient
+  verdict), `pipeline` (budget/gate/crash default). Post-hoc attribution is
+  now mechanical; the first in-the-wild row is the live validation.
 
 ## P3 — roadmap phases (post-cutover)
 
