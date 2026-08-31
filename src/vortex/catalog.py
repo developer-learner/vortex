@@ -48,7 +48,7 @@ class CatalogEntry(BaseModel):
     @field_validator("ready_url", "chat_endpoint")
     @classmethod
     def _valid_url(cls, v: str) -> str:
-        if not (v.startswith("http://") or v.startswith("https://")):
+        if not v.startswith(("http://", "https://")):
             raise ValueError("URL must start with http:// or https://")
         from urllib.parse import urlparse
 
