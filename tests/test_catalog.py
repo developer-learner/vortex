@@ -30,17 +30,44 @@ def test_catalog_entry_roundtrip() -> None:
 
 
 def test_catalog_rejects_duplicate_public_ids() -> None:
-    catalog = Catalog(entries=[CatalogEntry.model_validate(_entry()),
-                                CatalogEntry.model_validate(_entry(public_id="m1"))])
-    with pytest.raises(ValueError, match="duplicate public id"):
-        catalog.assert_unique_public_ids()
+    """Duplicates are rejected on ANY construction path (D: model_validator),
+    not just by a post-hoc assert the caller must remember to run."""
+    from pydantic import ValidationError
+
+    with pytest.raises((ValueError, ValidationError), match="duplicate public id"):
+        Catalog(entries=[CatalogEntry.model_validate(_entry()),
+                         CatalogEntry.model_validate(_entry(public_id="m1"))])
+    with pytest.raises(ValidationError, match="duplicate public id"):
+        Catalog.model_validate({"entries": [_entry(), _entry(public_id="m1")]})
 
 
 def test_catalog_rejects_duplicate_ports() -> None:
-    catalog = Catalog(entries=[CatalogEntry.model_validate(_entry()),
-                                CatalogEntry.model_validate(_entry(public_id="m2"))])
-    with pytest.raises(ValueError, match="duplicate port"):
-        catalog.assert_unique_ports()
+    from pydantic import ValidationError
+
+    with pytest.raises((ValueError, ValidationError), match="duplicate port"):
+        Catalog(entries=[CatalogEntry.model_validate(_entry()),
+                         CatalogEntry.model_validate(_entry(public_id="m2"))])
+    with pytest.raises(ValidationError, match="duplicate port"):
+        Catalog.model_validate({"entries": [_entry(), _entry(public_id="m2")]})
+
+
+def test_catalog_rejects_non_http_url() -> None:
+    with pytest.raises(ValueError, match="http"):
+        CatalogEntry.model_validate(_entry(ready_url="ftp://127.0.0.1:9001/v1/models"))
+    with pytest.raises(ValueError, match="host"):
+        CatalogEntry.model_validate(_entry(chat_endpoint="http:///v1/chat/completions"))
+
+
+def test_catalog_rejects_nonpositive_ram() -> None:
+    with pytest.raises(ValueError, match=r"> 0"):
+        CatalogEntry.model_validate(_entry(ram_estimate_gb=0))
+    with pytest.raises(ValueError, match=r"> 0"):
+        CatalogEntry.model_validate(_entry(ram_estimate_gb=-1.5))
+
+
+def test_catalog_rejects_nonpositive_ctx() -> None:
+    with pytest.raises(ValueError, match=r"> 0"):
+        CatalogEntry.model_validate(_entry(ctx_size=0))
 
 
 def test_catalog_rejects_empty_launch_command() -> None:

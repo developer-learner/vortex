@@ -179,7 +179,8 @@ def test_proxy_non_streaming(runtime: tuple[int, subprocess.Popen], tmp_path: Pa
     port, proc = runtime
     catalog = Catalog(entries=[_entry_for(port)])
     client = _client(tmp_path, catalog, adopt=[("m1", proc.pid, port)])
-    client.post("/api/models/m1/load")
+    op = client.post("/api/models/m1/load").json()["operation"]
+    _wait_state(client, op, "ready")
     resp = client.post("/v1/chat/completions", json={
         "model": "m1",
         "messages": [{"role": "user", "content": "hi"}],
@@ -193,7 +194,8 @@ def test_proxy_streaming_passthrough(runtime: tuple[int, subprocess.Popen], tmp_
     port, proc = runtime
     catalog = Catalog(entries=[_entry_for(port)])
     client = _client(tmp_path, catalog, adopt=[("m1", proc.pid, port)])
-    client.post("/api/models/m1/load")
+    op = client.post("/api/models/m1/load").json()["operation"]
+    _wait_state(client, op, "ready")
     resp = client.post("/v1/chat/completions", json={
         "model": "m1",
         "stream": True,
@@ -299,7 +301,8 @@ def test_unload_terminates_child(runtime: tuple[int, subprocess.Popen], tmp_path
     port, proc = runtime
     catalog = Catalog(entries=[_entry_for(port)])
     client = _client(tmp_path, catalog, adopt=[("m1", proc.pid, port)])
-    client.post("/api/models/m1/load")
+    op = client.post("/api/models/m1/load").json()["operation"]
+    _wait_state(client, op, "ready")
     resp = client.post("/api/models/m1/unload")
     assert resp.status_code == 202
     op = _wait_state(client, resp.json()["operation"], "unloaded")
@@ -339,17 +342,78 @@ def test_spawn_from_launch_command(tmp_path: Path) -> None:
     assert client.get("/api/catalog").json()["entries"][0]["port_pid"] is None
 
 
+def test_load_returns_before_ready(tmp_path: Path) -> None:
+    """202 contract: POST /load returns promptly with an operation id — it must
+    not block until the model is ready. The runtime needs several anneal probes
+    (~0.25s apart) before it is harmonic, so a prompt response proves the spawn
+    continues in the background. Clients then poll the operation to ready."""
+    port = _free_port()
+    catalog = Catalog(entries=[_entry(
+        public_id="m1",
+        launch_command=[sys.executable, "-m", "tests.fake_server", str(port), "8"],
+        port=port,
+        ready_url=f"http://127.0.0.1:{port}/v1/models",
+        chat_endpoint=f"http://127.0.0.1:{port}/v1/chat/completions",
+    )])
+    client = _client(tmp_path, catalog)
+    t0 = time.monotonic()
+    resp = client.post("/api/models/m1/load")
+    elapsed = time.monotonic() - t0
+    assert resp.status_code == 202
+    assert elapsed < 1.0, (
+        f"load blocked {elapsed:.1f}s — it must return promptly, not wait for ready"
+    )
+    body = resp.json()
+    assert body["model"] == "m1"
+    op = body["operation"]
+    assert client.get(f"/api/operations/{op}").status_code == 200
+    # and the background work still completes
+    snap = _wait_state(client, op, "ready")
+    assert snap["state"] == "ready"
+    assert [m["id"] for m in client.get("/v1/models").json()["data"]] == ["m1"]
+
+
+def test_failed_load_reaches_error_operation(tmp_path: Path) -> None:
+    """Async error path (HTTP level): a launch command that dies immediately must
+    surface as an operation in error:failed. The POST itself is a 202 (preflight
+    passed), so the failure is observable only via the operation — and the model
+    is never advertised."""
+    port = _free_port()
+    catalog = Catalog(entries=[_entry(
+        public_id="m1",
+        launch_command=[sys.executable, "-c", "import sys; sys.exit(1)"],
+        port=port,
+        ready_url=f"http://127.0.0.1:{port}/v1/models",
+        chat_endpoint=f"http://127.0.0.1:{port}/v1/chat/completions",
+    )])
+    client = _client(tmp_path, catalog)
+    resp = client.post("/api/models/m1/load")
+    assert resp.status_code == 202, (
+        "preflight passed; the failure must be observable via the operation"
+    )
+    op = resp.json()["operation"]
+    snap = _wait_state(client, op, "error")
+    assert snap["phase"] == "failed"
+    assert client.get("/v1/models").json()["data"] == []
+
+
 def test_load_conflict_reports_eviction(tmp_path: Path) -> None:
     """Structured 409: required size + eviction candidates (never auto-evict)."""
     runtime = _free_port()
+    other = _free_port()
     proc = _spawn_runtime(runtime)
     try:
+        # m2 must bind its OWN port: the catalog rejects duplicate ports at
+        # construction, and if admission were wrongly granted, m2 would become
+        # ready fast and fail this test quickly instead of blocking on timeout.
         catalog = Catalog(entries=[
             _entry_for(runtime, public_id="m1", ram_estimate_gb=5),
-            _entry_for(runtime, public_id="m2", ram_estimate_gb=1e6),
+            _entry_for(other, public_id="m2", ram_estimate_gb=1e6,
+                       launch_command=[sys.executable, "-m", "tests.fake_server", str(other)]),
         ])
         client = _client(tmp_path, catalog, adopt=[("m1", proc.pid, runtime)])
-        assert client.post("/api/models/m1/load").status_code == 202
+        op = client.post("/api/models/m1/load").json()["operation"]
+        _wait_state(client, op, "ready")
         resp = client.post("/api/models/m2/load")
         assert resp.status_code == 409
         detail = resp.json()["detail"]
@@ -357,6 +421,13 @@ def test_load_conflict_reports_eviction(tmp_path: Path) -> None:
         assert "m1" in detail["eviction_candidates"]
         assert client.get("/v1/models").json()["data"]  # m1 still there
     finally:
+        for p in (runtime, other):
+            pid = _find_listening_pid(p)
+            if pid is not None:
+                try:
+                    psutil.Process(pid).terminate()
+                except psutil.Error:
+                    pass
         if proc.poll() is None:
             proc.kill()
         proc.wait(timeout=5)

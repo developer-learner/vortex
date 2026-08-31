@@ -28,8 +28,8 @@ def _entry() -> CatalogEntry:
         engine="mlx",
         launch_command=["serve", "demo"],
         port=8001,
-        ready_url="127.0.0.1:8001/health",
-        chat_endpoint="127.0.0.1:8001/v1/chat/completions",
+        ready_url="http://127.0.0.1:8001/health",
+        chat_endpoint="http://127.0.0.1:8001/v1/chat/completions",
         ram_estimate_gb=30.0,
     )
 
