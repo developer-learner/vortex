@@ -73,6 +73,34 @@ def _spawn_runtime(port: int) -> subprocess.Popen:
     raise RuntimeError("fake runtime did not become ready")
 
 
+def _spawn_unhealthy_runtime(port: int) -> subprocess.Popen:
+    """Start a fake runtime that 200s GET /v1/models but 503s every chat call.
+
+    Mirrors `_spawn_runtime` but passes anneal_failures=-1 (chat never
+    succeeds — the llama-server phantom-ready class, D-174). Waits for
+    GET /v1/models to answer 200 before returning, so the runtime is genuinely
+    adoptable: a healthy models endpoint over a dead inference path.
+    """
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "tests.fake_server", str(port), "-1"],
+        cwd=TESTS_DIR.parent,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            import httpx
+
+            if httpx.get(f"http://127.0.0.1:{port}/v1/models", timeout=1).status_code == 200:
+                return proc
+        except Exception:  # noqa: BLE001, S110 — readiness polling loop
+            pass
+        time.sleep(0.05)
+    proc.kill()
+    raise RuntimeError("unhealthy fake runtime did not answer /v1/models")
+
+
 def _adopt_sidecar(path: Path, public_id: str, pid: int, port: int) -> None:
     path.mkdir(parents=True, exist_ok=True)
     record = {
@@ -396,3 +424,129 @@ def test_spawn_fails_when_chat_never_succeeds(tmp_path: Path) -> None:
         import psutil
 
         psutil.Process(pid).terminate()
+
+
+def test_unhealthy_adoption_never_advertised_ready(tmp_path: Path) -> None:
+    """R1: a sidecar-identified runtime that answers GET /v1/models with 200 but
+    503s every chat completion must NEVER be advertised ready.
+
+    - GET /v1/models never lists the model, and
+    - GET /api/catalog never shows the entry state as 'ready' (it settles to a
+      non-ready state such as 'unloaded'/'error').
+
+    Robustness: no assertion on the load POST status, and no assumption that
+    load is synchronous — readiness is judged only by polling the observable
+    /v1/models and /api/catalog surfaces on a bounded deadline.
+    """
+    port = _free_port()
+    proc = _spawn_unhealthy_runtime(port)
+    try:
+        import httpx
+
+        # Confirm the phantom-ready shape before adopting: models 200s, chat 503s.
+        assert httpx.get(f"http://127.0.0.1:{port}/v1/models", timeout=2).status_code == 200
+        assert httpx.post(
+            f"http://127.0.0.1:{port}/v1/chat/completions",
+            json={"model": "x", "messages": [{"role": "user", "content": "hi"}]},
+            timeout=2,
+        ).status_code == 503
+
+        catalog = Catalog(entries=[_entry_for(port)])
+        client = _client(tmp_path, catalog, adopt=[("m1", proc.pid, port)])
+
+        # Fire the load; do not depend on its status or on synchronous completion.
+        try:
+            client.post("/api/models/m1/load")
+        except Exception:  # noqa: BLE001 — load may fail; we assert on state only
+            pass
+
+        deadline = time.monotonic() + 10
+        final_state = None
+        while time.monotonic() < deadline:
+            ids = [m["id"] for m in client.get("/v1/models").json()["data"]]
+            final_state = client.get("/api/catalog").json()["entries"][0]["state"]
+            assert "m1" not in ids, (
+                f"unhealthy runtime was advertised in /v1/models "
+                f"(catalog state={final_state!r})"
+            )
+            assert final_state != "ready", "unhealthy runtime shown 'ready' in /api/catalog"
+            time.sleep(0.2)
+        assert final_state != "ready", "unhealthy runtime settled to 'ready'"
+    finally:
+        proc.kill()
+        proc.wait(timeout=5)
+
+
+def test_failed_spawn_leaves_no_owned_process_or_sidecar(tmp_path: Path) -> None:
+    """C1: a spawned runtime (launch_command path, not adoption) whose chat never
+    succeeds within the ready timeout must FAIL the load and leave strict cleanup:
+
+    - no process is listening on the port, and
+    - the entry's sidecar record is gone.
+
+    Mirrors `test_spawn_fails_when_chat_never_succeeds` (which pins SpawnError)
+    but additionally pins the post-failure cleanup. New test; the original is
+    left untouched.
+    """
+    port = _free_port()
+    sidecar_dir = tmp_path / "sidecars"
+    catalog = Catalog(entries=[_entry(
+        public_id="m1",
+        launch_command=[sys.executable, "-m", "tests.fake_server", str(port), "-1"],
+        port=port,
+        ready_url=f"http://127.0.0.1:{port}/v1/models",
+        chat_endpoint=f"http://127.0.0.1:{port}/v1/chat/completions",
+    )])
+    ops = OperationStore()
+    mgr = Manager(
+        catalog,
+        Lifecycle(catalog, SidecarStore(sidecar_dir), ready_timeout=lambda: 2.0),
+        ops,
+    )
+    try:
+        with pytest.raises(SpawnError):
+            mgr.load("m1")
+        # Allow for asynchronous teardown: poll the port free on a bounded deadline.
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and _find_listening_pid(port) is not None:
+            time.sleep(0.05)
+        assert _find_listening_pid(port) is None, "failed spawn left a process on the port"
+        assert SidecarStore(sidecar_dir).read("m1") is None, "failed spawn left a sidecar record"
+    finally:
+        pid = _find_listening_pid(port)
+        if pid is not None:
+            try:
+                psutil.Process(pid).terminate()
+            except psutil.Error:
+                pass
+
+
+def test_steady_state_reads_do_not_probe_runtime(
+    runtime: tuple[int, subprocess.Popen], tmp_path: Path
+) -> None:
+    """NREG: once a healthy adopted model is ready, repeatedly polling
+    GET /api/catalog and GET /v1/models must NOT cause additional chat
+    completions to the runtime. Guards against a fix that wires an inference
+    probe into the per-request/per-poll read paths.
+    """
+    port, proc = runtime
+    catalog = Catalog(entries=[_entry_for(port)])
+    client = _client(tmp_path, catalog, adopt=[("m1", proc.pid, port)])
+    op = client.post("/api/models/m1/load").json()["operation"]
+    _wait_state(client, op, "ready")
+    assert [m["id"] for m in client.get("/v1/models").json()["data"]] == ["m1"]
+
+    import httpx
+
+    def _chat_calls() -> int:
+        return httpx.get(f"http://127.0.0.1:{port}/mock/received", timeout=2).json()["chat_calls"]
+
+    before = _chat_calls()
+    for _ in range(5):
+        client.get("/api/catalog")
+        client.get("/v1/models")
+    after = _chat_calls()
+    assert after == before, (
+        f"steady-state readiness reads probed the runtime "
+        f"({before} -> {after} chat calls)"
+    )
