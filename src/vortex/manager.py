@@ -7,7 +7,7 @@ import threading
 import psutil  # type: ignore[import-untyped]
 
 from .catalog import Catalog, CatalogEntry
-from .lifecycle import Lifecycle, PortConflictError, SCAN_UNKNOWN, SpawnError
+from .lifecycle import SCAN_UNKNOWN, Lifecycle, PortConflictError, SpawnError
 from .operations import OperationStore
 
 
@@ -24,14 +24,27 @@ class MemoryConflict(Exception):
         )
 
 
+class BusyError(Exception):
+    """A different model mutation already owns the single operation slot."""
+
+    def __init__(self, operation: str, kind: str, public_id: str) -> None:
+        self.operation = operation
+        self.kind = kind
+        self.public_id = public_id
+        super().__init__(
+            f"{kind} for {public_id!r} is already in progress "
+            f"(operation {operation})"
+        )
+
+
 class Manager:
-    """Serializes load/unload (one mutation at a time) and owns eviction."""
+    """Owns admission, one async mutation slot, and eviction decisions."""
 
     def __init__(self, catalog: Catalog, lifecycle: Lifecycle, ops: OperationStore) -> None:
         self.catalog = catalog
         self.lifecycle = lifecycle
         self.ops = ops
-        self._lock = threading.RLock()
+        self._slot_lock = threading.Lock()
 
     def occupied_entries(self) -> list[CatalogEntry]:
         return [e for e in self.catalog.entries if self.lifecycle.occupying_pid(e) is not None]
@@ -84,74 +97,26 @@ class Manager:
         entry = self.catalog.by_public_id(public_id)
         if entry is None:
             raise LookupError(f"no catalog entry for {public_id!r}")
-        conflicts = self.eviction_required(entry)
-        if conflicts:
-            raise MemoryConflict(
-                entry.ram_estimate_gb, [e.public_id for e in conflicts]
-            )
-        op_id = self.ops.create("load", public_id)
-        try:
-            with self._lock:
-                self.ops.update(op_id, state="loading", phase="spawning")
-                _process, ready = self.lifecycle.spawn(entry)
-                if not ready:
-                    self.ops.update(op_id, state="loading", phase="adopting")
-                    raise SpawnError(f"{public_id} did not become ready", rc=None)
-                self.ops.update(op_id, state="ready", phase="done", message="serving")
-                return {"operation": op_id, "model": public_id}
-        except PortConflictError as exc:
-            self.ops.update(op_id, state="error", phase="refused", message=str(exc))
-            raise
-        except SpawnError as exc:
-            self.ops.update(op_id, state="error", phase="failed", message=str(exc))
-            raise
-        except MemoryConflict:
-            self.ops.update(op_id, state="error", phase="conflict", message="eviction required")
-            raise
 
-    def load_async(self, public_id: str) -> dict:
-        """202 contract: preflight synchronously (404/409 are immediate), then
-        return the operation id promptly while the spawn continues in the
-        background. Clients poll GET /api/operations/{id} to the terminal
-        state. The synchronous load() remains for callers that want to block."""
-        entry = self.catalog.by_public_id(public_id)
-        if entry is None:
-            raise LookupError(f"no catalog entry for {public_id!r}")
-        conflicts = self.eviction_required(entry)
-        if conflicts:
-            raise MemoryConflict(
-                entry.ram_estimate_gb, [e.public_id for e in conflicts]
-            )
-        # Port preflight mirrors Lifecycle.spawn so a refusal is an immediate
-        # 409, not a 202 that later surfaces as error:refused.
-        occupant = self.lifecycle.occupying_pid(entry)
-        if occupant is SCAN_UNKNOWN:
-            raise PortConflictError(
-                f"port {entry.port} scan incomplete — refusing to load "
-                f"(cannot verify the port is free)",
-                port=entry.port,
-                pid=None,
-            )
-        if occupant is not None and not self.lifecycle.sidecars.identifies(entry.public_id, occupant):
-            raise PortConflictError(
-                f"port {entry.port} occupied by unidentified process {occupant}",
-                port=entry.port,
-                pid=occupant,
-            )
-        op_id = self.ops.create("load", public_id)
-        self.ops.update(op_id, state="loading", phase="spawning")
+        with self._slot_lock:
+            existing = self._existing_or_busy("load", public_id)
+            if existing is not None:
+                return existing
+            conflicts = self.eviction_required(entry)
+            if conflicts:
+                raise MemoryConflict(
+                    entry.ram_estimate_gb, [e.public_id for e in conflicts]
+                )
+            self._preflight_load(entry)
+            op_id = self.ops.create("load", public_id)
+            self.ops.update(op_id, state="loading", phase="spawning")
 
         def _work() -> None:
             try:
-                with self._lock:
-                    _process, ready = self.lifecycle.spawn(entry)
-                    if not ready:
-                        self.ops.update(
-                            op_id, state="error", phase="failed",
-                            message=f"{public_id} did not become ready",
-                        )
-                    else:
-                        self.ops.update(op_id, state="ready", phase="done", message="serving")
+                _process, ready = self.lifecycle.spawn(entry)
+                if not ready:
+                    raise SpawnError(f"{public_id} did not become ready", rc=None)
+                self.ops.update(op_id, state="ready", phase="done", message="serving")
             except PortConflictError as exc:
                 self.ops.update(op_id, state="error", phase="refused", message=str(exc))
             except SpawnError as exc:
@@ -166,42 +131,55 @@ class Manager:
         entry = self.catalog.by_public_id(public_id)
         if entry is None:
             raise LookupError(f"no catalog entry for {public_id!r}")
-        op_id = self.ops.create("unload", public_id)
-        try:
-            with self._lock:
-                self.ops.update(op_id, state="unloading", phase="terminating")
+
+        with self._slot_lock:
+            existing = self._existing_or_busy("unload", public_id)
+            if existing is not None:
+                return existing
+            op_id = self.ops.create("unload", public_id)
+            self.ops.update(op_id, state="unloading", phase="terminating")
+
+        def _work() -> None:
+            try:
                 stopped = self.lifecycle.terminate(entry)
                 if stopped:
                     self.ops.update(op_id, state="unloaded", phase="done")
                 else:
-                    self.ops.update(op_id, state="error", phase="refused", message="unidentified process")
-                return {"operation": op_id, "model": public_id, "stopped": stopped}
-        except Exception as exc:
-            self.ops.update(op_id, state="error", phase="failed", message=str(exc))
-            raise
-
-    def unload_async(self, public_id: str) -> dict:
-        """202 contract: return the operation id promptly; the terminate
-        continues in the background. Clients poll GET /api/operations/{id}."""
-        entry = self.catalog.by_public_id(public_id)
-        if entry is None:
-            raise LookupError(f"no catalog entry for {public_id!r}")
-        op_id = self.ops.create("unload", public_id)
-        self.ops.update(op_id, state="unloading", phase="terminating")
-
-        def _work() -> None:
-            try:
-                with self._lock:
-                    stopped = self.lifecycle.terminate(entry)
-                    if stopped:
-                        self.ops.update(op_id, state="unloaded", phase="done")
-                    else:
-                        self.ops.update(
-                            op_id, state="error", phase="refused",
-                            message="unidentified process",
-                        )
+                    self.ops.update(
+                        op_id,
+                        state="error",
+                        phase="refused",
+                        message="unidentified process",
+                    )
             except Exception as exc:  # noqa: BLE001 — the operation must never die silently
                 self.ops.update(op_id, state="error", phase="failed", message=str(exc))
 
         threading.Thread(target=_work, daemon=True).start()
         return {"operation": op_id, "model": public_id}
+
+    def _existing_or_busy(self, kind: str, public_id: str) -> dict | None:
+        active = self.ops.active()
+        if active is None:
+            return None
+        if active.kind == kind and active.public_id == public_id:
+            return {"operation": active.id, "model": public_id}
+        raise BusyError(active.id, active.kind, active.public_id)
+
+    def _preflight_load(self, entry: CatalogEntry) -> None:
+        """Reject unsafe port ownership before accepting an async operation."""
+        occupant = self.lifecycle.occupying_pid(entry)
+        if occupant is SCAN_UNKNOWN:
+            raise PortConflictError(
+                f"port {entry.port} scan incomplete — refusing to load "
+                f"(cannot verify the port is free)",
+                port=entry.port,
+                pid=None,
+            )
+        if occupant is not None and not self.lifecycle.sidecars.identifies(
+            entry.public_id, occupant
+        ):
+            raise PortConflictError(
+                f"port {entry.port} occupied by unidentified process {occupant}",
+                port=entry.port,
+                pid=occupant,
+            )

@@ -9,7 +9,7 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from .catalog import MODEL_STATES
 
@@ -113,4 +113,12 @@ class OperationStore:
             for op in self._ops.values():
                 if op.public_id == public_id and op.state in ("loading", "unloading"):
                     return op.id
+        return None
+
+    def active(self) -> Operation | None:
+        """Return an atomic copy of the one in-flight mutation, if any."""
+        with self._lock:
+            for op in self._ops.values():
+                if op.state in ("loading", "unloading"):
+                    return replace(op)
         return None

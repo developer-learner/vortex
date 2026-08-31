@@ -454,6 +454,10 @@ footer {
         return r.json().then(function (body) {
           if (r.status === 409) {
             var d = body.detail;
+            if (d.busy) {
+              setConflict(d.message);
+              return null;
+            }
             var candidates = (d.eviction_candidates && d.eviction_candidates.length) ? d.eviction_candidates.join(", ") : "none";
             setConflict(d.message + " — requires " + d.required_gb + " GiB; candidates: " + candidates);
             return null;

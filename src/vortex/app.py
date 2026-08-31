@@ -25,7 +25,7 @@ from .lifecycle import (
     as_pid,
     log_stale_sidecars,
 )
-from .manager import Manager, MemoryConflict
+from .manager import BusyError, Manager, MemoryConflict
 from .memory import (
     estimate_ram_total_gb,
     estimate_ram_used_gb,
@@ -92,8 +92,10 @@ def build_app(
             # as that status, not as a successful-looking SSE body.
             client = httpx.AsyncClient(timeout=httpx.Timeout(300.0))
             try:
-                request = client.build_request("POST", entry.chat_endpoint, json=forwarded)
-                upstream = await client.send(request, stream=True)
+                upstream_request = client.build_request(
+                    "POST", entry.chat_endpoint, json=forwarded
+                )
+                upstream = await client.send(upstream_request, stream=True)
             except httpx.RequestError as exc:
                 await client.aclose()
                 raise HTTPException(status_code=502, detail=f"upstream connection failed: {exc}") from exc
@@ -165,9 +167,20 @@ def build_app(
     @app.post("/api/models/{public_id}/load", status_code=202)
     def load(public_id: str) -> dict:
         try:
-            return manager.load_async(public_id)
+            return manager.load(public_id)
         except LookupError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except BusyError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": str(exc),
+                    "busy": True,
+                    "operation": exc.operation,
+                    "active_kind": exc.kind,
+                    "active_model": exc.public_id,
+                },
+            ) from exc
         except MemoryConflict as exc:
             raise HTTPException(
                 status_code=409,
@@ -183,9 +196,20 @@ def build_app(
     @app.post("/api/models/{public_id}/unload", status_code=202)
     def unload(public_id: str) -> dict:
         try:
-            return manager.unload_async(public_id)
+            return manager.unload(public_id)
         except LookupError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except BusyError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": str(exc),
+                    "busy": True,
+                    "operation": exc.operation,
+                    "active_kind": exc.kind,
+                    "active_model": exc.public_id,
+                },
+            ) from exc
 
     @app.get("/api/operations/{op_id}")
     def operation(op_id: str) -> dict:
