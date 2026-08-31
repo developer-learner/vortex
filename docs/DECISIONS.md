@@ -21,6 +21,36 @@
 
 ## Decisions
 
+## D-180 — 2026-08-31 — TPM receives the engineering-constitution projection in its project-owned role document
+
+**Decision:** Adopt the Blueprint engineering constitution for Vortex through
+the three real decision-making LLM channels. The linked `coder.md` and
+`em-plan.md` already carry the coder and EM projections. The TPM projection is
+now self-contained in `docs/TPM-ROLE.md`, which reaches chat mode through
+`tpm-pack.sh`, repository-agent mode through `tpm-agent.sh`, and materialized-
+view mode through `tpm-view.sh`. The conductor remains process-only and no
+application-code reviewer role is introduced. This is guidance, not a new gate.
+
+**Alternatives considered:** (a) Point the TPM at Blueprint's canonical file —
+rejected because chat mode and the materialized view require self-contained
+context, and Vortex does not carry that reference file. (b) Add Vortex's
+project-owned `TPM-ROLE.md` to the template manifest — rejected because it would
+change document ownership and overwrite project-specific TPM policy across the
+fleet. (c) Rely on tests and gates alone — rejected because they verify behavior
+and structural invariants, not SOLID, cohesion, or design clarity.
+
+**Reason:** The frontier TPM decides contracts, invariants, failure behavior,
+idempotency, dependency direction, compatibility, and the discriminating tests
+before the local EM and coder act. If those choices are implicit, the weaker
+tiers cannot reconstruct them later. Role-shaped, self-contained guidance puts
+the judgment at the capability level that owns it without changing the
+freeze-to-plan-to-code workflow.
+
+**Do not suggest:** a blanket `print()`/Ruff `T20` gate (intentional CLI output
+is valid); assigning SOLID review to the conductor; adding an application-code
+reviewer implicitly; or replacing concrete ACs/contracts/tests with “follow
+SOLID” prose.
+
 ## D-179 — 2026-08-30 — Test listen backlog raised from 1 to 64 for port-sharing tests
 
 **Decision:** `test_shared_default_ports_report_the_port_not_the_process` sets `sock.listen(64)` instead of `sock.listen(1)`.
