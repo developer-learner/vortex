@@ -711,3 +711,319 @@ def test_streaming_preserves_upstream_error_status(tmp_path: Path) -> None:
     finally:
         proc.kill()
         proc.wait(timeout=5)
+
+
+# ---------------------------------------------------------------------------
+# async-202 load/unload contract (A–G).
+#
+# The single target mutation methods are manager.load(public_id) and
+# manager.unload(public_id): each does SYNCHRONOUS admission then returns
+# promptly {"operation": <id>, "model": <id>} while the spawn/terminate runs in
+# the background. Completion is observed via the operation store (ops.snapshot).
+# A conflicting concurrent mutation raises vortex.manager.BusyError; an exact
+# duplicate returns the EXISTING operation.
+#
+# These tests are authored purely from the contract. They are DELIBERATELY RED
+# against the current code, where load()/unload() are synchronous and there is
+# no single-slot serialization, no BusyError, and no duplicate dedup. Each
+# blocking test runs the mutation on a background thread with a bounded join so
+# the current code's synchronous blocking surfaces as a failed assertion, never
+# a hung suite; a finally always releases the event and joins.
+# ---------------------------------------------------------------------------
+
+import threading as _threading  # noqa: E402 — appended contract block, kept local
+
+
+class _StubSidecars:
+    """Sidecar store stub used only for admission preflight.
+
+    identifies() -> False is safe here: occupying_pid() reports the port FREE,
+    so the load/unload admission path never consults identity — the request is
+    accepted rather than 409'd on an unidentified-occupant preflight.
+    """
+
+    def identifies(self, public_id: str, pid: int) -> bool:  # noqa: ARG002
+        return False
+
+
+class _StubLifecycle:
+    """Minimal Lifecycle mirroring only the methods Manager calls on the
+    load/unload path, so A–E and G are deterministic with no real processes.
+
+    Admission PASSES: occupying_pid -> None (port free), owner_status ->
+    'unloaded', is_verified -> False, sidecars.identifies -> False.
+
+    spawn()/terminate() optionally block on a caller-controlled threading.Event
+    so a mutation can be pinned 'in flight', and spawn() can be told to raise.
+    """
+
+    def __init__(
+        self,
+        *,
+        spawn_result: tuple[object, bool] = (None, True),
+        spawn_event: _threading.Event | None = None,
+        spawn_exc: BaseException | None = None,
+        terminate_result: bool = True,
+        terminate_event: _threading.Event | None = None,
+    ) -> None:
+        self.spawn_result = spawn_result
+        self.spawn_event = spawn_event
+        self.spawn_exc = spawn_exc
+        self.terminate_result = terminate_result
+        self.terminate_event = terminate_event
+        self.sidecars = _StubSidecars()
+        self.spawn_calls = 0
+        self.terminate_calls = 0
+
+    def occupying_pid(self, entry: CatalogEntry) -> None:  # noqa: ARG002
+        return None
+
+    def owner_status(self, entry: CatalogEntry, pid: object) -> str:  # noqa: ARG002
+        return "unloaded"
+
+    def is_verified(self, entry: CatalogEntry) -> bool:  # noqa: ARG002
+        return False
+
+    def spawn(self, entry: CatalogEntry) -> tuple[object, bool]:  # noqa: ARG002
+        self.spawn_calls += 1
+        if self.spawn_event is not None:
+            self.spawn_event.wait()
+        if self.spawn_exc is not None:
+            raise self.spawn_exc
+        return self.spawn_result
+
+    def terminate(self, entry: CatalogEntry) -> bool:  # noqa: ARG002
+        self.terminate_calls += 1
+        if self.terminate_event is not None:
+            self.terminate_event.wait()
+        return self.terminate_result
+
+
+def _two_entry_catalog() -> Catalog:
+    """A real Catalog with two entries on distinct public_ids and distinct
+    ports (the catalog rejects duplicate ports)."""
+    return Catalog(entries=[
+        _entry_for(_free_port(), public_id="A"),
+        _entry_for(_free_port(), public_id="B"),
+    ])
+
+
+def _bg_call(fn, *args):  # noqa: ANN001, ANN202 — test helper
+    """Run fn(*args) on a daemon thread, capturing its return in box['result']
+    or its exception in box['exc']. Returns (thread, box)."""
+    box: dict = {}
+
+    def _target() -> None:
+        try:
+            box["result"] = fn(*args)
+        except BaseException as exc:  # noqa: BLE001 — captured for assertion
+            box["exc"] = exc
+
+    thread = _threading.Thread(target=_target, daemon=True)
+    thread.start()
+    return thread, box
+
+
+def _poll_until(pred, timeout: float = 3.0) -> bool:  # noqa: ANN001 — test helper
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if pred():
+            return True
+        time.sleep(0.01)
+    return False
+
+
+def test_async_load_returns_while_worker_blocked(tmp_path: Path) -> None:
+    """Contract A — prompt 202 while worker blocked.
+
+    manager.load() must RETURN promptly while the background spawn is still
+    blocked on the event; the operation is observable as 'loading' before the
+    event is released; releasing it drives the op to 'ready'. Proves the return
+    does not block on the spawn. RED on current code: load() is synchronous, so
+    the background caller thread stays alive (blocked in spawn) past the bound.
+    """
+    event = _threading.Event()
+    lifecycle = _StubLifecycle(spawn_event=event)
+    ops = OperationStore()
+    mgr = Manager(_two_entry_catalog(), lifecycle, ops)
+    t, box = _bg_call(mgr.load, "A")
+    try:
+        t.join(timeout=2.0)
+        assert not t.is_alive(), "load() blocked on the spawn — it must return promptly"
+        assert box["result"]["model"] == "A"
+        op_id = box["result"]["operation"]
+        assert ops.snapshot(op_id)["state"] == "loading", "op must be observable as loading"
+        event.set()
+        assert _ops_wait(ops, op_id, "ready")["state"] == "ready"
+    finally:
+        event.set()
+        t.join(timeout=5)
+
+
+def test_async_unload_returns_while_worker_blocked(tmp_path: Path) -> None:
+    """Contract B — observable unloading.
+
+    manager.unload() must RETURN promptly while terminate is still blocked; the
+    op is observable as 'unloading'; releasing the event drives it to
+    'unloaded'. RED on current code for the same reason as A (unload is
+    synchronous).
+    """
+    event = _threading.Event()
+    lifecycle = _StubLifecycle(terminate_event=event, terminate_result=True)
+    ops = OperationStore()
+    mgr = Manager(_two_entry_catalog(), lifecycle, ops)
+    t, box = _bg_call(mgr.unload, "A")
+    try:
+        t.join(timeout=2.0)
+        assert not t.is_alive(), "unload() blocked on terminate — it must return promptly"
+        op_id = box["result"]["operation"]
+        assert ops.snapshot(op_id)["state"] == "unloading", "op must be observable as unloading"
+        event.set()
+        assert _ops_wait(ops, op_id, "unloaded")["state"] == "unloaded"
+    finally:
+        event.set()
+        t.join(timeout=5)
+
+
+def test_single_slot_load_in_flight_rejects_second_load(tmp_path: Path) -> None:
+    """Contract C — single slot -> 409/BusyError (load vs load).
+
+    While load('A') is in flight (worker blocked), a load('B') must raise
+    vortex.manager.BusyError and create NO second in-flight operation and NO
+    second worker. Releasing the event lets the first op still complete. RED on
+    current code: there is no BusyError and the second load blocks on the shared
+    lock instead of failing fast.
+    """
+    import vortex.manager as vortex_manager
+
+    event = _threading.Event()
+    lifecycle = _StubLifecycle(spawn_event=event)
+    ops = OperationStore()
+    mgr = Manager(_two_entry_catalog(), lifecycle, ops)
+    t1, box1 = _bg_call(mgr.load, "A")
+    try:
+        assert _poll_until(
+            lambda: lifecycle.spawn_calls >= 1 and ops.active_for("A") is not None
+        ), "first load never reached its blocked spawn"
+        t2, box2 = _bg_call(mgr.load, "B")
+        t2.join(timeout=2.0)
+        assert not t2.is_alive(), "second mutation blocked instead of failing fast (BusyError)"
+        assert isinstance(box2.get("exc"), vortex_manager.BusyError), (
+            f"conflicting load must raise BusyError, got {box2!r}"
+        )
+        assert ops.active_for("B") is None, "rejected load must not create a second in-flight op"
+        assert lifecycle.spawn_calls == 1, "rejected load must not start a second worker"
+        event.set()
+        assert _ops_wait(ops, box1["result"]["operation"], "ready")["state"] == "ready"
+    finally:
+        event.set()
+        t1.join(timeout=5)
+
+
+def test_single_slot_load_in_flight_rejects_unload(tmp_path: Path) -> None:
+    """Contract C — single slot -> BusyError (load vs unload collision).
+
+    With load('A') in flight, an unload of the SAME model ('A') and an unload of
+    a DIFFERENT model ('B') must both raise BusyError, and terminate must never
+    be called. Releasing the event lets the first op still complete. RED on
+    current code (no BusyError; the unload blocks on the shared lock).
+    """
+    import vortex.manager as vortex_manager
+
+    event = _threading.Event()
+    lifecycle = _StubLifecycle(spawn_event=event)
+    ops = OperationStore()
+    mgr = Manager(_two_entry_catalog(), lifecycle, ops)
+    t1, box1 = _bg_call(mgr.load, "A")
+    try:
+        assert _poll_until(
+            lambda: lifecycle.spawn_calls >= 1 and ops.active_for("A") is not None
+        ), "first load never reached its blocked spawn"
+
+        t_same, box_same = _bg_call(mgr.unload, "A")
+        t_same.join(timeout=2.0)
+        assert not t_same.is_alive(), "same-model unload blocked instead of BusyError"
+        assert isinstance(box_same.get("exc"), vortex_manager.BusyError), (
+            f"unload('A') during load('A') must raise BusyError, got {box_same!r}"
+        )
+
+        t_diff, box_diff = _bg_call(mgr.unload, "B")
+        t_diff.join(timeout=2.0)
+        assert not t_diff.is_alive(), "different-model unload blocked instead of BusyError"
+        assert isinstance(box_diff.get("exc"), vortex_manager.BusyError), (
+            f"unload('B') during load('A') must raise BusyError, got {box_diff!r}"
+        )
+
+        assert lifecycle.terminate_calls == 0, "a rejected unload must not call terminate"
+        event.set()
+        assert _ops_wait(ops, box1["result"]["operation"], "ready")["state"] == "ready"
+    finally:
+        event.set()
+        t1.join(timeout=5)
+
+
+def test_exact_duplicate_load_returns_existing_operation(tmp_path: Path) -> None:
+    """Contract D — exact duplicate -> existing op.
+
+    While load('A') is in flight, a second load('A') returns the SAME operation
+    id, starts no second worker, and creates no second op. RED on current code:
+    the duplicate blocks on the shared lock and (once past it) would create a
+    fresh operation via ops.create.
+    """
+    event = _threading.Event()
+    lifecycle = _StubLifecycle(spawn_event=event)
+    ops = OperationStore()
+    mgr = Manager(_two_entry_catalog(), lifecycle, ops)
+    t1, box1 = _bg_call(mgr.load, "A")
+    try:
+        assert _poll_until(
+            lambda: lifecycle.spawn_calls >= 1 and ops.active_for("A") is not None
+        ), "first load never reached its blocked spawn"
+        first_op = ops.active_for("A")
+        t2, box2 = _bg_call(mgr.load, "A")
+        t2.join(timeout=2.0)
+        assert not t2.is_alive(), "duplicate load blocked instead of returning the existing op"
+        assert box2["result"]["operation"] == first_op, (
+            "exact-duplicate load must return the existing operation id"
+        )
+        assert lifecycle.spawn_calls == 1, "duplicate load must not start a second worker"
+        event.set()
+        assert _ops_wait(ops, first_op, "ready")["state"] == "ready"
+    finally:
+        event.set()
+        t1.join(timeout=5)
+
+
+def test_background_spawn_exception_drives_op_to_error(tmp_path: Path) -> None:
+    """Contract E — background exception -> terminal error.
+
+    A spawn that raises (any exception) must drive the operation to terminal
+    'error', never leave it stuck in 'loading'. RED on current code: the
+    synchronous load() does not catch a bare Exception, so it propagates out of
+    load() and the op is left in 'loading'.
+    """
+    lifecycle = _StubLifecycle(spawn_exc=RuntimeError("boom in spawn"))
+    ops = OperationStore()
+    mgr = Manager(_two_entry_catalog(), lifecycle, ops)
+    op_id = mgr.load("A")["operation"]
+    assert _ops_wait(ops, op_id, "error")["state"] == "error"
+
+
+def test_success_paths_reach_terminal_states(tmp_path: Path) -> None:
+    """Contract G — success reaches terminal.
+
+    A spawn returning (None, True) drives load to 'ready'; a terminate returning
+    True drives unload to 'unloaded'. This is a success anchor for the stub
+    harness and may already pass on the current code — it pins the happy path so
+    a regression in the terminal-state transitions is caught.
+    """
+    ops = OperationStore()
+    catalog = _two_entry_catalog()
+
+    load_life = _StubLifecycle(spawn_result=(None, True))
+    load_op = Manager(catalog, load_life, ops).load("A")["operation"]
+    assert _ops_wait(ops, load_op, "ready")["state"] == "ready"
+
+    unload_life = _StubLifecycle(terminate_result=True)
+    unload_op = Manager(catalog, unload_life, ops).unload("B")["operation"]
+    assert _ops_wait(ops, unload_op, "unloaded")["state"] == "unloaded"
