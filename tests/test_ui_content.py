@@ -45,3 +45,17 @@ def test_ram_bar_zones_present() -> None:
 def test_no_external_assets() -> None:
     assert 'src="http' not in UI_PAGE
     assert 'href="http' not in UI_PAGE
+
+
+def test_dashboard_surfaces_fetch_failures() -> None:
+    """No poll/action failure is silently discarded (audit finding #5): there are
+    no empty catch handlers, and failures route to an operator-visible surface.
+
+    Observes only the locked UI_PAGE surface, so it asserts on source shape —
+    the same contract style as the rest of this file.
+    """
+    assert "catch(function () {})" not in UI_PAGE, "an empty catch silently drops a failure"
+    assert 'id="uierror"' in UI_PAGE, "a visible error banner element must exist"
+    assert "function setError" in UI_PAGE, "a setError surface must exist"
+    # catalog, wrappers, operation-poll, action, discover — each surfaced.
+    assert UI_PAGE.count("setError(") >= 5, "failure paths must route to setError"
