@@ -40,7 +40,7 @@ class Manager:
         out = []
         for e in self.catalog.entries:
             pid = self.lifecycle.occupying_pid(e)
-            if self.lifecycle.owner_status(e, pid) == "ready":
+            if self.lifecycle.owner_status(e, pid) == "ready" and self.lifecycle.is_verified(e):
                 out.append(e)
         return out
 
@@ -51,7 +51,8 @@ class Manager:
             if op is not None:
                 return op.state
         status = self.lifecycle.owner_status(entry, pid)
-        return "ready" if status == "ready" else "unloaded"
+        verified = status == "ready" and self.lifecycle.is_verified(entry)
+        return "ready" if verified else "unloaded"
 
     def eviction_required(self, entry: CatalogEntry) -> list[CatalogEntry]:
         """Loaded models that would need eviction for this entry, or []."""

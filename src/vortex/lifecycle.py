@@ -287,6 +287,7 @@ class Lifecycle:
         self.ready_timeout = ready_timeout
         self.processes: dict[str, subprocess.Popen | None] = {}
         self._last_status: dict[str, str] = {}
+        self._verified: set[str] = set()
 
     def occupying_pid(self, entry: CatalogEntry) -> int | None | _ScanState:
         return _scan_port(entry.port)
@@ -335,6 +336,18 @@ class Lifecycle:
         """Port ownership PLUS a 200 on /v1/models PLUS a real completion."""
         return _responds_ready(entry.ready_url) and _anneal_probe(entry.chat_endpoint)
 
+    def is_verified(self, entry: CatalogEntry) -> bool:
+        """Whether a load/adopt THIS session confirmed the entry serves inference.
+
+        Truthful readiness (finding #1): structural port ownership is not enough
+        to advertise 'ready' — an identified process can answer /v1/models while
+        its inference path still 503s (the phantom-ready class, D-174). This flag
+        is set only when an anneal completion actually succeeded, so a caller can
+        gate 'ready' on it. It is a cheap in-memory check by design: steady-state
+        reads consult it, they never re-probe the runtime.
+        """
+        return entry.public_id in self._verified
+
     def spawn(self, entry: CatalogEntry) -> tuple[subprocess.Popen | None, bool]:
         """Spawn the entry's launch command. Returns (process, became_ready).
 
@@ -357,7 +370,17 @@ class Lifecycle:
                 pid=occupant,
             )
         if occupant is not None:
+            # Adoption is not free readiness: probe the inference path before
+            # advertising an identified-but-possibly-wedged process as ready.
+            if not self._harmonic_ready(entry):
+                logger.warning(
+                    "%s identified on :%d but not serving inference — not ready",
+                    entry.public_id, entry.port,
+                )
+                self._verified.discard(entry.public_id)
+                return None, False
             logger.info("%s already serving on :%d — adopting", entry.public_id, entry.port)
+            self._verified.add(entry.public_id)
             return None, True
 
         proc = subprocess.Popen(
@@ -375,6 +398,7 @@ class Lifecycle:
                 self.owner_status(entry, self.occupying_pid(entry)) == "ready"
                 and self._harmonic_ready(entry)
             ):
+                self._verified.add(entry.public_id)
                 return proc, True
             if proc.poll() is not None:
                 raise SpawnError(f"{entry.public_id} exited early rc={proc.returncode}", rc=proc.returncode)
@@ -395,6 +419,7 @@ class Lifecycle:
         if occupant is None:
             self.processes[entry.public_id] = None
             self.sidecars.drop(entry.public_id)
+            self._verified.discard(entry.public_id)
             return False
         if not self.sidecars.identifies(entry.public_id, occupant):
             logger.warning("refusing to terminate unidentified pid %s on :%d", occupant, entry.port)
@@ -403,6 +428,7 @@ class Lifecycle:
         _terminate_pid(occupant)
         self.processes[entry.public_id] = None
         self.sidecars.drop(entry.public_id)
+        self._verified.discard(entry.public_id)
         return True
 
 
