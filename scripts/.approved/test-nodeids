@@ -6,6 +6,9 @@ tests/test_anneal_retry.py::test_anneal_bounds_are_bounded
 tests/test_catalog.py::test_catalog_entry_roundtrip
 tests/test_catalog.py::test_catalog_rejects_duplicate_public_ids
 tests/test_catalog.py::test_catalog_rejects_duplicate_ports
+tests/test_catalog.py::test_catalog_rejects_non_http_url
+tests/test_catalog.py::test_catalog_rejects_nonpositive_ram
+tests/test_catalog.py::test_catalog_rejects_nonpositive_ctx
 tests/test_catalog.py::test_catalog_rejects_empty_launch_command
 tests/test_catalog.py::test_catalog_rejects_bad_public_id
 tests/test_catalog.py::test_load_catalog_from_json
@@ -19,6 +22,11 @@ tests/test_cli.py::test_load_success_polls_to_ready
 tests/test_cli.py::test_load_failure_returns_1
 tests/test_cli.py::test_unload_success
 tests/test_cli.py::test_unload_failure_returns_1
+tests/test_cli.py::test_request_timeout_is_controlled_not_traceback
+tests/test_cli.py::test_http_error_status_is_controlled
+tests/test_cli.py::test_malformed_load_response_is_controlled
+tests/test_cli.py::test_poll_has_a_deadline
+tests/test_cli.py::test_load_no_wait_skips_polling
 tests/test_discovery.py::test_registry_covers_the_named_wrappers
 tests/test_discovery.py::test_registry_entries_are_sane_and_ordered
 tests/test_discovery.py::test_finds_an_installed_binary_on_path
@@ -44,6 +52,12 @@ tests/test_memory_figure.py::test_activity_monitor_missing_keys_report_zero
 tests/test_memory_figure.py::test_ram_used_prefers_vm_stat_and_names_it
 tests/test_memory_figure.py::test_psutil_fallback_is_labeled_never_silent
 tests/test_memory_figure.py::test_status_api_names_the_memory_source
+tests/test_operations.py::test_update_missing_op_returns_false
+tests/test_operations.py::test_update_present_op_returns_true
+tests/test_operations.py::test_snapshot_is_a_copy
+tests/test_operations.py::test_retention_caps_total_ops
+tests/test_operations.py::test_retention_expires_old_completed_ops
+tests/test_operations.py::test_retention_never_prunes_in_flight_ops
 tests/test_serve.py::test_unidentified_occupant_refused
 tests/test_serve.py::test_adopt_surviving_runtime_and_load
 tests/test_serve.py::test_proxy_non_streaming
@@ -54,6 +68,8 @@ tests/test_serve.py::test_proxy_forwards_public_id_when_no_upstream_alias
 tests/test_serve.py::test_proxy_unloaded_model_404
 tests/test_serve.py::test_unload_terminates_child
 tests/test_serve.py::test_spawn_from_launch_command
+tests/test_serve.py::test_load_returns_before_ready
+tests/test_serve.py::test_failed_load_reaches_error_operation
 tests/test_serve.py::test_load_conflict_reports_eviction
 tests/test_serve.py::test_unknown_model_load_404
 tests/test_serve.py::test_spawn_waits_for_anneal_before_ready
@@ -62,6 +78,7 @@ tests/test_serve.py::test_unhealthy_adoption_never_advertised_ready
 tests/test_serve.py::test_failed_spawn_leaves_no_owned_process_or_sidecar
 tests/test_serve.py::test_steady_state_reads_do_not_probe_runtime
 tests/test_serve.py::test_unverified_running_model_still_counts_for_admission
+tests/test_serve.py::test_streaming_preserves_upstream_error_status
 tests/test_ui_api_contract.py::test_catalog_response_is_enveloped
 tests/test_ui_api_contract.py::test_ui_only_reads_catalog_fields_the_api_returns
 tests/test_ui_api_contract.py::test_ui_only_reads_status_fields_the_api_returns
@@ -78,6 +95,7 @@ tests/test_ui_content.py::test_conflict_card_elements_present
 tests/test_ui_content.py::test_down_state_elements_present
 tests/test_ui_content.py::test_ram_bar_zones_present
 tests/test_ui_content.py::test_no_external_assets
+tests/test_ui_content.py::test_dashboard_surfaces_fetch_failures
 tests/test_ui_engine_wrappers.py::test_ui_has_engine_wrappers_section
 tests/test_ui_engine_wrappers.py::test_ui_fetches_the_inventory_endpoint
 tests/test_ui_engine_wrappers.py::test_ui_renders_wrapper_fields_from_the_api
