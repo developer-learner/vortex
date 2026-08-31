@@ -401,7 +401,13 @@ def test_spawn_waits_for_anneal_before_ready(tmp_path: Path) -> None:
 
 
 def test_spawn_fails_when_chat_never_succeeds(tmp_path: Path) -> None:
-    """A runtime whose chat never leaves 503 must fail the load, not go ready."""
+    """A runtime whose chat never leaves 503 must fail the load, not go ready.
+
+    v22 reconciliation: the lifecycle now cleans up the failed process at
+    spawn failure, so the mock server is no longer reachable after the load
+    fails — this test no longer queries it. The post-failure cleanup itself
+    is pinned by test_failed_spawn_leaves_no_owned_process_or_sidecar (C1).
+    """
     port = _free_port()
     catalog = Catalog(entries=[_entry(
         public_id="m1",
@@ -415,15 +421,6 @@ def test_spawn_fails_when_chat_never_succeeds(tmp_path: Path) -> None:
     with pytest.raises(SpawnError):
         mgr.load("m1")
     assert ops.active_for("m1") is None, "no lingering loading op"
-    import httpx
-
-    received = httpx.get(f"http://127.0.0.1:{port}/mock/received", timeout=2).json()
-    assert received["chat_calls"] > 0, "anneal probes must have been attempted"
-    pid = _find_listening_pid(port)
-    if pid is not None:
-        import psutil
-
-        psutil.Process(pid).terminate()
 
 
 def test_unhealthy_adoption_never_advertised_ready(tmp_path: Path) -> None:

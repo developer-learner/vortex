@@ -48,6 +48,9 @@ tests/test_serve.py::test_unidentified_occupant_refused
 tests/test_serve.py::test_adopt_surviving_runtime_and_load
 tests/test_serve.py::test_proxy_non_streaming
 tests/test_serve.py::test_proxy_streaming_passthrough
+tests/test_serve.py::test_proxy_non_streaming_remaps_public_id_to_upstream_alias
+tests/test_serve.py::test_proxy_streaming_remaps_public_id_to_upstream_alias
+tests/test_serve.py::test_proxy_forwards_public_id_when_no_upstream_alias
 tests/test_serve.py::test_proxy_unloaded_model_404
 tests/test_serve.py::test_unload_terminates_child
 tests/test_serve.py::test_spawn_from_launch_command
@@ -55,6 +58,10 @@ tests/test_serve.py::test_load_conflict_reports_eviction
 tests/test_serve.py::test_unknown_model_load_404
 tests/test_serve.py::test_spawn_waits_for_anneal_before_ready
 tests/test_serve.py::test_spawn_fails_when_chat_never_succeeds
+tests/test_serve.py::test_unhealthy_adoption_never_advertised_ready
+tests/test_serve.py::test_failed_spawn_leaves_no_owned_process_or_sidecar
+tests/test_serve.py::test_steady_state_reads_do_not_probe_runtime
+tests/test_serve.py::test_unverified_running_model_still_counts_for_admission
 tests/test_ui_api_contract.py::test_catalog_response_is_enveloped
 tests/test_ui_api_contract.py::test_ui_only_reads_catalog_fields_the_api_returns
 tests/test_ui_api_contract.py::test_ui_only_reads_status_fields_the_api_returns

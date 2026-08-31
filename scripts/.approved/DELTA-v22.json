@@ -1,0 +1,10 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_serve.py::test_spawn_fails_when_chat_never_succeeds"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": []
+}
