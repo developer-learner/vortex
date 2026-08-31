@@ -139,6 +139,19 @@ tbody tr.empty td {
 }
 .status-dot.loaded { background: var(--ok); }
 .status-dot.loading { background: var(--warn); }
+.badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim);
+  vertical-align: middle;
+}
+.badge.dflash { border-color: var(--accent); color: var(--accent); }
 button {
   font: inherit;
   font-size: 12px;
@@ -291,7 +304,11 @@ footer {
       }
       html += "<tr>";
       html += "<td>" + dot + (loading ? "loading…" : loaded ? "loaded" : "idle") + "</td>";
-      html += "<td>" + esc(m.public_id) + "</td>";
+      var isDflash = m.engine === "mlx-dflash2";
+      var engBadge = isDflash
+        ? '<span class="badge dflash" title="oMLX speculative decoding via ' + esc(m.upstream_alias || "DFlash2 draft") + '">DFlash2</span>'
+        : '<span class="badge" title="engine: ' + esc(m.engine) + '">' + esc(m.engine) + '</span>';
+      html += "<td>" + esc(m.public_id) + engBadge + "</td>";
       html += "<td>" + esc(m.ram_estimate_gb) + " GiB</td>";
       html += "<td>" + actBtn + "</td>";
       html += "</tr>";
