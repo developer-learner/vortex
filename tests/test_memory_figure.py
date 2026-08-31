@@ -12,9 +12,9 @@ from fastapi.testclient import TestClient
 
 from vortex.app import build_app
 from vortex.catalog import Catalog
-from vortex.manager import _activity_monitor_used_gb, _ram_used
+from vortex.memory import _activity_monitor_used_gb, _ram_used
 
-import vortex.manager as manager_module
+import vortex.memory as memory_module
 
 
 def test_activity_monitor_parse_matches_the_vm_stat_arithmetic(
@@ -32,7 +32,7 @@ def test_activity_monitor_parse_matches_the_vm_stat_arithmetic(
         "Pages occupied by compressor:           702144.",
     ])
     monkeypatch.setattr(
-        manager_module.subprocess,
+        memory_module.subprocess,
         "run",
         lambda *a, **k: type("R", (), {"stdout": canned, "returncode": 0})(),
     )
@@ -47,7 +47,7 @@ def test_activity_monitor_missing_keys_report_zero(monkeypatch) -> None:
     """An unreadable vm_stat output must report 0.0 (degraded source), never
     a partial sum that silently understates usage."""
     monkeypatch.setattr(
-        manager_module.subprocess,
+        memory_module.subprocess,
         "run",
         lambda *a, **k: type("R", (), {"stdout": "Pages free: 1.\n", "returncode": 0})(),
     )
@@ -55,12 +55,12 @@ def test_activity_monitor_missing_keys_report_zero(monkeypatch) -> None:
 
 
 def test_ram_used_prefers_vm_stat_and_names_it() -> None:
-    saved = manager_module._activity_monitor_used_gb
-    manager_module._activity_monitor_used_gb = lambda: 100.0  # type: ignore[assignment]
+    saved = memory_module._activity_monitor_used_gb
+    memory_module._activity_monitor_used_gb = lambda: 100.0  # type: ignore[assignment]
     try:
         value, source = _ram_used()
     finally:
-        manager_module._activity_monitor_used_gb = saved  # type: ignore[assignment]
+        memory_module._activity_monitor_used_gb = saved  # type: ignore[assignment]
     assert value == 100.0
     assert source == "vm_stat"
 
@@ -69,7 +69,7 @@ def test_psutil_fallback_is_labeled_never_silent(monkeypatch) -> None:
     """When vm_stat is unavailable (non-macOS host), the figure still computes
     — but the caller can see it switched basis instead of being surprised by
     a ~15GB jump with no explanation."""
-    monkeypatch.setattr(manager_module, "_activity_monitor_used_gb", lambda: 0.0)
+    monkeypatch.setattr(memory_module, "_activity_monitor_used_gb", lambda: 0.0)
     value, source = _ram_used()
     assert source == "psutil"
     assert value > 0.0
