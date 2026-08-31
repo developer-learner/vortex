@@ -26,9 +26,8 @@ from .lifecycle import (
     as_pid,
     log_stale_sidecars,
 )
-from .manager import (
-    Manager,
-    MemoryConflict,
+from .manager import Manager, MemoryConflict
+from .memory import (
     estimate_ram_total_gb,
     estimate_ram_used_gb,
     ram_used_source,
