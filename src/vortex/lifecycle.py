@@ -401,9 +401,24 @@ class Lifecycle:
                 self._verified.add(entry.public_id)
                 return proc, True
             if proc.poll() is not None:
-                raise SpawnError(f"{entry.public_id} exited early rc={proc.returncode}", rc=proc.returncode)
+                rc = proc.returncode
+                self._cleanup_failed_spawn(entry, proc)
+                raise SpawnError(f"{entry.public_id} exited early rc={rc}", rc=rc)
             time.sleep(POLL_INTERVAL_SECONDS)
+        self._cleanup_failed_spawn(entry, proc)
         raise SpawnError(f"{entry.public_id} not ready within timeout", rc=None)
+
+    def _cleanup_failed_spawn(self, entry: CatalogEntry, proc: subprocess.Popen) -> None:
+        """A failed spawn must leave no Vortex-owned process or misleading sidecar,
+        so a retry cannot adopt the failed runtime as ready. The process is one we
+        started this session (positively ours), so terminating it never touches an
+        unidentified occupant.
+        """
+        _terminate_process_group(proc.pid)
+        _terminate_pid(proc.pid)
+        self.processes[entry.public_id] = None
+        self.sidecars.drop(entry.public_id)
+        self._verified.discard(entry.public_id)
 
     def terminate(self, entry: CatalogEntry) -> bool:
         """Terminate the entry's process IF positively identified; else False."""
