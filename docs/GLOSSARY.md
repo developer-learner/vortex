@@ -62,9 +62,19 @@ from the bottom up:
   (1.0 s tolerance). Anything else on a configured port is
   **unidentified**: never claimed, never terminated, never evicted — the
   load/unload is refused with a clear error instead.
-- **Continuous readiness probing** — loading is defined as "the ready URL
-  answers 200"; there is no byte-progress reporting in v1. Poll phases, not
-  bytes.
+- **Harmonic readiness** — a model is *ready* only when three things hold
+  together: the port is owned by a process modelmux identifies (PID +
+  start-time sidecar match), the ready URL (`/v1/models`) answers 200, and a
+  real 1-token anneal completion succeeds. Structural port ownership alone is
+  not enough — an identified process can answer `/v1/models` while its
+  inference path still 503s (the phantom-ready class). There is no
+  byte-progress reporting in v1; poll phases, not bytes.
+- **Session verification** — readiness is confirmed once, on load or adopt,
+  by running the harmonic probe. When it succeeds the entry is marked
+  verified; steady-state reads consult that in-memory flag rather than
+  re-probing the runtime. The flag clears when the runtime terminates, so a
+  verified runtime that later degrades but stays alive is not re-probed until
+  it terminates.
 
 ## Operations contract
 
