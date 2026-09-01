@@ -71,7 +71,8 @@ class OperationStore:
 
     def get(self, op_id: str) -> Operation | None:
         with self._lock:
-            return self._ops.get(op_id)
+            op = self._ops.get(op_id)
+            return replace(op) if op is not None else None
 
     def update(self, op_id: str, *, state: MODEL_STATES | None = None,
                phase: str | None = None, message: str | None = None) -> bool:

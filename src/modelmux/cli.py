@@ -142,8 +142,8 @@ def main(argv: list[str] | None = None) -> int:
     except httpx.HTTPError as exc:
         print(f"request failed: {exc} ({type(exc).__name__})", file=sys.stderr)
         return 1
-    except (KeyError, ValueError) as exc:
-        print(f"unexpected response from daemon (missing/invalid {exc})", file=sys.stderr)
+    except (KeyError, ValueError, TypeError, AttributeError) as exc:
+        print(f"unexpected response from daemon (missing/invalid/mistyped {exc})", file=sys.stderr)
         return 1
 
 
