@@ -9,6 +9,64 @@
 > where a historical note conflicts with current repository state, this
 > section controls status.
 
+## Status summary — through v26 (2026-09-01)
+
+> The SOLID/async audit remediation is complete and on `origin/main` at **v26**
+> (`06adaa9`), green through the local suite (115), the push release-gate (538
+> control-plane selftests), and GitHub CI (lint / type / tests / coverage).
+> Items are numbered per the canonical register below.
+
+**Done — SOLID/async audit remediation (shipped across v22–v26):**
+
+- [x] Proxy **alias remap** — a client's `public_id` reaches the runtime as its
+  `upstream_alias`, on both the streaming and non-streaming paths.
+- [x] **Readiness truthful for adoption** — an identified-but-unhealthy adopted
+  process is never advertised ready; verification is a load/adopt-time anneal,
+  not a per-read probe (guarded so steady-state reads issue zero probes).
+- [x] **Admission accounting** — an identified, RAM-consuming but unverified
+  runtime still counts for eviction/admission (no memory undercount).
+- [x] **Failed-startup cleanup** — a failed spawn terminates its own process and
+  drops its sidecar, so a retry cannot adopt the corpse.
+- [x] **Streaming upstream-status preservation** — an upstream 4xx/5xx on a
+  streaming request no longer surfaces as a 200 event-stream.
+- [x] **CLI bounded/normalized failures** — poll deadline, controlled exit codes
+  (no tracebacks), real `--wait`/`--no-wait`.
+- [x] **Dashboard failure-visibility** — empty `catch` handlers replaced with a
+  visible `#uierror` surface; and (v26) routine polls no longer clear an error
+  the operator needs to see — only a user action or a completed operation does.
+- [x] **Catalog construction invariants** (unique non-null ports) + **operation
+  store** atomic snapshot + bounded retention (prerequisites).
+- [x] **Async-202 unified single-slot worker (v24/v25)** — one Manager-owned
+  slot, prompt `202`+operation; `BusyError`→`409` on a conflicting concurrent
+  mutation (never silently queued); exact duplicate → the existing operation;
+  every background exception drives the operation to terminal `error`. The
+  dual-path `load_async`/`unload_async` is removed. Blind-authored concurrency
+  oracle is in the frozen suite.
+
+**Done — earlier register items:** 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 14; the
+three v14 tooling gaps (model-id stamp, coder archive, `fault_role`); and the
+v14 engine-wrapper-inventory milestone.
+
+**Pending:**
+
+- [ ] **4** — Vortex D-168 live-fire: one successful real multi-task run that
+  crosses a mid-run Blueprint advancement and records the unchanged plane SHA.
+- [ ] **9** — Blueprint: validate the first organic two-strike ladder climb
+  (observation trigger, not a worktree job).
+- [ ] **13** — model-specific Git provenance (CEO decision).
+- [ ] **15** — Testchat recut onto Vortex's universal surface (phase 3).
+- [ ] **16** — `LLM_ENDPOINT` cutover to `:9000/v1/chat/completions` (phase 4).
+- [ ] **17** — provisioning/tuning v2 + vmlx live exercise (memory-blocked;
+  needs the CEO to free RAM and drive from outside the session).
+- [ ] **18** — CEO-approved mature OSS adoption subject #2.
+- [ ] **19** — `vortex ctx-tune <model>` build / no-build decision.
+- [ ] **Continuous readiness monitoring** *(product decision, not a defect)* — a
+  runtime that degrades after a successful load stays advertised; readiness is
+  verified once per session. Documented as an explicit limitation in the
+  glossary.
+- [ ] **Starlette TestClient deprecation warning** (P3 cosmetic) — suite is
+  green; one dependency-migration warning remains.
+
 ### P0 closure — release repaired; one strict live-fire proof remains
 
 1. [x] **Blueprint — repair and prove the D-168 release.** The original 47
@@ -197,6 +255,16 @@ final closure ref.
 
 ## Completed milestones
 
+- [x] **v22–v26 — SOLID/async audit remediation** *(2026-08-31 → 2026-09-01)*.
+  Alias remap; truthful readiness + admission accounting + failed-startup
+  cleanup; streaming upstream-status preservation; CLI failure bounding;
+  dashboard failure-visibility; catalog construction invariants + operation-store
+  atomicity/retention; the async-202 unified single-slot worker (`BusyError`,
+  duplicate→existing op, background-exception→error) superseding v23's rejected
+  dual-path; and (v26) dashboard operation errors that persist until acted on.
+  All freeze-first with blind-authored oracles where the implementation was
+  non-trivial. `origin/main` at `06adaa9` (v26): local 115, release-gate 538,
+  GitHub CI green (lint/type/tests/coverage). See the Status summary at the top.
 - [x] **v14 (spec v20) — engine-wrapper inventory** *(2026-08-30)*. Added 4
   new wrapper specs (mlx-serve, mlx-lm-server, ds4-server, mlx-dspark), split
   mlx-lm server component into its own spec, updated all tests. Dashboard
