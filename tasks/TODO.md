@@ -156,6 +156,9 @@
 - **Priority:** roadmap decision
 - **Cost:** L if approved
 - **Blocker:** CEO build/no-build decision
+- **Status:** Decision note prepared at `tasks/T12-ctx-tune-decision.md` (build /
+  no-build / defer options + recommendation: defer until after T1). Awaiting the
+  CEO's call.
 - **Done when:** explicitly declined, or specified as a milestone covering
   workload profiling, model context probes, recommendation/application, and
   a bounded re-tuning policy.
