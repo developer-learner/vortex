@@ -8,6 +8,11 @@
 > agent-authored entries below remain untouched as historical source notes;
 > where a historical note conflicts with current repository state, this
 > section controls status.
+>
+> **Current execution checklist:** `tasks/TODO.md` is the concise, ordered
+> projection of the unchecked work below, with cost, blockers, dependencies,
+> and completion conditions. This file remains the detailed status/history
+> authority.
 
 ## Status summary — through v26 (2026-09-01)
 
@@ -23,8 +28,9 @@
 - [x] **Readiness truthful for adoption** — an identified-but-unhealthy adopted
   process is never advertised ready; verification is a load/adopt-time anneal,
   not a per-read probe (guarded so steady-state reads issue zero probes).
-- [x] **Admission accounting** — an identified, RAM-consuming but unverified
-  runtime still counts for eviction/admission (no memory undercount).
+- [x] **Identified-runtime admission accounting** — an identified,
+  RAM-consuming but unverified runtime still counts for eviction/admission.
+  Uncertain/unidentified occupancy is a separate pending policy below.
 - [x] **Failed-startup cleanup** — a failed spawn terminates its own process and
   drops its sidecar, so a retry cannot adopt the corpse.
 - [x] **Streaming upstream-status preservation** — an upstream 4xx/5xx on a
@@ -49,6 +55,13 @@ v14 engine-wrapper-inventory milestone.
 
 **Pending:**
 
+- [ ] **Fail-safe admission under uncertain occupancy** *(P1 product decision)*
+  — Manager admission is serialized for Vortex mutations, but a non-target
+  catalog entry with `SCAN_UNKNOWN` and no prior status, or an unidentified
+  occupant with a missing/invalid sidecar, is excluded from `all_ready()` and
+  can undercount catalog-associated RAM. Choose: refuse, conservatively count
+  its catalog estimate, add actual host-available memory as a bound, or a
+  documented combination. See `tasks/TODO.md` T1.
 - [ ] **4** — Vortex D-168 live-fire: one successful real multi-task run that
   crosses a mid-run Blueprint advancement and records the unchanged plane SHA.
 - [ ] **9** — Blueprint: validate the first organic two-strike ladder climb
