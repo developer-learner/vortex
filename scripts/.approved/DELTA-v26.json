@@ -1,0 +1,10 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_ui_content.py::test_routine_polls_do_not_clear_error_banner"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": []
+}

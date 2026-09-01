@@ -105,6 +105,7 @@ tests/test_ui_content.py::test_down_state_elements_present
 tests/test_ui_content.py::test_ram_bar_zones_present
 tests/test_ui_content.py::test_no_external_assets
 tests/test_ui_content.py::test_dashboard_surfaces_fetch_failures
+tests/test_ui_content.py::test_routine_polls_do_not_clear_error_banner
 tests/test_ui_engine_wrappers.py::test_ui_has_engine_wrappers_section
 tests/test_ui_engine_wrappers.py::test_ui_fetches_the_inventory_endpoint
 tests/test_ui_engine_wrappers.py::test_ui_renders_wrapper_fields_from_the_api

@@ -59,3 +59,20 @@ def test_dashboard_surfaces_fetch_failures() -> None:
     assert "function setError" in UI_PAGE, "a setError surface must exist"
     # catalog, wrappers, operation-poll, action, discover — each surfaced.
     assert UI_PAGE.count("setError(") >= 5, "failure paths must route to setError"
+
+
+def test_routine_polls_do_not_clear_error_banner() -> None:
+    """An error the user needs to see (e.g. an operation failure surfaced by
+    pollOperation) must not be wiped a beat later by a routine catalog/wrapper
+    poll's success path — only a user action or a completed operation clears the
+    banner. Static check on the locked UI_PAGE surface: the poll success bodies
+    must not call setError(null).
+    """
+    marker = "\n  function "
+    for fn in ("pollCatalog", "pollWrappers"):
+        start = UI_PAGE.index(marker + fn)
+        end = UI_PAGE.index(marker, start + len(marker))
+        body = UI_PAGE[start:end]
+        assert "setError(null)" not in body, (
+            f"{fn} clears the error banner on a routine poll — it would clobber an operation error"
+        )
