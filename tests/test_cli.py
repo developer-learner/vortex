@@ -209,6 +209,22 @@ def test_malformed_load_response_is_controlled(
     assert capsys.readouterr().err.strip()
 
 
+def test_malformed_type_response_is_controlled(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A 200 whose body is the wrong JSON type (a string, not an object) must
+    exit 1 with a message, not an uncaught TypeError/AttributeError traceback."""
+    def handler(method: str, path: str, **_kw: object) -> _Resp:
+        assert (method, path) == ("GET", "/api/status")
+        return _Resp(payload="not a dict")  # valid JSON, wrong type
+
+    _install(monkeypatch, handler)
+    assert cli.main(["status"]) == 1
+    err = capsys.readouterr().err
+    assert err.strip(), "a mistyped response must print a message to stderr"
+    assert "Traceback" not in err, "a mistyped response must not leak a traceback"
+
+
 def test_poll_has_a_deadline(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

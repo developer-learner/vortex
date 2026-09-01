@@ -48,6 +48,20 @@ def test_snapshot_is_a_copy() -> None:
     assert store.snapshot(op_id)["message"] == "work"
 
 
+def test_get_returns_a_copy() -> None:
+    """Mutating a returned get() result must not corrupt the stored operation —
+    get() hands out a copy, like snapshot(), so a reader cannot write through
+    the live registry outside the lock."""
+    store = OperationStore()
+    op_id = store.create("load", "m1")
+    store.update(op_id, state="loading", phase="spawning", message="work")
+    got = store.get(op_id)
+    got.state = "ready"
+    got.message = "tampered"
+    assert store.get(op_id).state == "loading"
+    assert store.get(op_id).message == "work"
+
+
 def test_retention_caps_total_ops() -> None:
     """A long-lived daemon must not grow the registry without bound: completed
     ops are pruned to MAX_OPS on create, oldest first."""
@@ -63,8 +77,12 @@ def test_retention_expires_old_completed_ops() -> None:
     """Completed ops older than RETENTION_SECONDS are expired on the next create."""
     store = OperationStore()
     old = _completed(store, model="old")
-    store.get(old).updated_at = time.time() - (RETENTION_SECONDS + 60)
-    new = _completed(store, model="new")  # prune runs on create
+    real_time = time.time
+    time.time = lambda: real_time() + RETENTION_SECONDS + 60
+    try:
+        new = _completed(store, model="new")  # prune runs on create
+    finally:
+        time.time = real_time
     assert store.get(old) is None, "completed op past the retention window must be pruned"
     assert store.get(new) is not None
 

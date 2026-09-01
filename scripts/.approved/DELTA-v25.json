@@ -1,0 +1,12 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_cli.py::test_malformed_type_response_is_controlled",
+    "tests/test_operations.py::test_get_returns_a_copy",
+    "tests/test_operations.py::test_retention_expires_old_completed_ops"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": []
+}

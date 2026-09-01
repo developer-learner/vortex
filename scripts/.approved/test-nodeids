@@ -25,6 +25,7 @@ tests/test_cli.py::test_unload_failure_returns_1
 tests/test_cli.py::test_request_timeout_is_controlled_not_traceback
 tests/test_cli.py::test_http_error_status_is_controlled
 tests/test_cli.py::test_malformed_load_response_is_controlled
+tests/test_cli.py::test_malformed_type_response_is_controlled
 tests/test_cli.py::test_poll_has_a_deadline
 tests/test_cli.py::test_load_no_wait_skips_polling
 tests/test_discovery.py::test_registry_covers_the_named_wrappers
@@ -55,6 +56,7 @@ tests/test_memory_figure.py::test_status_api_names_the_memory_source
 tests/test_operations.py::test_update_missing_op_returns_false
 tests/test_operations.py::test_update_present_op_returns_true
 tests/test_operations.py::test_snapshot_is_a_copy
+tests/test_operations.py::test_get_returns_a_copy
 tests/test_operations.py::test_retention_caps_total_ops
 tests/test_operations.py::test_retention_expires_old_completed_ops
 tests/test_operations.py::test_retention_never_prunes_in_flight_ops
