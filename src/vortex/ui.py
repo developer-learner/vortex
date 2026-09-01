@@ -363,7 +363,6 @@ footer {
         return r.json();
       })
       .then(function (data) {
-        setError(null);
         renderRows(data.entries);
       })
       .catch(function (e) {
@@ -428,6 +427,8 @@ footer {
             }
             if (op.state === "error") {
               setError(op.message || "operation failed");
+            } else {
+              setError(null);
             }
             pollCatalog();
             pollStatus();
