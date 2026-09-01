@@ -16,6 +16,10 @@
 - **Priority:** P1 safety hardening
 - **Cost:** M/L
 - **Blocker:** CEO/TPM must choose the conservative admission policy
+- **Status:** Decision note prepared at `tasks/T1-admission-decision.md` (options +
+  recommendation: conservatively count the catalog estimate for uncertain
+  non-target entries). Awaiting the CEO/TPM policy choice, then a controlled
+  milestone (blind tests → refreeze → implementation → gates).
 - **Risk:** Vortex serializes its own load/unload admission correctly, and an
   identified-but-unverified runtime counts toward estimated RAM. However, a
   non-target catalog entry whose scan is `SCAN_UNKNOWN` with no prior status,
@@ -36,6 +40,10 @@
 - **Priority:** P2 product-policy decision
 - **Cost:** M if implemented; XS if the current limitation is explicitly accepted
 - **Blocker:** CEO chooses whether session-latched readiness is sufficient
+- **Status:** CLOSED (2026-09-01) — no-code acceptance. The session-latched
+  readiness contract is accepted as documented (glossary *Session verification*):
+  a verified runtime that degrades but stays alive is not re-probed until it
+  terminates. A bounded re-probe policy would be a separate milestone if wanted.
 - **Current behavior:** harmonic readiness is verified on load/adopt and then
   represented by an in-memory session flag. A verified runtime that later
   degrades while remaining alive stays advertised. Steady-state reads perform
@@ -54,6 +62,11 @@
 - **Priority:** P3 maintenance
 - **Cost:** S/M
 - **Blocker:** dependency/API migration choice; no new dependency without CEO approval
+- **Status:** Investigated (2026-09-01). The warning is a
+  `StarletteDeprecationWarning` (httpx → httpx2) emitted by `fastapi/testclient.py`
+  (third-party). The proper fix is a dependency migration (httpx2 is a real
+  installable, 2.12.0) touching `requirements.txt`/`pyproject.toml` + test code →
+  a **maintenance milestone** (CEO approval), not an ad hoc change.
 - **Done when:** the full suite emits no TestClient/httpx compatibility warning,
   behavior and coverage remain green, and dependency/config changes are pinned
   through the normal stack-sync path.
@@ -150,7 +163,7 @@
 ## Recommended order
 
 1. Decide T1; it is the only remaining audit-related safety question.
-2. Decide T2; accepting the current limitation is a valid closure.
+2. ~~Decide T2~~ — closed (no-code acceptance, 2026-09-01); see the T2 Status note.
 3. Publish the documentation (T4).
 4. Execute T8 → T9; use a suitable real multi-task milestone to collect T5
    and, if it occurs organically, T6.

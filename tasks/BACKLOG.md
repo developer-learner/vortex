@@ -61,7 +61,9 @@ v14 engine-wrapper-inventory milestone.
   occupant with a missing/invalid sidecar, is excluded from `all_ready()` and
   can undercount catalog-associated RAM. Choose: refuse, conservatively count
   its catalog estimate, add actual host-available memory as a bound, or a
-  documented combination. See `tasks/TODO.md` T1.
+  documented combination. See `tasks/TODO.md` T1. Decision note prepared at
+  `tasks/T1-admission-decision.md` (recommendation: conservatively count the
+  catalog estimate for uncertain non-target entries); awaiting the policy choice.
 - [ ] **4** — Vortex D-168 live-fire: one successful real multi-task run that
   crosses a mid-run Blueprint advancement and records the unchanged plane SHA.
 - [ ] **9** — Blueprint: validate the first organic two-strike ladder climb
@@ -73,12 +75,17 @@ v14 engine-wrapper-inventory milestone.
   needs the CEO to free RAM and drive from outside the session).
 - [ ] **18** — CEO-approved mature OSS adoption subject #2.
 - [ ] **19** — `vortex ctx-tune <model>` build / no-build decision.
-- [ ] **Continuous readiness monitoring** *(product decision, not a defect)* — a
-  runtime that degrades after a successful load stays advertised; readiness is
-  verified once per session. Documented as an explicit limitation in the
-  glossary.
+- [x] **Continuous readiness monitoring** *(product decision, not a defect)* —
+  CLOSED (2026-09-01) via no-code acceptance. The session-latched readiness
+  contract is accepted as documented (glossary *Session verification*): a
+  runtime that degrades after a successful load stays advertised until it
+  terminates; readiness is verified once per session. A bounded re-probe policy
+  would be a separate milestone if wanted.
 - [ ] **Starlette TestClient deprecation warning** (P3 cosmetic) — suite is
-  green; one dependency-migration warning remains.
+  green; one dependency-migration warning remains. Investigated 2026-09-01: it
+  is a `StarletteDeprecationWarning` (httpx → httpx2) from `fastapi/testclient.py`
+  (third-party); the proper fix is a dependency migration (httpx2 2.12.0) → a
+  maintenance milestone (CEO approval), not ad hoc.
 
 ### P0 closure — release repaired; one strict live-fire proof remains
 
