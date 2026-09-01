@@ -1,0 +1,1 @@
+../../sw-dev-blueprint/scripts/git-provenance.sh
