@@ -1,0 +1,1 @@
+../../../sw-dev-blueprint/scripts/selftest/selftest_family_match.py
