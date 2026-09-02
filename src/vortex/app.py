@@ -26,7 +26,6 @@ from .lifecycle import (
     Lifecycle,
     PortConflictError,
     SidecarStore,
-    _terminate_pid,
     as_pid,
     log_stale_sidecars,
 )
