@@ -30,7 +30,6 @@ from .lifecycle import (
     _terminate_pid,
     as_pid,
     log_stale_sidecars,
-    terminate,
 )
 from .manager import BusyError, Manager, MemoryConflict
 from .memory import (
