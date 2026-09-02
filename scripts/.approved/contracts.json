@@ -1,8 +1,6 @@
 {
-  "erd_version": 20,
+  "erd_version": 27,
   "files": [
-    "src/vortex/manager.py",
-    "src/vortex/discovery.py",
     "src/vortex/app.py",
     "src/vortex/ui.py"
   ],
@@ -17,16 +15,11 @@
     "src.vortex.discovery:WrapperSpec",
     "src.vortex.discovery:WRAPPER_SPECS"
   ],
-  "no_edit_files": [
-    "src/vortex/manager.py"
+  "changed_files": [
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
   ],
-  "test_mapping": {
-    "tests/test_serve.py::test_load_conflict_reports_eviction": "src/vortex/manager.py",
-    "tests/test_serve.py::test_adopt_surviving_runtime_and_load": "src/vortex/manager.py"
-  },
-  "smoke_checks": {
-    "src/vortex/manager.py": "python3 -c \"compile(open('src/vortex/manager.py').read(), 'src/vortex/manager.py', 'exec')\""
-  },
+  "test_mapping": {},
   "routes": [
     {
       "id": "route:GET /",
@@ -79,6 +72,18 @@
       "method": "POST",
       "path": "/api/engine-wrappers/discover",
       "file": "src/vortex/app.py"
+    },
+    {
+      "id": "route:POST /api/shutdown",
+      "method": "POST",
+      "path": "/api/shutdown",
+      "file": "src/vortex/app.py"
     }
-  ]
+  ],
+  "no_edit_files": [
+    "src/vortex/manager.py"
+  ],
+  "smoke_checks": {
+    "src/vortex/manager.py": "python3 -c \"compile(open('src/vortex/manager.py').read(), 'src/vortex/manager.py', 'exec')\""
+  }
 }

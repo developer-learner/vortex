@@ -76,3 +76,30 @@ def test_routine_polls_do_not_clear_error_banner() -> None:
         assert "setError(null)" not in body, (
             f"{fn} clears the error banner on a routine poll — it would clobber an operation error"
         )
+
+
+def test_stop_vortex_button_in_header() -> None:
+    """A Stop Vortex control lives in the dashboard header (v27, AC-8)."""
+    assert 'id="stopvortex"' in UI_PAGE
+    header = UI_PAGE[UI_PAGE.index("<header>"):UI_PAGE.index("</header>")]
+    assert 'id="stopvortex"' in header, "the Stop Vortex control must be in the header"
+    assert "Stop" in header, "the control must be labelled"
+
+
+def test_stop_vortex_confirms_then_posts_shutdown() -> None:
+    """Clicking Stop Vortex confirms first, then POSTs /api/shutdown (v27, AC-8).
+
+    The confirm() argument must warn that loaded models will be unloaded, so a
+    stray click cannot power the machine down. Static check on the locked
+    UI_PAGE surface: the page's single confirm() gates the /api/shutdown POST.
+    """
+    assert "/api/shutdown" in UI_PAGE
+    assert "confirm(" in UI_PAGE, "shutdown must be gated behind a confirm()"
+    c = UI_PAGE.index("confirm(")
+    warning = UI_PAGE[c:c + 200].lower()
+    assert "unload" in warning and "model" in warning, (
+        "the confirm warning must say loaded models will be unloaded"
+    )
+    s = UI_PAGE.index("/api/shutdown")
+    near = UI_PAGE[s - 200:s + 200]
+    assert 'method: "POST"' in near, "shutdown must be issued as a POST"

@@ -1,0 +1,21 @@
+{
+  "changed_contract_ids": [
+    "route:POST /api/shutdown"
+  ],
+  "changed_tests": [
+    "tests/test_shutdown_api.py::test_shutdown_signals_stop_and_reports_nothing_loaded",
+    "tests/test_shutdown_api.py::test_shutdown_unloads_loaded_model_and_reports_it",
+    "tests/test_ui_content.py::test_stop_vortex_button_in_header",
+    "tests/test_ui_content.py::test_stop_vortex_confirms_then_posts_shutdown"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ],
+  "inventory_files": [
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ]
+}

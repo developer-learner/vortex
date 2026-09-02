@@ -92,3 +92,42 @@ owner can tell at a glance what Vortex could be pointed at.
 - **AC-6:** the dashboard provides a Discover control such that clicking
   it calls `POST /api/engine-wrappers/discover` and marks installed
   wrappers that are absent from the vortex catalog.
+
+## v27 scope (operator shutdown control)
+
+Vortex is launched from an app, but the dashboard offers no way to power it
+back down. The owner-operator's ask is a single control that stops Vortex
+cleanly from the page itself: unload every loaded model — freeing its RAM and
+closing its port — and then stop the daemon, returning the machine to a clean
+state. Stopping is deliberate and destructive, so the control is gated behind
+an explicit confirmation.
+
+- **Shutdown route**: a new `POST /api/shutdown` endpoint that unloads every
+  loaded model, then signals the daemon to stop. The unload runs first, so
+  the RAM is actually reclaimed — the model processes are session-leaders
+  that would otherwise outlive the daemon. The daemon-stop signal is an
+  injectable hook, so the behaviour is testable without killing the caller.
+- **Stop control**: a Stop Vortex button in the dashboard header. Clicking it
+  first requires the operator to confirm a warning; only on confirmation does
+  the page call the shutdown route and fall back to the existing
+  daemon-unreachable state. A cancelled confirmation leaves Vortex running.
+
+## Explicitly out of scope for v27
+
+A restart/relaunch control (the launcher owns start), a graceful per-client
+drain, scheduling or auto-shutdown, and any confirmation UI beyond the
+browser's native `confirm()`.
+
+## v27 acceptance criteria
+
+- **AC-7:** the daemon exposes `POST /api/shutdown` such that the call
+  unloads every currently-loaded model — each loaded entry's process is
+  terminated and its public id returned in the response `unloaded` list — and
+  then invokes an injectable daemon-stop hook after the response body is
+  sent, such that the response is `{"stopping": true, "unloaded": [<ids>]}`
+  and the hook is called exactly once.
+- **AC-8:** the dashboard header provides a Stop Vortex control such that
+  clicking it first requires the operator to confirm a warning that every
+  loaded model will be unloaded, and only on confirmation issues
+  `POST /api/shutdown` and falls back to the daemon-unreachable state, such
+  that a cancelled confirmation leaves Vortex running and sends no request.
