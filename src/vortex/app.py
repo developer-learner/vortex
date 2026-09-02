@@ -8,7 +8,6 @@ Two surfaces:
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import signal
@@ -18,7 +17,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
 from .catalog import Catalog, load_catalog
@@ -56,6 +55,11 @@ def build_app(
     ops = OperationStore()
     lifecycle = Lifecycle(catalog, sidecars)
     manager = Manager(catalog, lifecycle, ops)
+
+    def _default_stop() -> None:
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    stop_daemon = on_shutdown or _default_stop
     log_stale_sidecars(sidecars, catalog)
     wrapper_cache: dict[str, tuple[float, list[Wrapper]]] = {}
 
