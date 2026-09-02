@@ -19,6 +19,7 @@ from pathlib import Path
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 
 from .catalog import Catalog, load_catalog
 from .discovery import Wrapper, discover_wrappers
@@ -26,6 +27,7 @@ from .lifecycle import (
     Lifecycle,
     PortConflictError,
     SidecarStore,
+    _terminate_pid,
     as_pid,
     log_stale_sidecars,
     terminate,
@@ -228,7 +230,7 @@ def build_app(
     def shutdown() -> Response:
         unloaded: list[str] = []
         for entry in manager.all_ready():
-            terminate(entry)
+            _terminate_pid(entry)
             unloaded.append(entry.public_id)
 
         def _stop() -> None:
@@ -240,7 +242,7 @@ def build_app(
         return Response(
             content='{"stopping": true, "unloaded": ' + _json_list(unloaded) + "}",
             media_type="application/json",
-            background=_Background(_stop),
+            background=BackgroundTask(_stop),
         )
 
     def _get_wrappers() -> list[Wrapper]:
