@@ -202,7 +202,7 @@ footer {
 <header>
   <h1>vortex</h1>
   <span class="sub">model menu</span>
-  <button id="stopvortex">Stop Vortex</button>
+  <button id="stopvortex" title="Stop Vortex" style="margin-left:auto">✕ Stop Vortex</button>
 </header>
 <main>
   <div id="down">
@@ -509,15 +509,13 @@ footer {
   });
 
   document.getElementById("stopvortex").addEventListener("click", function () {
-    if (!confirm("Stopping Vortex will unload every loaded model. Continue?")) {
-      return;
-    }
+    if (!confirm("Stop Vortex? This unloads all loaded models, freeing their RAM, and shuts down the server.")) return;
     fetch("/api/shutdown", { method: "POST" })
       .then(function (r) {
-        if (r.ok) {
-          document.getElementById("down").style.display = "block";
-        }
-      });
+        if (!r.ok) throw new Error("shutdown " + r.status);
+        document.getElementById("down").style.display = "block";
+      })
+      .catch(function (e) { setError("Shutdown failed: " + e.message); });
   });
 
   pollStatus();
