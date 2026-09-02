@@ -9,7 +9,10 @@ Two surfaces:
 from __future__ import annotations
 
 import logging
+import os
+import signal
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx
@@ -24,6 +27,7 @@ from .lifecycle import (
     SidecarStore,
     as_pid,
     log_stale_sidecars,
+    terminate,
 )
 from .manager import BusyError, Manager, MemoryConflict
 from .memory import (
@@ -43,6 +47,7 @@ def build_app(
     catalog: Catalog | None = None,
     sidecar_dir: Path | None = None,
     wrapper_discovery=discover_wrappers,
+    on_shutdown: Callable[[], None] | None = None,
 ) -> FastAPI:
     catalog = catalog or load_catalog(_REPO_ROOT / "config/catalog.json")
     sidecars = SidecarStore(sidecar_dir or _REPO_ROOT / "data/sidecars")
@@ -218,6 +223,25 @@ def build_app(
             raise HTTPException(status_code=404, detail="unknown operation")
         return snapshot
 
+    @app.post("/api/shutdown")
+    def shutdown() -> Response:
+        unloaded: list[str] = []
+        for entry in manager.all_ready():
+            terminate(entry)
+            unloaded.append(entry.public_id)
+
+        def _stop() -> None:
+            if on_shutdown is not None:
+                on_shutdown()
+            else:
+                os.kill(os.getpid(), signal.SIGTERM)
+
+        return Response(
+            content='{"stopping": true, "unloaded": ' + _json_list(unloaded) + "}",
+            media_type="application/json",
+            background=_Background(_stop),
+        )
+
     def _get_wrappers() -> list[Wrapper]:
         now = time.time()
         cached = wrapper_cache.get("default")
@@ -242,3 +266,15 @@ def build_app(
         return {"wrappers": wrappers, "newly_found": newly_found}
 
     return app
+
+
+def _json_list(values: list[str]) -> str:
+    return "[" + ", ".join(json.dumps(v) for v in values) + "]"
+
+
+class _Background:
+    def __init__(self, func: Callable[[], None]) -> None:
+        self._func = func
+
+    async def __call__(self) -> None:
+        self._func()
