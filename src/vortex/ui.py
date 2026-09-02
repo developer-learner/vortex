@@ -202,6 +202,7 @@ footer {
 <header>
   <h1>vortex</h1>
   <span class="sub">model menu</span>
+  <button id="stopvortex">Stop Vortex</button>
 </header>
 <main>
   <div id="down">
@@ -504,6 +505,18 @@ footer {
       })
       .catch(function (e) {
         setError("Engine-wrapper discovery failed: " + e.message);
+      });
+  });
+
+  document.getElementById("stopvortex").addEventListener("click", function () {
+    if (!confirm("Stopping Vortex will unload every loaded model. Continue?")) {
+      return;
+    }
+    fetch("/api/shutdown", { method: "POST" })
+      .then(function (r) {
+        if (r.ok) {
+          document.getElementById("down").style.display = "block";
+        }
       });
   });
 
