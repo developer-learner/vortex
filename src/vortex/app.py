@@ -229,19 +229,11 @@ def build_app(
     def shutdown() -> Response:
         unloaded: list[str] = []
         for entry in manager.all_ready():
-            _terminate_pid(entry)
-            unloaded.append(entry.public_id)
-
-        def _stop() -> None:
-            if on_shutdown is not None:
-                on_shutdown()
-            else:
-                os.kill(os.getpid(), signal.SIGTERM)
-
-        return Response(
-            content='{"stopping": true, "unloaded": ' + _json_list(unloaded) + "}",
-            media_type="application/json",
-            background=BackgroundTask(_stop),
+            if lifecycle.terminate(entry):
+                unloaded.append(entry.public_id)
+        return JSONResponse(
+            {"stopping": True, "unloaded": unloaded},
+            background=BackgroundTask(stop_daemon),
         )
 
     def _get_wrappers() -> list[Wrapper]:
@@ -268,10 +260,6 @@ def build_app(
         return {"wrappers": wrappers, "newly_found": newly_found}
 
     return app
-
-
-def _json_list(values: list[str]) -> str:
-    return "[" + ", ".join(json.dumps(v) for v in values) + "]"
 
 
 class _Background:
