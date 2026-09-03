@@ -1,0 +1,15 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_anneal_retry.py::test_anneal_does_not_retry_a_loading_503",
+    "tests/test_anneal_retry.py::test_anneal_gives_up_after_bounded_attempts",
+    "tests/test_anneal_retry.py::test_anneal_probe_sends_the_real_model_id",
+    "tests/test_anneal_retry.py::test_anneal_retries_a_transport_blip_and_succeeds",
+    "tests/test_anneal_retry.py::test_anneal_still_rejects_a_completion_without_choices",
+    "tests/test_anneal_retry.py::test_harmonic_ready_probes_with_alias_then_public_id"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": []
+}

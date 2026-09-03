@@ -28,7 +28,7 @@ def test_anneal_retries_a_transport_blip_and_succeeds(monkeypatch) -> None:
 
     monkeypatch.setattr(lifecycle.httpx, "post", flaky)
     monkeypatch.setattr(lifecycle.time, "sleep", lambda seconds: None)
-    assert lifecycle._anneal_probe("http://127.0.0.1:9/v1/chat/completions") is True
+    assert lifecycle._anneal_probe("http://127.0.0.1:9/v1/chat/completions", "test-model") is True
     assert len(calls) == 2, "exactly one retry after the blip"
 
 
@@ -41,7 +41,7 @@ def test_anneal_gives_up_after_bounded_attempts(monkeypatch) -> None:
 
     monkeypatch.setattr(lifecycle.httpx, "post", dead)
     monkeypatch.setattr(lifecycle.time, "sleep", lambda seconds: None)
-    assert lifecycle._anneal_probe("http://127.0.0.1:9/v1/chat/completions") is False
+    assert lifecycle._anneal_probe("http://127.0.0.1:9/v1/chat/completions", "test-model") is False
     assert len(calls) == lifecycle.ANNEAL_ATTEMPTS
 
 
@@ -57,7 +57,7 @@ def test_anneal_does_not_retry_a_loading_503(monkeypatch) -> None:
 
     monkeypatch.setattr(lifecycle.httpx, "post", loading)
     monkeypatch.setattr(lifecycle.time, "sleep", lambda seconds: None)
-    assert lifecycle._anneal_probe("http://127.0.0.1:9/v1/chat/completions") is False
+    assert lifecycle._anneal_probe("http://127.0.0.1:9/v1/chat/completions", "test-model") is False
     assert len(calls) == 1
 
 
@@ -66,7 +66,65 @@ def test_anneal_still_rejects_a_completion_without_choices(monkeypatch) -> None:
         return _resp(200, {"choices": [], "probed": url})
 
     monkeypatch.setattr(lifecycle.httpx, "post", empty_choices)
-    assert lifecycle._anneal_probe("http://127.0.0.1:9/v1/chat/completions") is False
+    assert lifecycle._anneal_probe("http://127.0.0.1:9/v1/chat/completions", "test-model") is False
+
+
+def test_anneal_probe_sends_the_real_model_id(monkeypatch) -> None:
+    """The probe must name the model the runtime actually serves. The old
+    placeholder (__ready_probe__) was rejected by runtimes that validate
+    the model field, failing an otherwise-loaded model's readiness cycle."""
+    sent: list[dict] = []
+
+    def capture(url: str, json: dict | None = None, **kwargs: object) -> httpx.Response:
+        if json is not None:
+            sent.append(json)
+        return _resp(200, {"choices": [{"message": {"content": "pong"}}]})
+
+    monkeypatch.setattr(lifecycle.httpx, "post", capture)
+    assert lifecycle._anneal_probe(
+        "http://127.0.0.1:9/v1/chat/completions", "Qwen3.8-27B-MLX-8bit"
+    ) is True
+    assert sent[0]["model"] == "Qwen3.8-27B-MLX-8bit"
+
+
+def test_harmonic_ready_probes_with_alias_then_public_id(
+    monkeypatch, tmp_path
+) -> None:
+    """_harmonic_ready must hand the anneal the runtime's model name:
+    upstream_alias when configured, public_id otherwise — the public_id
+    is the proxy's name, not the runtime's."""
+    from vortex.catalog import Catalog, CatalogEntry
+    from vortex.lifecycle import Lifecycle, SidecarStore
+
+    def entry(public_id: str, upstream_alias: str | None) -> CatalogEntry:
+        return CatalogEntry(
+            public_id=public_id,
+            runtime="mlx",
+            engine="serve",
+            launch_command=["mlx", "serve"],
+            port=9,
+            ready_url="http://127.0.0.1:9/v1/models",
+            chat_endpoint="http://127.0.0.1:9/v1/chat/completions",
+            upstream_alias=upstream_alias,
+        )
+
+    monkeypatch.setattr(lifecycle, "_responds_ready", lambda url: True)
+    probed: list[str] = []
+
+    def fake_probe(chat_endpoint: str, model_id: str) -> bool:
+        probed.append(model_id)
+        return True
+
+    monkeypatch.setattr(lifecycle, "_anneal_probe", fake_probe)
+
+    for alias, expected in (("up-x", "up-x"), (None, "pub-x")):
+        life = Lifecycle(
+            Catalog(entries=[entry("pub-x", alias)]),
+            SidecarStore(tmp_path / "sidecars"),
+            ready_timeout=lambda: 30.0,
+        )
+        assert life._harmonic_ready(entry("pub-x", alias)) is True
+        assert probed[-1] == expected
 
 
 def test_anneal_bounds_are_bounded() -> None:
