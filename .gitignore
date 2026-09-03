@@ -26,3 +26,6 @@ scripts/.approved/incoming/
 
 # secrets + notebook cache
 .env
+
+# Review working documents (session inputs at the repo root, not template content)
+/REVIEW.md
