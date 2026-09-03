@@ -108,7 +108,7 @@
       "port": 8000,
       "ready_url": "http://127.0.0.1:8000/v1/models",
       "chat_endpoint": "http://127.0.0.1:8000/v1/chat/completions",
-      "upstream_alias": "Qwen3.8-27B-4bit + DFlash2 draft (oMLX)",
+      "upstream_alias": "mlx-community--Qwen3.8-27B-4bit",
       "ram_estimate_gb": 20.0,
       "exclusive": false
     },
@@ -127,7 +127,7 @@
       "port": 8007,
       "ready_url": "http://127.0.0.1:8007/v1/models",
       "chat_endpoint": "http://127.0.0.1:8007/v1/chat/completions",
-      "upstream_alias": "Qwen3.8-27B-8bit + DFlash2 draft (oMLX)",
+      "upstream_alias": "Qwen3.8-27B-MLX-8bit",
       "ram_estimate_gb": 30.0,
       "exclusive": false
     }

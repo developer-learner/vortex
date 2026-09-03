@@ -21,6 +21,40 @@
 
 ## Decisions
 
+## D-182 — 2026-09-03 — Anneal probe addresses the runtime by its real model id
+
+**Decision:** `_anneal_probe` takes the model id and posts it instead of the
+`__ready_probe__` placeholder; `_harmonic_ready` passes
+`entry.upstream_alias or entry.public_id` — the same name the proxy forwards
+(the `app.py` remap). Two catalog `upstream_alias` values that carried prose
+labels ("Qwen3.8-27B-4bit + DFlash2 draft (oMLX)") now carry the served model
+id. `READY_TIMEOUT_SECONDS` 300 → 600 (a 27B 4-bit/8-bit load plus anneal
+exceeds five minutes on the current host; the old bound was measured short,
+not derived).
+
+**Alternatives considered:** keep the placeholder and special-case it in
+runtimes (rejected — the probe must exercise exactly what the first real
+request sends, or it gates nothing); probe with the public_id only (rejected
+— aliased entries are addressed by the alias at the runtime; the public_id
+is the proxy's name).
+
+**Reason:** the placeholder and the prose aliases are one defect class:
+addressing the runtime with a name it does not serve. A runtime that
+validates the model field rejects both, failing an otherwise-loaded model's
+readiness cycle on the probe, not on inference.
+
+**Do not suggest:** reintroducing a synthetic probe model id; treating
+`upstream_alias` as a display label (it is the forwarded model name); lowering
+the ready timeout back to 300 without re-measuring a 27B load on the target
+host.
+
+**Pairing:** re-frozen as v30 (`[refreeze v30]`); direct route per D-175.
+Two new tests pin the corrected addressing (request-body model id;
+alias-then-public_id fallback) and the four carried anneal tests were
+re-pinned to the new signature.
+
+---
+
 ## D-181 — 2026-08-31 — Lifecycle mutations use one fail-fast async slot
 
 **Decision:** `Manager.load()` and `Manager.unload()` are the only mutation

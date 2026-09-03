@@ -28,7 +28,7 @@ from .catalog import Catalog, CatalogEntry
 
 logger = logging.getLogger(__name__)
 
-READY_TIMEOUT_SECONDS = 300
+READY_TIMEOUT_SECONDS = 600
 TERMINATE_GRACE_SECONDS = 5
 POLL_INTERVAL_SECONDS = 0.25
 SIDECAR_TOLERANCE_SECONDS = 1.0
@@ -128,7 +128,7 @@ ANNEAL_ATTEMPTS = 3
 ANNEAL_RETRY_DELAY_SECONDS = 0.5
 
 
-def _anneal_probe(chat_endpoint: str) -> bool:
+def _anneal_probe(chat_endpoint: str, model_id: str) -> bool:
     """A real inference anneal: the runtime must serve a 1-token completion.
 
     Endpoints that answer /v1/models across the load (llama-server returns
@@ -147,7 +147,7 @@ def _anneal_probe(chat_endpoint: str) -> bool:
             resp = httpx.post(
                 chat_endpoint,
                 json={
-                    "model": "__ready_probe__",
+                    "model": model_id,
                     "messages": [{"role": "user", "content": "ping"}],
                     "max_tokens": 1,
                     "stream": False,
@@ -334,7 +334,9 @@ class Lifecycle:
 
     def _harmonic_ready(self, entry: CatalogEntry) -> bool:
         """Port ownership PLUS a 200 on /v1/models PLUS a real completion."""
-        return _responds_ready(entry.ready_url) and _anneal_probe(entry.chat_endpoint)
+        return _responds_ready(entry.ready_url) and _anneal_probe(
+            entry.chat_endpoint, entry.upstream_alias or entry.public_id
+        )
 
     def is_verified(self, entry: CatalogEntry) -> bool:
         """Whether a load/adopt THIS session confirmed the entry serves inference.
