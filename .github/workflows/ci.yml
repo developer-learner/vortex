@@ -59,6 +59,51 @@ jobs:
         # milestone-trim/context-budget/mypy-cache suites were dark this way).
         run: pytest scripts/selftest/selftest_*.py -q
 
+  # Provenance report (advisory — M2a / D-184): the verifier is a plane file,
+  # so materialize the pinned Blueprint and run it against THIS repo.
+  # Report mode always exits 0 until the M2b gate flip (CEO call after one
+  # live adoption run).
+  provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 50
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Provenance report (advisory — M2a)
+        env:
+          TOKEN: ${{ secrets.TEMPLATE_READ_TOKEN }}
+        run: |
+          [ -f .template-link ] || { echo "no linked template — skipping"; exit 0; }
+          repo=$(grep '^repo=' .template-version | cut -d= -f2-)
+          ref=$(grep '^ref=' .template-version | cut -d= -f2-)
+          source=$(grep '^source=' .template-link | cut -d= -f2-)
+          target=$(python3 - "$PWD" "$source" <<'PY'
+          import os
+          import sys
+
+          workspace = os.path.abspath(sys.argv[1])
+          parent = os.path.dirname(workspace)
+          candidate = os.path.abspath(os.path.join(workspace, sys.argv[2]))
+          if os.path.commonpath((parent, candidate)) != parent or candidate == workspace:
+              raise SystemExit("unsafe linked-template source")
+          print(candidate)
+          PY
+          )
+          if [ -n "$TOKEN" ]; then
+            git clone --quiet "https://x-access-token:${TOKEN}@github.com/${repo}.git" "$target"
+          else
+            git clone --quiet "https://github.com/${repo}.git" "$target"
+          fi
+          git -C "$target" fetch --quiet origin "$ref"
+          git -C "$target" checkout --detach --quiet "$ref"
+          # guard: the verifier is a plane file — skip if the pinned plane
+          # predates it (this job may land one commit before the re-pin)
+          [ -f "$target/scripts/check-provenance.py" ] || { echo "verifier not in pinned plane yet — skipping"; exit 0; }
+          python3 "$target/scripts/check-provenance.py" "HEAD~50..HEAD"
+
   test:
     runs-on: ubuntu-latest
     # NOTE: the skeleton guard is a STEP, not a job-level `if` — hashFiles()
