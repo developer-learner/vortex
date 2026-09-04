@@ -96,6 +96,13 @@
 - **Backlog item:** 9
 - **Priority:** observation trigger, not a standalone worktree job
 - **Cost:** event-driven
+- **Status:** CLOSED 2026-09-03 (CEO call: validated). The v115 Testchat build
+  (2026-09-02) was the uninterrupted qualifying run — T1/T3 each struck twice
+  (8 coder calls) → schema-valid `brief_wrong` diagnoses → in-run revised briefs
+  (prompt-diff proven) → caps-exhausted TPM bundles → batch halt → v116
+  brief-only refreeze (`641aa8d`) → v119 success (`aa3deea`), D-69 budget
+  contained. Recorded in the blueprint BACKLOG (2026-09-03) and the cross-repo
+  register (`sw-dev-blueprint/tasks/REGISTER-2026-09-03.md`, item #6).
 - **Done when:** one uninterrupted organic run exercises the complete intended
   retry → diagnosis → revised brief/TPM path and its outcome is accepted against
   D-70/D-69.
@@ -118,6 +125,11 @@
 - **Priority:** roadmap phase 3
 - **Cost:** L
 - **Blocker:** settle the reopened oracle/refreeze-mode question
+- **Status:** DONE 2026-09-02 — v115 spec built in the Linux VM window
+  (the run that also closed T6); v116 brief-only refreeze `641aa8d`; **v119
+  success `aa3deea`** (8-task run, no-edit). T9 (deployment cutover) is the
+  successor, tracked in testchat's own backlog. See the cross-repo register
+  (`sw-dev-blueprint/tasks/REGISTER-2026-09-03.md`, item #3 context).
 - **Done when:** Testchat uses the Vortex-compatible universal surface under a
   frozen, accepted migration contract.
 
@@ -168,7 +180,8 @@
 1. Decide T1; it is the only remaining audit-related safety question.
 2. ~~Decide T2~~ — closed (no-code acceptance, 2026-09-01); see the T2 Status note.
 3. Publish the documentation (T4).
-4. Execute T8 → T9; use a suitable real multi-task milestone to collect T5
-   and, if it occurs organically, T6.
+4. ~~Execute T8~~ (done 2026-09-02, v119) → execute T9; use a suitable real
+   multi-task milestone to collect T5. ~~T6~~ already collected via the v115 run
+   (closed 2026-09-03).
 5. Schedule T10 when host memory/session constraints are satisfied.
 6. Handle T3, T7, T11, and T12 independently when their decision gates open.
