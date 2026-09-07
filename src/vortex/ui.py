@@ -179,6 +179,14 @@ button[data-act="load"] { border-color: var(--ok); color: var(--ok); }
 button[data-act="load"]:hover:not(:disabled) { border-color: var(--ok); color: var(--ok); background: rgba(63, 185, 80, 0.1); }
 button[data-act="unload"] { border-color: var(--danger); color: var(--danger); }
 button[data-act="unload"]:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); background: rgba(248, 81, 73, 0.1); }
+button.port {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+button.port:hover:not(:disabled) { background: rgba(88, 166, 255, 0.1); }
+.dim { color: var(--dim); }
 .open-dot {
   display: inline-block;
   width: 8px;
@@ -230,11 +238,12 @@ footer {
         <th>Status</th>
         <th>Model</th>
         <th>Size</th>
+        <th>Endpoint</th>
         <th>Actions</th>
       </tr>
     </thead>
     <tbody id="rows">
-      <tr class="empty"><td colspan="4">loading…</td></tr>
+      <tr class="empty"><td colspan="5">loading…</td></tr>
     </tbody>
   </table>
   <section id="enginewrappers">
@@ -309,7 +318,7 @@ footer {
   function renderRows(models) {
     var rows = document.getElementById("rows");
     if (!models || !models.length) {
-      rows.innerHTML = '<tr class="empty"><td colspan="4">no models in catalog</td></tr>';
+      rows.innerHTML = '<tr class="empty"><td colspan="5">no models in catalog</td></tr>';
       return;
     }
     var html = "";
@@ -333,6 +342,12 @@ footer {
         : '<span class="badge" title="engine: ' + esc(m.engine) + '">' + esc(m.engine) + '</span>';
       html += "<td>" + esc(m.public_id) + engBadge + "</td>";
       html += "<td>" + esc(m.ram_estimate_gb) + " GiB</td>";
+      var endpoint = m.chat_endpoint || ("http://localhost:" + m.port + "/v1/chat/completions");
+      var portCell = (loaded && m.port)
+        ? '<button type="button" class="port" data-copy="' + esc(endpoint) + '" '
+          + 'title="Copy endpoint: ' + esc(endpoint) + '">localhost:' + esc(m.port) + '</button>'
+        : '<span class="dim">—</span>';
+      html += "<td>" + portCell + "</td>";
       html += "<td>" + actBtn + "</td>";
       html += "</tr>";
     }
@@ -446,6 +461,21 @@ footer {
   }
 
   document.getElementById("rows").addEventListener("click", function (e) {
+    var copyBtn = e.target.closest("button[data-copy]");
+    if (copyBtn) {
+      var endpoint = copyBtn.getAttribute("data-copy");
+      var done = function () {
+        var prev = copyBtn.textContent;
+        copyBtn.textContent = "copied ✓";
+        setTimeout(function () { copyBtn.textContent = prev; }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(endpoint).then(done, function () { setError("Copy failed: " + endpoint); });
+      } else {
+        setError("Endpoint: " + endpoint);
+      }
+      return;
+    }
     var btn = e.target.closest("button[data-act]");
     if (!btn) return;
     var act = btn.getAttribute("data-act");
