@@ -39,7 +39,7 @@
 
 - **Priority:** P2 product-policy decision
 - **Cost:** M if implemented; XS if the current limitation is explicitly accepted
-- **Blocker:** CEO chooses whether session-latched readiness is sufficient
+- **Blocker:** none — the session-latched contract was accepted
 - **Status:** CLOSED (2026-09-01) — no-code acceptance. The session-latched
   readiness contract is accepted as documented (glossary *Session verification*):
   a verified runtime that degrades but stays alive is not re-probed until it
@@ -48,9 +48,9 @@
   represented by an in-memory session flag. A verified runtime that later
   degrades while remaining alive stays advertised. Steady-state reads perform
   zero inference probes by design.
-- **Decision required:** accept the documented session-latched contract, or
-  define a bounded re-probe policy (for example background/TTL/manual health
-  refresh) that does not put a completion probe on every read.
+- **Decision outcome:** the documented session-latched contract was accepted.
+  A bounded re-probe policy would be a separate future milestone, not a
+  remainder of this item.
 - **Done when:** either the limitation is explicitly accepted and this item is
   closed without code, or the new policy is frozen, implemented, and verified
   against both degradation detection and the no-per-read-probe invariant.
@@ -124,7 +124,7 @@
 - **Backlog item:** 15
 - **Priority:** roadmap phase 3
 - **Cost:** L
-- **Blocker:** settle the reopened oracle/refreeze-mode question
+- **Blocker:** none — the refreeze-mode question was resolved during delivery
 - **Status:** DONE 2026-09-02 — v115 spec built in the Linux VM window
   (the run that also closed T6); v116 brief-only refreeze `641aa8d`; **v119
   success `aa3deea`** (8-task run, no-edit). T9 (deployment cutover) is the

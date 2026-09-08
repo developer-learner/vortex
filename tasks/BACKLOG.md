@@ -40,6 +40,11 @@
 - [x] **Dashboard failure-visibility** — empty `catch` handlers replaced with a
   visible `#uierror` surface; and (v26) routine polls no longer clear an error
   the operator needs to see — only a user action or a completed operation does.
+- [x] **Dashboard per-model endpoint column** — loaded models show
+  `localhost:<port>` in an Endpoint column; clicking copies the full
+  `/v1/chat/completions` URL for pointing external clients at the runtime.
+  Reads the existing catalog `port`/`chat_endpoint` fields; UI-only. Increment
+  toward roadmap milestone 2 (UI).
 - [x] **Catalog construction invariants** (unique non-null ports) + **operation
   store** atomic snapshot + bounded retention (prerequisites).
 - [x] **Async-202 unified single-slot worker (v24/v25)** — one Manager-owned
@@ -49,9 +54,10 @@
   dual-path `load_async`/`unload_async` is removed. Blind-authored concurrency
   oracle is in the frozen suite.
 
-**Done — earlier register items:** 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 14; the
-three v14 tooling gaps (model-id stamp, coder archive, `fault_role`); and the
-v14 engine-wrapper-inventory milestone.
+**Done — earlier register items:** 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 14,
+15; the three v14 tooling gaps (model-id stamp, coder archive, `fault_role`);
+the v14 engine-wrapper-inventory milestone; and the continuous-readiness
+decision (session-latched behavior accepted without code on 2026-09-01).
 
 **Pending:**
 
@@ -66,21 +72,12 @@ v14 engine-wrapper-inventory milestone.
   catalog estimate for uncertain non-target entries); awaiting the policy choice.
 - [ ] **4** — Vortex D-168 live-fire: one successful real multi-task run that
   crosses a mid-run Blueprint advancement and records the unchanged plane SHA.
-- [ ] **9** — Blueprint: validate the first organic two-strike ladder climb
-  (observation trigger, not a worktree job).
 - [ ] **13** — model-specific Git provenance (CEO decision).
-- [ ] **15** — Testchat recut onto Vortex's universal surface (phase 3).
 - [ ] **16** — `LLM_ENDPOINT` cutover to `:9000/v1/chat/completions` (phase 4).
 - [ ] **17** — provisioning/tuning v2 + vmlx live exercise (memory-blocked;
   needs the CEO to free RAM and drive from outside the session).
 - [ ] **18** — CEO-approved mature OSS adoption subject #2.
 - [ ] **19** — `vortex ctx-tune <model>` build / no-build decision.
-- [x] **Continuous readiness monitoring** *(product decision, not a defect)* —
-  CLOSED (2026-09-01) via no-code acceptance. The session-latched readiness
-  contract is accepted as documented (glossary *Session verification*): a
-  runtime that degrades after a successful load stays advertised until it
-  terminates; readiness is verified once per session. A bounded re-probe policy
-  would be a separate milestone if wanted.
 - [ ] **Starlette TestClient deprecation warning** (P3 cosmetic) — suite is
   green; one dependency-migration warning remains. Investigated 2026-09-01: it
   is a `StarletteDeprecationWarning` (httpx → httpx2) from `fastapi/testclient.py`
@@ -133,11 +130,11 @@ v14 engine-wrapper-inventory milestone.
    operator-review halt—no automatic retry, re-probe, plan change, or TPM
    escalation. Vortex adopted that exact ref in `2a32945`; its inherited
    control-plane suite is green at 490/490.
-9. [ ] **Blueprint — validate the first organic two-strike ladder climb.** The
-   Vortex repair run produced schema-valid `brief_wrong` diagnosis and a
-   materially revised brief, and later produced a usable TPM batch. Keep this
-   open until one uninterrupted organic run exercises the complete intended
-   ladder and its outcome is explicitly accepted against D-70/D-69.
+9. [x] **Blueprint — validate the first organic two-strike ladder climb.**
+   CLOSED 2026-09-03 by CEO acceptance of the uninterrupted Testchat v115 run:
+   T1/T3 each struck twice, produced schema-valid `brief_wrong` diagnoses and
+   materially revised briefs, reached caps-exhausted TPM bundles, halted, and
+   subsequently completed through v116/v119 within the D-69 budget.
 10. [x] **Blueprint — finish the pending D-44/Rule-5 acceptance wording.**
     Reconciled in `3225106`; D-44 remains a human acceptance gate, not a test
     claim.
@@ -157,8 +154,9 @@ v14 engine-wrapper-inventory milestone.
     published Blueprint `3d5a5e6` in `e831315`; both manifest checks and the
     complete inherited suite are green at **490/490**. Adoption evidence is
     recorded in `bb8f7cd`, published on Testchat `main`.
-15. [ ] **Vortex/Testchat — roadmap phase 3:** recut Testchat onto Vortex's
-    universal surface; settle the reopened oracle/refreeze-mode question.
+15. [x] **Vortex/Testchat — roadmap phase 3:** recut Testchat onto Vortex's
+    universal surface. DONE 2026-09-02: the v115 build, v116 brief-only
+    refreeze, and v119 success (`aa3deea`) completed the migration contract.
 16. [ ] **Vortex/Testchat — roadmap phase 4:** cut `LLM_ENDPOINT` over to
     `http://127.0.0.1:9000/v1/chat/completions`.
 17. [ ] **Vortex — roadmap phase 5:** provisioning and tuning v2, including a
@@ -349,8 +347,9 @@ final closure ref.
   legacy-test choice is unresolved, and the UI route/slicing decision remains
   open. Preserve the completed v1/v2/v3 evidence; this is documentation/status
   cleanup, not a new product milestone.
-- testchat recut (phase 3) — swap `SCRIPT_MODELS` + per-model routing for
-  the universal surface; oracle-heavy; refreeze mode question reopens.
+- ~~testchat recut (phase 3) — swap `SCRIPT_MODELS` + per-model routing for
+  the universal surface; oracle-heavy; refreeze mode question reopens.~~
+  DONE 2026-09-02 as v119.
 - Cutover (phase 4) — `LLM_ENDPOINT` → `http://127.0.0.1:9000/v1/chat/completions`.
 - Provisioning + tuning v2 (phase 5) — `mtplx tune` / `vmlx bench`, winners
   → catalog.
