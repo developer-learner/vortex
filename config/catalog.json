@@ -130,6 +130,21 @@
       "upstream_alias": "Qwen3.8-27B-MLX-8bit",
       "ram_estimate_gb": 30.0,
       "exclusive": false
+    },
+    {
+      "public_id": "nemotron",
+      "runtime": "vmlx",
+      "engine": "vmlx",
+      "launch_command": [
+        "/opt/homebrew/bin/python3",
+        "/Users/arc.elixir/nemotron-vmlx.py"
+      ],
+      "port": 8600,
+      "ready_url": "http://127.0.0.1:8600/v1/models",
+      "chat_endpoint": "http://127.0.0.1:8600/v1/chat/completions",
+      "upstream_alias": "dealignai/Nemotron-3-Super-120B-A12B-UNCENSORED-JANG_2L",
+      "ram_estimate_gb": 60.0,
+      "exclusive": true
     }
   ]
 }
