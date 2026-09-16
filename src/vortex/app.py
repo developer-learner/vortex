@@ -33,6 +33,8 @@ from .manager import BusyError, Manager, MemoryConflict
 from .memory import (
     estimate_ram_total_gb,
     estimate_ram_used_gb,
+    loadable_gb,
+    model_rss_gb,
     ram_used_source,
 )
 from .operations import OperationStore
@@ -162,6 +164,7 @@ def build_app(
             "ram_used_gb": round(estimate_ram_used_gb(), 1),
             "ram_total_gb": round(estimate_ram_total_gb(), 1),
             "ram_source": ram_used_source(),
+            "loadable_gb": round(loadable_gb(), 1),
             "loaded": [
                 {
                     "id": e.public_id,
@@ -169,6 +172,9 @@ def build_app(
                     "engine": e.engine,
                     "port": e.port,
                     "ram_estimate_gb": e.ram_estimate_gb,
+                    "rss_gb": round(
+                        model_rss_gb(as_pid(lifecycle.occupying_pid(e))), 1
+                    ),
                 }
                 for e in manager.all_ready()
             ],

@@ -222,6 +222,7 @@ footer {
     <div class="label">
       <span>RAM</span>
       <span id="ramlabel">—</span>
+      <span id="ramdetail"></span>
     </div>
     <div class="track">
       <div class="fill" id="ramfill"></div>
@@ -292,6 +293,17 @@ footer {
     label.textContent = used + " / " + total + " GiB (" + p.toFixed(1) + "%)";
     fill.style.width = p + "%";
     fill.className = "fill" + (p > 85 ? " danger" : p > 70 ? " warn" : "");
+  }
+
+  function setRamDetail(loadable, loaded) {
+    var el = document.getElementById("ramdetail");
+    var parts = [];
+    for (var i = 0; i < loaded.length; i++) {
+      var lm = loaded[i];
+      parts.push(esc(lm.id) + " " + (lm.rss_gb || 0) + " GB");
+    }
+    parts.push("~" + loadable + " GB loadable");
+    el.textContent = " · " + parts.join(" · ");
   }
 
   function setConflict(msg) {
@@ -366,6 +378,7 @@ footer {
         var total = s.ram_total_gb || 0;
         var pct = total > 0 ? (used / total) * 100 : 0;
         setRam(pct, used, total);
+        setRamDetail(s.loadable_gb || 0, s.loaded || []);
       })
       .catch(function () {
         document.getElementById("down").style.display = "block";
