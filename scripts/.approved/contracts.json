@@ -1,6 +1,7 @@
 {
-  "erd_version": 29,
+  "erd_version": 31,
   "files": [
+    "src/vortex/memory.py",
     "src/vortex/app.py",
     "src/vortex/ui.py"
   ],
@@ -16,16 +17,15 @@
     "src.vortex.discovery:WRAPPER_SPECS"
   ],
   "changed_files": [
+    "src/vortex/memory.py",
     "src/vortex/app.py",
     "src/vortex/ui.py"
   ],
-  "no_edit_files": [],
   "test_mapping": {
-    "tests/test_shutdown_api.py::test_shutdown_signals_stop_and_reports_nothing_loaded": "src/vortex/app.py",
-    "tests/test_shutdown_api.py::test_shutdown_unloads_loaded_model_and_reports_it": "src/vortex/app.py",
-    "tests/test_ui_content.py::test_stop_vortex_button_in_header": "src/vortex/ui.py",
-    "tests/test_ui_content.py::test_stop_vortex_confirms_then_posts_shutdown": "src/vortex/ui.py"
+    "tests/test_memory_figure.py::test_activity_monitor_parse_matches_the_vm_stat_arithmetic": "src/vortex/memory.py",
+    "tests/test_memory_figure.py::test_status_api_names_the_memory_source": "src/vortex/app.py"
   },
+  "no_edit_files": [],
   "smoke_checks": {},
   "routes": [
     {

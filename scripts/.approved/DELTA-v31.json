@@ -1,0 +1,30 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_memory_figure.py::test_activity_monitor_missing_keys_report_zero",
+    "tests/test_memory_figure.py::test_activity_monitor_parse_matches_the_vm_stat_arithmetic",
+    "tests/test_memory_figure.py::test_loadable_gb_bounds_reclaimable_by_wired_limit",
+    "tests/test_memory_figure.py::test_loadable_gb_failure_reports_zero",
+    "tests/test_memory_figure.py::test_model_rss_gb_none_pid_is_zero",
+    "tests/test_memory_figure.py::test_model_rss_gb_reads_ps_output",
+    "tests/test_memory_figure.py::test_model_rss_gb_unreadable_is_zero",
+    "tests/test_memory_figure.py::test_psutil_fallback_is_labeled_never_silent",
+    "tests/test_memory_figure.py::test_ram_used_prefers_vm_stat_and_names_it",
+    "tests/test_memory_figure.py::test_status_api_carries_memory_source_and_parity_figures",
+    "tests/test_memory_figure.py::test_status_api_names_the_memory_source",
+    "tests/test_memory_figure.py::test_used_figure_excludes_reclaimable_cache",
+    "tests/test_ui_content.py::test_ram_detail_parity_elements_present"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [
+    "src/vortex/memory.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ],
+  "inventory_files": [
+    "src/vortex/memory.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ]
+}

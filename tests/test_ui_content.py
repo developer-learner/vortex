@@ -103,3 +103,14 @@ def test_stop_vortex_confirms_then_posts_shutdown() -> None:
     s = UI_PAGE.index("/api/shutdown")
     near = UI_PAGE[s - 200:s + 200]
     assert 'method: "POST"' in near, "shutdown must be issued as a POST"
+
+
+def test_ram_detail_parity_elements_present() -> None:
+    """RAM display parity with testchat (v31): a detail line shows each loaded
+    model's live RSS and the loadable figure. Static check on the locked
+    UI_PAGE surface — the same content-contract style as the rest of this file.
+    """
+    assert 'id="ramdetail"' in UI_PAGE
+    assert "function setRamDetail" in UI_PAGE
+    assert "loadable_gb" in UI_PAGE, "the loadable figure must be consumed"
+    assert "rss_gb" in UI_PAGE, "per-model RSS must be consumed"
