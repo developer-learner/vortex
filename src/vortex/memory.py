@@ -96,6 +96,7 @@ def model_rss_gb(pid: int | None) -> float:
             capture_output=True,
             text=True,
             timeout=2,
+            check=False,
         )
         return int(out.stdout.strip()) / 1024**2
     except (subprocess.SubprocessError, OSError, ValueError):
@@ -116,11 +117,12 @@ def loadable_gb() -> float:
             capture_output=True,
             text=True,
             timeout=2,
+            check=False,
         )
         total_gb = int(out.stdout.strip()) / 1024**3
 
         out = subprocess.run(
-            ["vm_stat"], capture_output=True, text=True, timeout=2
+            ["vm_stat"], capture_output=True, text=True, timeout=2, check=False
         )
         page_size = 16384
         pages: dict[str, int] = {}
@@ -155,6 +157,7 @@ def loadable_gb() -> float:
                 capture_output=True,
                 text=True,
                 timeout=2,
+                check=False,
             )
             limit_mb = int(out.stdout.strip())
             cap_gb = limit_mb / 1024 if limit_mb > 0 else 0.75 * total_gb
