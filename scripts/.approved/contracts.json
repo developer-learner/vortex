@@ -1,6 +1,7 @@
 {
-  "erd_version": 32,
+  "erd_version": 33,
   "files": [
+    "src/vortex/memory.py",
     "src/vortex/discovery.py",
     "src/vortex/app.py",
     "src/vortex/ui.py"
@@ -9,6 +10,9 @@
     "src/vortex/discovery.py",
     "src/vortex/app.py",
     "src/vortex/ui.py"
+  ],
+  "no_edit_files": [
+    "src/vortex/memory.py"
   ],
   "entry_points": [
     "src.vortex.ui",
@@ -24,6 +28,7 @@
     "src.vortex.discovery:DiscoveredModel"
   ],
   "test_mapping": {},
+  "smoke_checks": {},
   "routes": [
     {
       "id": "route:GET /",
@@ -95,7 +100,5 @@
       "path": "/api/discovered-models/discover",
       "file": "src/vortex/app.py"
     }
-  ],
-  "no_edit_files": [],
-  "smoke_checks": {}
+  ]
 }
