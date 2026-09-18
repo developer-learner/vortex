@@ -1,0 +1,37 @@
+{
+  "changed_contract_ids": [
+    "route:GET /api/discovered-models",
+    "route:POST /api/discovered-models/discover",
+    "src.vortex.discovery:DiscoveredModel",
+    "src.vortex.discovery:discover_models"
+  ],
+  "changed_tests": [
+    "tests/test_discovered_models.py::test_discovered_model_carries_the_metadata_fields",
+    "tests/test_discovered_models.py::test_entries_without_a_key_are_skipped",
+    "tests/test_discovered_models.py::test_in_catalog_flag_matches_key_against_catalog_upstream_alias",
+    "tests/test_discovered_models.py::test_library_unreachable_yields_no_models_never_an_error",
+    "tests/test_discovered_models.py::test_loaded_flag_reflects_loaded_instances",
+    "tests/test_discovered_models.py::test_probe_maps_every_library_entry_to_a_discovered_model",
+    "tests/test_discovered_models_api.py::test_build_app_defaults_to_real_model_discovery",
+    "tests/test_discovered_models_api.py::test_discover_post_flags_models_not_in_catalog",
+    "tests/test_discovered_models_api.py::test_get_lists_discovered_models",
+    "tests/test_discovered_models_api.py::test_wire_schema_carries_all_discovered_model_fields",
+    "tests/test_ui_discovered_models.py::test_poll_models_runs_on_the_existing_cadence",
+    "tests/test_ui_discovered_models.py::test_scan_button_posts_to_the_rescan_route",
+    "tests/test_ui_discovered_models.py::test_ui_fetches_the_discovered_models_endpoint",
+    "tests/test_ui_discovered_models.py::test_ui_has_discovered_models_section",
+    "tests/test_ui_discovered_models.py::test_ui_renders_discovered_model_fields_from_the_api"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [
+    "src/vortex/discovery.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ],
+  "inventory_files": [
+    "src/vortex/discovery.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ]
+}

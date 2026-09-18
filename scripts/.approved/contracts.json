@@ -1,7 +1,12 @@
 {
-  "erd_version": 31,
+  "erd_version": 32,
   "files": [
-    "src/vortex/memory.py",
+    "src/vortex/discovery.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ],
+  "changed_files": [
+    "src/vortex/discovery.py",
     "src/vortex/app.py",
     "src/vortex/ui.py"
   ],
@@ -14,19 +19,11 @@
     "src.vortex.discovery:discover_wrappers",
     "src.vortex.discovery:Wrapper",
     "src.vortex.discovery:WrapperSpec",
-    "src.vortex.discovery:WRAPPER_SPECS"
+    "src.vortex.discovery:WRAPPER_SPECS",
+    "src.vortex.discovery:discover_models",
+    "src.vortex.discovery:DiscoveredModel"
   ],
-  "changed_files": [
-    "src/vortex/memory.py",
-    "src/vortex/app.py",
-    "src/vortex/ui.py"
-  ],
-  "test_mapping": {
-    "tests/test_memory_figure.py::test_activity_monitor_parse_matches_the_vm_stat_arithmetic": "src/vortex/memory.py",
-    "tests/test_memory_figure.py::test_status_api_names_the_memory_source": "src/vortex/app.py"
-  },
-  "no_edit_files": [],
-  "smoke_checks": {},
+  "test_mapping": {},
   "routes": [
     {
       "id": "route:GET /",
@@ -85,6 +82,20 @@
       "method": "POST",
       "path": "/api/shutdown",
       "file": "src/vortex/app.py"
+    },
+    {
+      "id": "route:GET /api/discovered-models",
+      "method": "GET",
+      "path": "/api/discovered-models",
+      "file": "src/vortex/app.py"
+    },
+    {
+      "id": "route:POST /api/discovered-models/discover",
+      "method": "POST",
+      "path": "/api/discovered-models/discover",
+      "file": "src/vortex/app.py"
     }
-  ]
+  ],
+  "no_edit_files": [],
+  "smoke_checks": {}
 }

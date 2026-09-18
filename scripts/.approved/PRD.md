@@ -131,3 +131,58 @@ browser's native `confirm()`.
   loaded model will be unloaded, and only on confirmation issues
   `POST /api/shutdown` and falls back to the daemon-unreachable state, such
   that a cancelled confirmation leaves Vortex running and sends no request.
+
+## v32 scope (LM Studio library discovery)
+
+Every loadable model must be hand-added to `config/catalog.json` today. The
+owner-operator wants to *browse the models a library wrapper has already
+downloaded* — LM Studio first — directly on the dashboard, so the catalog can
+be grown from what the machine already holds instead of from memory. This
+milestone delivers the read-only browse surface only; it never mutates the
+catalog and never loads a model. It preserves config-first: a discovered model
+is reported as DISCOVERED, never made loadable, exactly as the discovery layer
+already reserves ("discovered, not configured").
+
+- **Model discovery**: a library wrapper that exposes an OpenAI-style library
+  listing (LM Studio on :1234, via `GET /api/v1/models`) is probed read-only.
+  Each downloaded model is reported with its key, display name, publisher,
+  architecture, quantization, size, parameter string, max context, format,
+  whether the wrapper currently has it loaded, its source wrapper, and whether
+  a catalog entry already references it. An unreachable library yields no
+  models, never an error.
+- **Inventory route**: `GET /api/discovered-models` returns the discovered
+  models. **Rescan route**: `POST /api/discovered-models/discover` forces a
+  fresh probe and reports which discovered models are NOT referenced by any
+  catalog entry (`newly_found`).
+- **Dashboard section**: a "Discovered models" table on the same dashboard
+  page lists the library's models; a Scan control triggers a rescan and flags
+  models absent from the catalog.
+
+## Explicitly out of scope for v32
+
+Promotion of a discovered model into the catalog (a later milestone: entry
+synthesis, port allocation, launch-command derivation), loading a discovered
+model, LM Studio as the runtime loader (presets/chat templates/JIT), auto
+download of models not yet downloaded, and non-LM-Studio libraries (a later
+add on the same route shape).
+
+## v32 acceptance criteria
+
+- **AC-9:** the discovery layer exposes `discover_models` such that probing a
+  library wrapper's `/api/v1/models` listing yields one DiscoveredModel per
+  downloaded entry carrying key, display_name, publisher, architecture,
+  quantization, size_bytes, params, max_context, fmt, loaded, source, and
+  in_catalog, where in_catalog is true exactly when the model's key matches a
+  catalog entry's upstream alias, an entry without a key is skipped, and an
+  unreachable library yields an empty list rather than raising.
+- **AC-10:** the daemon exposes `GET /api/discovered-models` returning the
+  discovered models with all of the above fields, and
+  `POST /api/discovered-models/discover` forcing a fresh probe such that the
+  response includes newly_found, the keys of discovered models referenced by
+  no catalog entry; discovery is injected into the app exactly as wrapper
+  discovery is, so the routes are exercisable without a running library.
+- **AC-11:** the dashboard renders a "Discovered models" section such that each
+  discovered model shows its key, publisher, quantization, and catalog status
+  on the existing poll cadence, and provides a Scan control such that clicking
+  it calls `POST /api/discovered-models/discover` and marks discovered models
+  absent from the catalog.
