@@ -1,30 +1,3 @@
 {
-  "erd_version": 29,
-  "tasks": [
-    {
-      "brief": "Constraints: sync FastAPI route; no new imports beyond those listed; use existing local `manager` and `lifecycle` objects inside build_app — do not import or construct new ones; no global mutable state; no TODO comments.\n\nFile: src/vortex/app.py (existing — edit only the named regions).\n\n1. Add these imports at the top next to existing ones:\n   import os\n   import signal\n   from collections.abc import Callable\n   from starlette.background import BackgroundTask\n   Extend the existing `from fastapi.responses import StreamingResponse` line to:\n   from fastapi.responses import JSONResponse, StreamingResponse\n\n2. Add a keyword parameter to build_app's signature, after `wrapper_discovery=discover_wrappers,`:\n   on_shutdown: Callable[[], None] | None = None\n\n3. Immediately after `manager = Manager(...)` is created inside build_app, add:\n   def _default_stop() -> None:\n       os.kill(os.getpid(), signal.SIGTERM)\n   stop_daemon = on_shutdown or _default_stop\n\n4. Register this route inside build_app, next to the other `@app.post(...)` routes:\n   @app.post(\"/api/shutdown\")\n   def shutdown() -> Response:\n       unloaded: list[str] = []\n       for entry in manager.all_ready():\n           if lifecycle.terminate(entry):\n               unloaded.append(entry.public_id)\n       return JSONResponse(\n           {\"stopping\": True, \"unloaded\": unloaded},\n           background=BackgroundTask(stop_daemon),\n       )\n\n`manager.all_ready()` returns a list of CatalogEntry objects. `lifecycle.terminate(entry)` is an instance method taking one CatalogEntry, returning True when it stopped that entry's process; that call is the only termination call. build_app still returns the FastAPI app.\n\nAcceptance: `ruff check src/vortex/app.py` and `mypy --explicit-package-bases src/vortex/app.py` are clean; the shutdown handler calls `lifecycle.terminate(entry)`; POST /api/shutdown returns {\"stopping\": true, \"unloaded\": [...]} and schedules stop_daemon as a background task.",
-      "contracts": [
-        "route:POST /api/shutdown"
-      ],
-      "depends_on": [],
-      "file": "src/vortex/app.py",
-      "id": "T1",
-      "tests": [
-        "tests/test_shutdown_api.py::test_shutdown_signals_stop_and_reports_nothing_loaded",
-        "tests/test_shutdown_api.py::test_shutdown_unloads_loaded_model_and_reports_it"
-      ]
-    },
-    {
-      "brief": "Constraints: UI_PAGE is one inline HTML string; no external asset references (no http/https src or href); no print/logging; button id is exactly `stopvortex`.\n\nFile: src/vortex/ui.py (existing — edit only the named regions).\n\n1. In the `<header>` element, after the existing `<span class=\"sub\">model menu</span>`, add:\n   <button id=\"stopvortex\" title=\"Stop Vortex\" style=\"margin-left:auto\">✕ Stop Vortex</button>\n\n2. In the page's `<script>`, next to the other `addEventListener` handlers, add:\n   document.getElementById(\"stopvortex\").addEventListener(\"click\", function () {\n     if (!confirm(\"Stop Vortex? This unloads all loaded models, freeing their RAM, and shuts down the server.\")) return;\n     fetch(\"/api/shutdown\", { method: \"POST\" })\n       .then(function (r) {\n         if (!r.ok) throw new Error(\"shutdown \" + r.status);\n         document.getElementById(\"down\").style.display = \"block\";\n       })\n       .catch(function (e) { setError(\"Shutdown failed: \" + e.message); });\n   });\n\nThe confirm() message contains the words \"unloads\" and \"models\".\n\nAcceptance: the string `id=\"stopvortex\"` appears inside the `<header>...</header>` block; the `confirm(` call and the `/api/shutdown` POST are both present; and the page adds no http/https asset URL.",
-      "contracts": [],
-      "depends_on": [],
-      "file": "src/vortex/ui.py",
-      "id": "T2",
-      "tests": [
-        "tests/test_ui_content.py::test_stop_vortex_button_in_header",
-        "tests/test_ui_content.py::test_stop_vortex_confirms_then_posts_shutdown"
-      ]
-    }
-  ],
-  "version": 3
+  "tasks": []
 }
