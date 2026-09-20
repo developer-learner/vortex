@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 from vortex.app import build_app
 from vortex.catalog import Catalog, CatalogEntry
+from vortex.discovery import DiscoveredModel
 from vortex.ui import UI_PAGE
 
 
@@ -34,10 +35,30 @@ def _entry() -> CatalogEntry:
     )
 
 
-def _client(tmp_path: Path, entries: list[CatalogEntry]) -> TestClient:
-    return TestClient(
-        build_app(catalog=Catalog(entries=entries), sidecar_dir=tmp_path / "s")
-    )
+def _client(tmp_path: Path, entries: list[CatalogEntry], model_discovery=None) -> TestClient:
+    kwargs = {"catalog": Catalog(entries=entries), "sidecar_dir": tmp_path / "s"}
+    if model_discovery is not None:
+        kwargs["model_discovery"] = model_discovery
+    return TestClient(build_app(**kwargs))
+
+
+def _one_discovered() -> list[DiscoveredModel]:
+    return [
+        DiscoveredModel(
+            key="qwen3-1.7b-mlx@bf16",
+            display_name="Qwen3 1.7B",
+            publisher="lmstudio-community",
+            architecture="qwen3",
+            quantization="bf16",
+            size_bytes=3457091252,
+            params="1.7B",
+            max_context=40960,
+            fmt="safetensors",
+            loaded=False,
+            source="lmstudio",
+            in_catalog=False,
+        )
+    ]
 
 
 def _reads(prefix: str) -> set[str]:
@@ -54,10 +75,14 @@ def test_catalog_response_is_enveloped(tmp_path: Path) -> None:
 
 
 def test_ui_only_reads_catalog_fields_the_api_returns(tmp_path: Path) -> None:
-    body = _client(tmp_path, [_entry()]).get("/api/catalog").json()
-    keys = set(body["entries"][0])
+    # ERD-33: the dashboard reads m.* from TWO endpoints — /api/catalog (model
+    # rows) and /api/discovered-models (library rows). The contract is that
+    # every field the UI reads is returned by at least one of them.
+    client = _client(tmp_path, [_entry()], model_discovery=lambda catalog_entries=None: _one_discovered())
+    keys = set(client.get("/api/catalog").json()["entries"][0])
+    keys |= set(client.get("/api/discovered-models").json()["models"][0])
     missing = _reads("m") - keys
-    assert not missing, f"dashboard reads catalog fields the API never returns: {sorted(missing)}"
+    assert not missing, f"dashboard reads fields no API returns: {sorted(missing)}"
 
 
 def test_ui_only_reads_status_fields_the_api_returns(tmp_path: Path) -> None:

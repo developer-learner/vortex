@@ -1,0 +1,28 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_discovery.py::test_discovery_module_is_stdlib_only",
+    "tests/test_discovery.py::test_failed_version_probe_reports_empty",
+    "tests/test_discovery.py::test_finds_an_installed_binary_on_path",
+    "tests/test_discovery.py::test_in_catalog_matches_absolute_launch_path_by_basename",
+    "tests/test_discovery.py::test_in_catalog_reflects_catalog_entries",
+    "tests/test_discovery.py::test_mlx_lm_resolves_only_its_console_script_names",
+    "tests/test_discovery.py::test_only_probe_subprocess_is_the_version_check",
+    "tests/test_discovery.py::test_port_check_reports_open_and_closed",
+    "tests/test_discovery.py::test_registry_covers_the_named_wrappers",
+    "tests/test_discovery.py::test_registry_entries_are_sane_and_ordered",
+    "tests/test_discovery.py::test_shared_default_ports_report_the_port_not_the_process",
+    "tests/test_discovery.py::test_unresolved_wrappers_report_not_installed",
+    "tests/test_discovery.py::test_version_probe_records_first_stdout_line",
+    "tests/test_ui_api_contract.py::test_catalog_response_is_enveloped",
+    "tests/test_ui_api_contract.py::test_ui_only_reads_catalog_fields_the_api_returns",
+    "tests/test_ui_api_contract.py::test_ui_only_reads_status_fields_the_api_returns",
+    "tests/test_ui_api_contract.py::test_ui_operation_completion_uses_real_terminal_states",
+    "tests/test_ui_api_contract.py::test_ui_uses_the_api_loaded_state_token",
+    "tests/test_ui_api_contract.py::test_ui_uses_the_operation_field_the_api_returns"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": []
+}

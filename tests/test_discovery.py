@@ -5,9 +5,8 @@ import re
 import socket
 from pathlib import Path
 
-from vortex.discovery import WRAPPER_SPECS, discover_wrappers
-
 from vortex.catalog import CatalogEntry
+from vortex.discovery import WRAPPER_SPECS, discover_wrappers
 
 REGISTRY_ORDER = [
     "omlx",
@@ -25,9 +24,10 @@ REGISTRY_ORDER = [
 ]
 
 # Third-party names the discovery module must never import (AC-2 stdlib-only).
+# ERD-33: httpx is the one sanctioned exception — the LM Studio library probe
+# (discover_models) needs a real HTTP client; everything else stays stdlib-only.
 FORBIDDEN_IMPORTS = [
     "requests",
-    "httpx",
     "psutil",
     "fastapi",
     "uvicorn",
@@ -52,6 +52,7 @@ ALLOWED_IMPORT_ROOTS = {
     "functools",
     "concurrent",
     "pydantic",
+    "httpx",
     "__future__",
 }
 
