@@ -270,6 +270,30 @@ footer {
       <button data-act="discover">Discover</button>
     </div>
   </section>
+  <section id="discoveredmodels">
+    <h2>Discovered models</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Publisher</th>
+          <th>Quant</th>
+          <th>Size</th>
+          <th>Params</th>
+          <th>Context</th>
+          <th>Loaded</th>
+          <th>Catalog</th>
+        </tr>
+      </thead>
+      <tbody id="modelrows">
+        <tr class="empty"><td colspan="8">loading…</td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+      <span id="modelstatus"></span>
+      <button data-act="scan-models">Scan</button>
+    </div>
+  </section>
 </main>
 <footer>served at :9000/ by the daemon · polls /api/* every 2s</footer>
 <script>
@@ -437,6 +461,48 @@ footer {
       });
   }
 
+  function fmtSize(bytes) {
+    if (!bytes) return "";
+    return (bytes / 1e9).toFixed(1) + " GB";
+  }
+
+  function renderModels(models) {
+    var rows = document.getElementById("modelrows");
+    if (!models || !models.length) {
+      rows.innerHTML = '<tr class="empty"><td colspan="8">no discovered models</td></tr>';
+      return;
+    }
+    var html = "";
+    for (var i = 0; i < models.length; i++) {
+      var m = models[i];
+      html += "<tr>";
+      html += "<td>" + esc(m.key) + "</td>";
+      html += "<td>" + esc(m.publisher) + "</td>";
+      html += "<td>" + esc(m.quantization) + "</td>";
+      html += "<td>" + esc(fmtSize(m.size_bytes)) + "</td>";
+      html += "<td>" + esc(m.params) + "</td>";
+      html += "<td>" + esc(m.max_context) + "</td>";
+      html += "<td>" + (m.loaded ? "yes" : "no") + "</td>";
+      html += "<td>" + (m.in_catalog ? "yes" : "no") + "</td>";
+      html += "</tr>";
+    }
+    rows.innerHTML = html;
+  }
+
+  function pollModels() {
+    fetch("/api/discovered-models")
+      .then(function (r) {
+        if (!r.ok) throw new Error("models " + r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        renderModels(data.models);
+      })
+      .catch(function (e) {
+        setError("Could not refresh discovered models: " + e.message);
+      });
+  }
+
   function pollOperation(opId) {
     if (opTimer) {
       clearInterval(opTimer);
@@ -551,6 +617,34 @@ footer {
       });
   });
 
+  document.getElementById("discoveredmodels").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    if (btn.getAttribute("data-act") !== "scan-models") return;
+    fetch("/api/discovered-models/discover", { method: "POST" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("scan " + r.status);
+        return r.json();
+      })
+      .then(function (res) {
+        setError(null);
+        pollModels();
+        var newly = res.newly_found || [];
+        if (newly.length) {
+          var rows = document.getElementById("modelrows").querySelectorAll("tr");
+          for (var i = 0; i < rows.length; i++) {
+            var keyCell = rows[i].cells[0];
+            if (keyCell && newly.indexOf(keyCell.textContent) !== -1) {
+              rows[i].classList.add("newly-found");
+            }
+          }
+        }
+      })
+      .catch(function (e) {
+        setError("Model discovery failed: " + e.message);
+      });
+  });
+
   document.getElementById("stopvortex").addEventListener("click", function () {
     if (!confirm("Stop Vortex? This unloads all loaded models, freeing their RAM, and shuts down the server.")) return;
     fetch("/api/shutdown", { method: "POST" })
@@ -564,9 +658,11 @@ footer {
   pollStatus();
   pollCatalog();
   pollWrappers();
+  pollModels();
   setInterval(pollStatus, POLL_MS);
   setInterval(pollCatalog, POLL_MS);
   setInterval(pollWrappers, POLL_MS);
+  setInterval(pollModels, POLL_MS);
 })();
 </script>
 </body>

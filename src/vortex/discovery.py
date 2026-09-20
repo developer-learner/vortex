@@ -6,9 +6,11 @@ import os
 import shutil
 import socket
 import subprocess
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal
 
+import httpx
 from pydantic import BaseModel
 
 
@@ -234,3 +236,73 @@ def discover_wrappers(
             )
         )
     return wrappers
+
+
+class DiscoveredModel(BaseModel):
+    model_config = {"frozen": True}
+    key: str
+    display_name: str
+    publisher: str | None = None
+    architecture: str | None = None
+    quantization: str | None = None
+    size_bytes: int | None = None
+    params: str | None = None
+    max_context: int | None = None
+    fmt: str | None = None
+    loaded: bool = False
+    source: str
+    in_catalog: bool = False
+
+
+LIBRARY_PROBES: tuple[tuple[str, int], ...] = (("lmstudio", 1234),)
+
+
+def _fetch_library(base_url: str) -> list[dict]:
+    try:
+        response = httpx.get(f"{base_url}/api/v1/models", timeout=3.0)
+    except (httpx.HTTPError, OSError):
+        return []
+    if response.status_code != 200:
+        return []
+    try:
+        body = response.json()
+    except ValueError:
+        return []
+    models = body.get("models")
+    return models if isinstance(models, list) else []
+
+
+def discover_models(
+    catalog_entries: list | None = None,
+    fetch: Callable[[str], list[dict]] = _fetch_library,
+    probes: tuple[tuple[str, int], ...] = LIBRARY_PROBES,
+) -> list:
+    aliases: set[str | None] = set()
+    for entry in catalog_entries or []:
+        aliases.add(getattr(entry, "upstream_alias", None))
+        aliases.add(getattr(entry, "public_id", None))
+    found: list = []
+    for source, port in probes:
+        for raw in fetch(f"http://127.0.0.1:{port}"):
+            key = raw.get("key")
+            if not key:
+                continue
+            quant = raw.get("quantization")
+            quant_name = quant.get("name") if isinstance(quant, dict) else quant
+            found.append(
+                DiscoveredModel(
+                    key=key,
+                    display_name=raw.get("display_name") or key,
+                    publisher=raw.get("publisher"),
+                    architecture=raw.get("architecture"),
+                    quantization=quant_name,
+                    size_bytes=raw.get("size_bytes"),
+                    params=raw.get("params_string"),
+                    max_context=raw.get("max_context_length"),
+                    fmt=raw.get("format"),
+                    loaded=bool(raw.get("loaded_instances")),
+                    source=source,
+                    in_catalog=key in aliases,
+                )
+            )
+    return found

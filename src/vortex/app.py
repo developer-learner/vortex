@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
 from .catalog import Catalog, load_catalog
-from .discovery import Wrapper, discover_wrappers
+from .discovery import DiscoveredModel, Wrapper, discover_models, discover_wrappers
 from .lifecycle import (
     Lifecycle,
     PortConflictError,
@@ -49,6 +49,7 @@ def build_app(
     catalog: Catalog | None = None,
     sidecar_dir: Path | None = None,
     wrapper_discovery=discover_wrappers,
+    model_discovery=discover_models,
     on_shutdown: Callable[[], None] | None = None,
 ) -> FastAPI:
     catalog = catalog or load_catalog(_REPO_ROOT / "config/catalog.json")
@@ -63,6 +64,7 @@ def build_app(
     stop_daemon = on_shutdown or _default_stop
     log_stale_sidecars(sidecars, catalog)
     wrapper_cache: dict[str, tuple[float, list[Wrapper]]] = {}
+    model_cache: dict[str, tuple[float, list[DiscoveredModel]]] = {}
 
     app = FastAPI(title="Vortex", version="0.1.0")
 
@@ -267,6 +269,28 @@ def build_app(
         wrappers = [dict(w) for w in findings if w.installed]
         newly_found = [w.name for w in findings if w.installed and not w.in_catalog]
         return {"wrappers": wrappers, "newly_found": newly_found}
+
+    def _get_models() -> list:
+        now = time.time()
+        cached = model_cache.get("default")
+        if cached is not None and now - cached[0] <= 60.0:
+            return cached[1]
+        findings = model_discovery(catalog_entries=catalog.entries)
+        model_cache["default"] = (now, findings)
+        return findings
+
+    @app.get("/api/discovered-models")
+    def discovered_models() -> dict:
+        return {"models": [dict(m) for m in _get_models()]}
+
+    @app.post("/api/discovered-models/discover")
+    def discovered_models_discover() -> dict:
+        model_cache.clear()
+        findings = model_discovery(catalog_entries=catalog.entries)
+        model_cache["default"] = (time.time(), findings)
+        models = [dict(m) for m in findings]
+        newly_found = [m.key for m in findings if not m.in_catalog]
+        return {"models": models, "newly_found": newly_found}
 
     return app
 
