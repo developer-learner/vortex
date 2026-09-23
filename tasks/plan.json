@@ -1,3 +1,124 @@
 {
-  "tasks": []
+  "version": 1,
+  "erd_version": 37,
+  "tasks": [
+    {
+      "id": "T1",
+      "file": "src/vortex/memory.py",
+      "depends_on": [],
+      "brief": "NO-OP \u2014 acceptance-only carry. Do not edit `src/vortex/memory.py`. It implements the v31 direct-route RAM parity (vm_stat working-set figure, psutil fallback, per-model RSS, loadable bound) and is green. Its frozen tests (`tests/test_memory_figure.py`) run as acceptance; make no changes.",
+      "contracts": [],
+      "tests": [
+        "tests/test_memory_figure.py::test_activity_monitor_missing_keys_report_zero",
+        "tests/test_memory_figure.py::test_activity_monitor_parse_matches_the_vm_stat_arithmetic",
+        "tests/test_memory_figure.py::test_loadable_gb_bounds_reclaimable_by_wired_limit",
+        "tests/test_memory_figure.py::test_loadable_gb_failure_reports_zero",
+        "tests/test_memory_figure.py::test_model_rss_gb_none_pid_is_zero",
+        "tests/test_memory_figure.py::test_model_rss_gb_reads_ps_output",
+        "tests/test_memory_figure.py::test_model_rss_gb_unreadable_is_zero",
+        "tests/test_memory_figure.py::test_psutil_fallback_is_labeled_never_silent",
+        "tests/test_memory_figure.py::test_ram_used_prefers_vm_stat_and_names_it",
+        "tests/test_memory_figure.py::test_status_api_carries_memory_source_and_parity_figures",
+        "tests/test_memory_figure.py::test_status_api_names_the_memory_source",
+        "tests/test_memory_figure.py::test_used_figure_excludes_reclaimable_cache"
+      ]
+    },
+    {
+      "id": "T2",
+      "file": "src/vortex/app.py",
+      "depends_on": [
+        "T1",
+        "T4"
+      ],
+      "brief": "This is an EDIT to an existing file. Make exactly four changes; change nothing\nelse.\n\n**(a)** Change the discovery import line\n`from .discovery import Wrapper, discover_wrappers`\nto\n`from .discovery import DiscoveredModel, Wrapper, discover_models, discover_wrappers`\n\n**(b)** In the `build_app(...)` signature, add a new parameter\n`model_discovery=discover_models` on its own line immediately after the\nexisting `wrapper_discovery=discover_wrappers,` line and before\n`on_shutdown: Callable[[], None] | None = None,`.\n\n**(c)** Immediately after the existing module-level line that declares\n`wrapper_cache` (a dict initialized to an empty dict), add a new line\ndeclaring `model_cache` with the SAME annotation shape as `wrapper_cache`\nbut substituting the element type Wrapper with DiscoveredModel \u2014 i.e. a dict\nfrom str to a tuple of a float and a list of DiscoveredModel \u2014 initialized to\nan empty dict. Indentation matches the `wrapper_cache` line.\n\n**(d)** Immediately before the final `return app` line at the end of\n`build_app`, insert these three definitions verbatim (keep the existing\n`return app` after them). Annotate `_get_models`'s return as a list of\nDiscoveredModel (shown as `-> list` below to keep this brief plain; use the\nprecise `list` of DiscoveredModel annotation in the code):\n\n```python\n    def _get_models() -> list:\n        now = time.time()\n        cached = model_cache.get(\"default\")\n        if cached is not None and now - cached[0] <= 60.0:\n            return cached[1]\n        findings = model_discovery(catalog_entries=catalog.entries)\n        model_cache[\"default\"] = (now, findings)\n        return findings\n\n    @app.get(\"/api/discovered-models\")\n    def discovered_models() -> dict:\n        return {\"models\": [dict(m) for m in _get_models()]}\n\n    @app.post(\"/api/discovered-models/discover\")\n    def discovered_models_discover() -> dict:\n        model_cache.clear()\n        findings = model_discovery(catalog_entries=catalog.entries)\n        model_cache[\"default\"] = (time.time(), findings)\n        models = [dict(m) for m in findings]\n        newly_found = [m.key for m in findings if not m.in_catalog]\n        return {\"models\": models, \"newly_found\": newly_found}\n```\n\nSelf-verify: the file parses; `build_app` has a `model_discovery` parameter\nwhose default is `discover_models`; the existing engine-wrappers routes are\nunchanged.",
+      "contracts": [
+        "route:GET /api/discovered-models",
+        "route:POST /api/discovered-models/discover"
+      ],
+      "tests": [
+        "tests/test_anneal_retry.py::test_anneal_does_not_retry_a_loading_503",
+        "tests/test_anneal_retry.py::test_anneal_gives_up_after_bounded_attempts",
+        "tests/test_anneal_retry.py::test_anneal_probe_sends_the_real_model_id",
+        "tests/test_anneal_retry.py::test_anneal_retries_a_transport_blip_and_succeeds",
+        "tests/test_anneal_retry.py::test_anneal_still_rejects_a_completion_without_choices",
+        "tests/test_anneal_retry.py::test_harmonic_ready_probes_with_alias_then_public_id",
+        "tests/test_discovered_models_api.py::test_build_app_defaults_to_real_model_discovery",
+        "tests/test_discovered_models_api.py::test_discover_post_flags_models_not_in_catalog",
+        "tests/test_discovered_models_api.py::test_get_lists_discovered_models",
+        "tests/test_discovered_models_api.py::test_wire_schema_carries_all_discovered_model_fields"
+      ]
+    },
+    {
+      "id": "T3",
+      "file": "src/vortex/ui.py",
+      "depends_on": [
+        "T2"
+      ],
+      "brief": "This is an EDIT to the single `UI_PAGE` string in `src/vortex/ui.py`. Insert a `#discoveredmodels` section between the engine-wrappers `</section>` and `</main>`, plus the JS that drives it. `UI_PAGE` is a plain triple-quoted string \u2014 insert literal HTML/JS, no f-string interpolation.\n\nHTML: a `<section id=\"discoveredmodels\">` with an `<h2>Discovered models</h2>`, a `<table>` (thead: Model, Publisher, Quant, Size, Params, Context, Loaded, Catalog) whose `<tbody id=\"modelrows\">` starts with a loading row, and a `<button data-act=\"scan-models\">Scan</button>`.\n\nJS (insert after the existing `pollWrappers` function):\n- `renderModels(models)`: fill `#modelrows` with one row per model showing `m.key`, `m.publisher`, `m.quantization`, size, params, context, `m.loaded`, `m.in_catalog` (an empty-state row when the list is empty).\n- `pollModels()`: `fetch(\"/api/discovered-models\")` then `renderModels(data.models)`.\n- A click handler on `#discoveredmodels`: for a `data-act=\"scan-models\"` button, `fetch(\"/api/discovered-models/discover\", { method: \"POST\" })` then `pollModels()`.\n\nBootstrap (the existing `pollStatus(); pollCatalog(); pollWrappers();` + `setInterval(..., POLL_MS)` block at the end): add `pollModels();` after `pollWrappers();` and `setInterval(pollModels, POLL_MS);` after `setInterval(pollWrappers, POLL_MS);`.\n\nSelf-verify: `UI_PAGE` contains `Discovered models`, `id=\"modelrows\"`, `data-act=\"scan-models\"`, `fetch(\"/api/discovered-models\")`, `m.key`, `m.publisher`, `m.quantization`, `m.in_catalog`, `discovered-models/discover`, `method: \"POST\"`, and `setInterval(pollModels, POLL_MS)`.",
+      "contracts": [],
+      "tests": [
+        "tests/test_ui_api_contract.py::test_catalog_response_is_enveloped",
+        "tests/test_ui_api_contract.py::test_ui_only_reads_catalog_fields_the_api_returns",
+        "tests/test_ui_api_contract.py::test_ui_only_reads_status_fields_the_api_returns",
+        "tests/test_ui_api_contract.py::test_ui_operation_completion_uses_real_terminal_states",
+        "tests/test_ui_api_contract.py::test_ui_uses_the_api_loaded_state_token",
+        "tests/test_ui_api_contract.py::test_ui_uses_the_operation_field_the_api_returns",
+        "tests/test_ui_content.py::test_ram_detail_parity_elements_present",
+        "tests/test_ui_discovered_models.py::test_poll_models_runs_on_the_existing_cadence",
+        "tests/test_ui_discovered_models.py::test_scan_button_posts_to_the_rescan_route",
+        "tests/test_ui_discovered_models.py::test_ui_fetches_the_discovered_models_endpoint",
+        "tests/test_ui_discovered_models.py::test_ui_has_discovered_models_section",
+        "tests/test_ui_discovered_models.py::test_ui_renders_discovered_model_fields_from_the_api"
+      ]
+    },
+    {
+      "id": "T4",
+      "file": "src/vortex/discovery.py",
+      "depends_on": [],
+      "brief": "This is an EDIT to `src/vortex/discovery.py`. Append the model-discovery surface after the existing `discover_wrappers`; change nothing else. Add `import httpx` and `from collections.abc import Callable` to the imports.\n\nAdd a frozen pydantic `DiscoveredModel` (`model_config = {\"frozen\": True}`) with fields: `key`, `display_name`, `publisher`, `architecture`, `quantization`, `size_bytes` (int), `params`, `max_context` (int), `fmt`, `loaded` (bool, default False), `source`, `in_catalog` (bool, default False).\n\nAdd `LIBRARY_PROBES = ((\"lmstudio\", 1234),)`.\n\nAdd `_fetch_library(base_url) -> list[dict]`: GET `{base_url}/api/v1/models` with a 3s timeout; return the JSON `models` list, or `[]` on ANY failure (unreachable, non-200, bad JSON, missing/non-list key) \u2014 never raises.\n\nAdd `discover_models(catalog_entries=None, fetch=_fetch_library, probes=LIBRARY_PROBES)` returning a list of DiscoveredModel. For each `(source, port)` probe, for each fetched entry that has a `key`, build a `DiscoveredModel` with EXACTLY these mappings:\n- `key` \u2190 `key`\n- `display_name` \u2190 `display_name` (fall back to `key` if absent)\n- `publisher` \u2190 `publisher`\n- `architecture` \u2190 `architecture`\n- `quantization` \u2190 the `name` from the entry's `quantization` dict (or the raw value if it is a string)\n- `size_bytes` \u2190 `size_bytes`\n- `params` \u2190 `params_string`\n- `max_context` \u2190 `max_context_length`\n- `fmt` \u2190 `format`\n- `loaded` \u2190 `bool(loaded_instances)`\n- `source` \u2190 the probe's source name\n- `in_catalog` \u2190 True iff `key` equals some catalog entry's `upstream_alias` or `public_id`\nSkip entries without a `key`. Never launches, loads, or alters anything.\n\nSelf-verify: the file parses; `DiscoveredModel` and `discover_models` import; the existing `discover_wrappers`/`Wrapper`/`WRAPPER_SPECS` are unchanged.",
+      "contracts": [
+        "src.vortex.discovery:DiscoveredModel",
+        "src.vortex.discovery:discover_models"
+      ],
+      "tests": [
+        "tests/test_discovered_models.py::test_discovered_model_carries_the_metadata_fields",
+        "tests/test_discovered_models.py::test_entries_without_a_key_are_skipped",
+        "tests/test_discovered_models.py::test_in_catalog_flag_matches_key_against_catalog_upstream_alias",
+        "tests/test_discovered_models.py::test_library_unreachable_yields_no_models_never_an_error",
+        "tests/test_discovered_models.py::test_loaded_flag_reflects_loaded_instances",
+        "tests/test_discovered_models.py::test_probe_maps_every_library_entry_to_a_discovered_model",
+        "tests/test_discovery.py::test_discovery_module_is_stdlib_only",
+        "tests/test_discovery.py::test_failed_version_probe_reports_empty",
+        "tests/test_discovery.py::test_finds_an_installed_binary_on_path",
+        "tests/test_discovery.py::test_in_catalog_matches_absolute_launch_path_by_basename",
+        "tests/test_discovery.py::test_in_catalog_reflects_catalog_entries",
+        "tests/test_discovery.py::test_mlx_lm_resolves_only_its_console_script_names",
+        "tests/test_discovery.py::test_only_probe_subprocess_is_the_version_check",
+        "tests/test_discovery.py::test_port_check_reports_open_and_closed",
+        "tests/test_discovery.py::test_registry_covers_the_named_wrappers",
+        "tests/test_discovery.py::test_registry_entries_are_sane_and_ordered",
+        "tests/test_discovery.py::test_shared_default_ports_report_the_port_not_the_process",
+        "tests/test_discovery.py::test_unresolved_wrappers_report_not_installed",
+        "tests/test_discovery.py::test_version_probe_records_first_stdout_line"
+      ]
+    },
+    {
+      "id": "T5",
+      "file": "src/vortex/manager.py",
+      "depends_on": [],
+      "brief": "1. `MemoryConflict.__init__` gains a third parameter `uncertain: list[str] | None = None`; store `self.uncertain = uncertain or []`. When `candidates` is non-empty keep the existing message. When it is empty use: `f\"loading needs {total_required}; not enough memory is free and nothing loaded can be evicted \u2014 held by a process Vortex cannot identify: {', '.join(self.uncertain)}\"`.\n2. After `eviction_required`, add a method `uncertain_entries(self, entry: CatalogEntry)` that returns a list of `CatalogEntry` (annotate it with the same `list` of `CatalogEntry` form the file uses elsewhere). Collect `loaded_ids = {e.public_id for e in self.all_ready()}`. For each `e` in `self.catalog.entries`, skip it when `e.public_id == entry.public_id` or `e.public_id in loaded_ids`; otherwise `pid = self.lifecycle.occupying_pid(e)` and include `e` when `pid is SCAN_UNKNOWN`, or when `pid is not None and self.lifecycle.owner_status(e, pid) != \"ready\"`. Return the list.\n3. Add `def admits(self, entry: CatalogEntry) -> bool:`. Return True when `entry.ram_estimate_gb is None` or `not entry.exclusive`, or when `entry` is already in `self.all_ready()` (same `public_id`). Otherwise `used` = sum of `(e.ram_estimate_gb or 0)` over `self.all_ready()` plus the same sum over `self.uncertain_entries(entry)`; `available = max(0.0, psutil.virtual_memory().total / (1024**3) * 0.8 - used)`; return `entry.ram_estimate_gb <= available`.\n4. Change the body of `eviction_required` after its first guard to: `loaded = self.all_ready()`; `if self.admits(entry): return []`; `return loaded`.\n5. In `load()`, replace the block `conflicts = self.eviction_required(entry)` / `if conflicts: raise MemoryConflict(...)` with: `if not self.admits(entry): raise MemoryConflict(entry.ram_estimate_gb, [e.public_id for e in self.eviction_required(entry)], [e.public_id for e in self.uncertain_entries(entry)])`.\n\nSelf-verify: with one other entry on `SCAN_UNKNOWN` holding 50 GB of an 80 GB budget, `admits` on a 40 GB target is False and `load` raises `MemoryConflict` with `candidates == []`; with that entry simply unloaded, `admits` is True.",
+      "contracts": [],
+      "tests": [
+        "tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified0]",
+        "tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified1]",
+        "tests/test_admission_uncertain.py::test_refusal_without_candidates_names_the_unidentified_process",
+        "tests/test_admission_uncertain.py::test_scan_unknown_entry_held_ready_is_counted_once",
+        "tests/test_admission_uncertain.py::test_scan_unknown_neighbour_counts_and_refuses_the_load",
+        "tests/test_admission_uncertain.py::test_target_is_never_counted_against_itself",
+        "tests/test_admission_uncertain.py::test_uncertain_entry_is_not_an_eviction_candidate",
+        "tests/test_admission_uncertain.py::test_unidentified_occupant_counts_and_refuses_the_load",
+        "tests/test_admission_uncertain.py::test_unloaded_entries_do_not_count"
+      ]
+    }
+  ]
 }
