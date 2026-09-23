@@ -2,6 +2,16 @@
 
 ## State
 
+- **2026-09-23 — Task files refreshed; D-186 migration landed.**
+  - `main` = `2f46a09`, in sync with origin, CI + swbp-guard green, spec v35,
+    144 tests. Vortex is builder-targeted: run steps via
+    `~/dev/sw-dev-blueprint/scripts/swbp <cmd> --app ~/dev/vortex`.
+  - `tasks/TODO.md` rewritten as a prioritized table (criticality / cost /
+    milestone vs ad hoc). Top items: **R1** first real `swbp orchestrate`
+    milestone (P0, gates Blueprint stage F); **T1** admission policy (P1,
+    awaiting CEO) — recommended to run T1 as R1.
+  - Backlog #4 (D-168 plane live-fire) superseded by R1.
+
 - **2026-08-26 (2) — Catch-ledger hook landed + vmlx path live-verified.**
   - **Catch-ledger recording hook (combined TODO item, done):** the wiring was
     already inherited — the shared `refreeze.sh` (symlink) carries `record_catch`

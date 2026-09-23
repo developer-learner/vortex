@@ -14,6 +14,16 @@
 > and completion conditions. This file remains the detailed status/history
 > authority.
 
+## Status summary — through v35 + D-186 (2026-09-23)
+
+> **2026-09-23 refresh:** frozen spec **v35** on `origin/main`; 144 tests,
+> CI + swbp-guard green at `2f46a09`. Shipped since v26: v27–v29 Stop Vortex,
+> v30 anneal-probe model id, v31 RAM display parity, dashboard endpoint column,
+> nemotron + Splash/mtplx catalog entries, v32–v35 discovered-models, and the
+> D-186 migration (Vortex is now builder-targeted; no control plane). Item **4**
+> is superseded by TODO **R1** (first real milestone under `swbp orchestrate`).
+> `tasks/TODO.md` has the prioritized table (criticality / cost / kind).
+
 ## Status summary — through v26 (2026-09-01)
 
 > The SOLID/async audit remediation is complete and on `origin/main` at **v26**
@@ -70,8 +80,10 @@ decision (session-latched behavior accepted without code on 2026-09-01).
   documented combination. See `tasks/TODO.md` T1. Decision note prepared at
   `tasks/T1-admission-decision.md` (recommendation: conservatively count the
   catalog estimate for uncertain non-target entries); awaiting the policy choice.
-- [ ] **4** — Vortex D-168 live-fire: one successful real multi-task run that
-  crosses a mid-run Blueprint advancement and records the unchanged plane SHA.
+- [x] **4** — ~~Vortex D-168 live-fire~~ — superseded 2026-09-23 by D-186 (no
+  in-app plane). Successor: TODO **R1**, one real milestone via `swbp orchestrate`.
+- [ ] **R1** — first real milestone under `swbp orchestrate` (P0; gates
+  Blueprint stage F).
 - [ ] **13** — model-specific Git provenance (CEO decision).
 - [ ] **16** — `LLM_ENDPOINT` cutover to `:9000/v1/chat/completions` (phase 4).
 - [ ] **17** — provisioning/tuning v2 + vmlx live exercise (memory-blocked;
