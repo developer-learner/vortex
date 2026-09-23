@@ -1,0 +1,108 @@
+I'll work through the five changes against the file content provided.
+
+<<<<<<< SEARCH
+class MemoryConflict(Exception):
+    def __init__(self, required_gb: float | None, candidates: list[str]) -> None:
+        self.required_gb = required_gb
+        self.candidates = candidates
+        total_required = (
+            f"~{required_gb:.0f} GB" if required_gb is not None else "unknown size"
+        )
+        super().__init__(
+            f"loading needs {total_required}; {len(candidates)} loaded model(s) "
+            f"would need eviction: {', '.join(candidates)}"
+        )
+=======
+class MemoryConflict(Exception):
+    def __init__(
+        self,
+        required_gb: float | None,
+        candidates: list[str],
+        uncertain: list[str] | None = None,
+    ) -> None:
+        self.required_gb = required_gb
+        self.candidates = candidates
+        self.uncertain = uncertain or []
+        total_required = (
+            f"~{required_gb:.0f} GB" if required_gb is not None else "unknown size"
+        )
+        if candidates:
+            message = (
+                f"loading needs {total_required}; {len(candidates)} loaded model(s) "
+                f"would need eviction: {', '.join(candidates)}"
+            )
+        else:
+            message = (
+                f"loading needs {total_required}; not enough memory is free and "
+                f"nothing loaded can be evicted — held by a process Vortex cannot "
+                f"identify: {', '.join(self.uncertain)}"
+            )
+        super().__init__(message)
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+        if amount <= available:
+            return []
+        return loaded
+
+    def load(self, public_id: str) -> dict:
+=======
+        if amount <= available:
+            return []
+        return loaded
+
+    def uncertain_entries(self, entry: CatalogEntry) -> list[CatalogEntry]:
+        loaded_ids = {e.public_id for e in self.all_ready()}
+        out: list[CatalogEntry] = []
+        for e in self.catalog.entries:
+            if e.public_id == entry.public_id or e.public_id in loaded_ids:
+                continue
+            pid = self.lifecycle.occupying_pid(e)
+            if pid is SCAN_UNKNOWN or (
+                pid is not None and self.lifecycle.owner_status(e, pid) != "ready"
+            ):
+                out.append(e)
+        return out
+
+    def admits(self, entry: CatalogEntry) -> bool:
+        if entry.ram_estimate_gb is None or not entry.exclusive:
+            return True
+        if any(e.public_id == entry.public_id for e in self.all_ready()):
+            return True
+        used = sum((e.ram_estimate_gb or 0) for e in self.all_ready())
+        used += sum((e.ram_estimate_gb or 0) for e in self.uncertain_entries(entry))
+        available = max(0.0, psutil.virtual_memory().total / (1024**3) * 0.8 - used)
+        return entry.ram_estimate_gb <= available
+
+    def load(self, public_id: str) -> dict:
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+        amount = entry.ram_estimate_gb
+        if amount is None or not entry.exclusive:
+            return []
+        loaded = self.all_ready()
+        if any(e.public_id == entry.public_id for e in loaded):
+            return []
+        used = sum((e.ram_estimate_gb or 0) for e in loaded)
+        available = max(0.0, psutil.virtual_memory().total / (1024**3) * 0.8 - used)
+        if amount <= available:
+            return []
+        return loaded
+=======
+        if self.admits(entry):
+            return []
+        return self.all_ready()
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+            conflicts = self.eviction_required(entry)
+            if conflicts:
+                raise MemoryConflict(
+                    entry.ram_estimate_gb, [e.public_id for e in conflicts]
+                )
+=======
+            if not self.admits(entry):
+                raise MemoryConflict(
+                    entry.ram_estimate_gb,
+                    [e.public_id for e in self.eviction_required(entry)],
+                    [e.public_id for e in self.uncertain_entries(entry)],
+                )
+>>>>>>> REPLACE

@@ -1,0 +1,3 @@
+model=incoai/Qwen3.8-27B-Splash
+call_id=chatcmpl-d8791dc5011c003a798fbf8524952283
+ts=2026-09-23T07:16:05Z

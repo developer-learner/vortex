@@ -1,3 +1,31 @@
+1. `MemoryConflict.__init__` gains a third parameter `uncertain: list[str] | None = None`; store `self.uncertain = uncertain or []`. When `candidates` is non-empty keep the existing message. When it is empty use: `f"loading needs {total_required}; not enough memory is free and nothing loaded can be evicted — held by a process Vortex cannot identify: {', '.join(self.uncertain)}"`.
+2. After `eviction_required`, add a method `uncertain_entries(self, entry: CatalogEntry)` that returns a list of `CatalogEntry` (annotate it with the same `list` of `CatalogEntry` form the file uses elsewhere). Collect `loaded_ids = {e.public_id for e in self.all_ready()}`. For each `e` in `self.catalog.entries`, skip it when `e.public_id == entry.public_id` or `e.public_id in loaded_ids`; otherwise `pid = self.lifecycle.occupying_pid(e)` and include `e` when `pid is SCAN_UNKNOWN`, or when `pid is not None and self.lifecycle.owner_status(e, pid) != "ready"`. Return the list.
+3. Add `def admits(self, entry: CatalogEntry) -> bool:`. Return True when `entry.ram_estimate_gb is None` or `not entry.exclusive`, or when `entry` is already in `self.all_ready()` (same `public_id`). Otherwise `used` = sum of `(e.ram_estimate_gb or 0)` over `self.all_ready()` plus the same sum over `self.uncertain_entries(entry)`; `available = max(0.0, psutil.virtual_memory().total / (1024**3) * 0.8 - used)`; return `entry.ram_estimate_gb <= available`.
+4. Change the body of `eviction_required` after its first guard to: `loaded = self.all_ready()`; `if self.admits(entry): return []`; `return loaded`.
+5. In `load()`, replace the block `conflicts = self.eviction_required(entry)` / `if conflicts: raise MemoryConflict(...)` with: `if not self.admits(entry): raise MemoryConflict(entry.ram_estimate_gb, [e.public_id for e in self.eviction_required(entry)], [e.public_id for e in self.uncertain_entries(entry)])`.
+
+Self-verify: with one other entry on `SCAN_UNKNOWN` holding 50 GB of an 80 GB budget, `admits` on a 40 GB target is False and `load` raises `MemoryConflict` with `candidates == []`; with that entry simply unloaded, `admits` is True.
+
+Write EXACTLY one file: src/vortex/manager.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/manager.py and confirm it satisfies every acceptance condition in this brief.
+
+Reply with ONLY edit blocks in this exact format, nothing else:
+<<<<<<< SEARCH
+(an EXACT, character-for-character copy of a short existing section — 3 to 10 lines)
+=======
+(that same section with the change applied)
+>>>>>>> REPLACE
+Rules:
+- Each SEARCH must appear EXACTLY ONCE in the file. Copy it verbatim — same spaces, same quotes.
+- Several small blocks, not one big one. Do not touch code outside your blocks. Do not reformat or reorder anything.
+- Never include any line containing a think tag in a SEARCH section — anchor on nearby tag-free lines instead.
+- In new code, never write the think tag as one literal string — construct it by concatenation, e.g. '<' + 'think>'.
+- If the file already satisfies the brief, reply with exactly this line and nothing else: === NO CHANGES ===
+- Verify each SEARCH against the file one more time before answering.
+- Your reply's VERY FIRST line must be '<<<<<<< SEARCH' (or the NO CHANGES line). Do not analyze, plan, or explain anything — every design decision is already made in the brief. Prose before the blocks burns your output budget and truncates the edit mid-block.
+- Every block must be COMPLETE working code — never a stub, placeholder, or '...' body. If the brief needs a new function, write its full body in the block.
+
+### existing (src/vortex/manager.py)
+```
 """Vortex manager: load/unload orchestration, eviction, state aggregation."""
 
 from __future__ import annotations
@@ -12,30 +40,16 @@ from .operations import OperationStore
 
 
 class MemoryConflict(Exception):
-    def __init__(
-        self,
-        required_gb: float | None,
-        candidates: list[str],
-        uncertain: list[str] | None = None,
-    ) -> None:
+    def __init__(self, required_gb: float | None, candidates: list[str]) -> None:
         self.required_gb = required_gb
         self.candidates = candidates
-        self.uncertain = uncertain or []
         total_required = (
             f"~{required_gb:.0f} GB" if required_gb is not None else "unknown size"
         )
-        if candidates:
-            message = (
-                f"loading needs {total_required}; {len(candidates)} loaded model(s) "
-                f"would need eviction: {', '.join(candidates)}"
-            )
-        else:
-            message = (
-                f"loading needs {total_required}; not enough memory is free and "
-                f"nothing loaded can be evicted — held by a process Vortex cannot "
-                f"identify: {', '.join(self.uncertain)}"
-            )
-        super().__init__(message)
+        super().__init__(
+            f"loading needs {total_required}; {len(candidates)} loaded model(s) "
+            f"would need eviction: {', '.join(candidates)}"
+        )
 
 
 class BusyError(Exception):
@@ -95,32 +109,17 @@ class Manager:
 
     def eviction_required(self, entry: CatalogEntry) -> list[CatalogEntry]:
         """Loaded models that would need eviction for this entry, or []."""
-        if self.admits(entry):
+        amount = entry.ram_estimate_gb
+        if amount is None or not entry.exclusive:
             return []
-        return self.all_ready()
-
-    def uncertain_entries(self, entry: CatalogEntry) -> list[CatalogEntry]:
-        loaded_ids = {e.public_id for e in self.all_ready()}
-        out: list[CatalogEntry] = []
-        for e in self.catalog.entries:
-            if e.public_id == entry.public_id or e.public_id in loaded_ids:
-                continue
-            pid = self.lifecycle.occupying_pid(e)
-            if pid is SCAN_UNKNOWN or (
-                pid is not None and self.lifecycle.owner_status(e, pid) != "ready"
-            ):
-                out.append(e)
-        return out
-
-    def admits(self, entry: CatalogEntry) -> bool:
-        if entry.ram_estimate_gb is None or not entry.exclusive:
-            return True
-        if any(e.public_id == entry.public_id for e in self.all_ready()):
-            return True
-        used = sum((e.ram_estimate_gb or 0) for e in self.all_ready())
-        used += sum((e.ram_estimate_gb or 0) for e in self.uncertain_entries(entry))
+        loaded = self.all_ready()
+        if any(e.public_id == entry.public_id for e in loaded):
+            return []
+        used = sum((e.ram_estimate_gb or 0) for e in loaded)
         available = max(0.0, psutil.virtual_memory().total / (1024**3) * 0.8 - used)
-        return entry.ram_estimate_gb <= available
+        if amount <= available:
+            return []
+        return loaded
 
     def load(self, public_id: str) -> dict:
         entry = self.catalog.by_public_id(public_id)
@@ -131,11 +130,10 @@ class Manager:
             existing = self._existing_or_busy("load", public_id)
             if existing is not None:
                 return existing
-            if not self.admits(entry):
+            conflicts = self.eviction_required(entry)
+            if conflicts:
                 raise MemoryConflict(
-                    entry.ram_estimate_gb,
-                    [e.public_id for e in self.eviction_required(entry)],
-                    [e.public_id for e in self.uncertain_entries(entry)],
+                    entry.ram_estimate_gb, [e.public_id for e in conflicts]
                 )
             self._preflight_load(entry)
             op_id = self.ops.create("load", public_id)
@@ -213,3 +211,5 @@ class Manager:
                 port=entry.port,
                 pid=occupant,
             )
+
+```
