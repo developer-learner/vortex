@@ -1,3 +1,0 @@
-mode=linked
-source=../sw-dev-blueprint
-exception=.github/workflows/check-drift.yml

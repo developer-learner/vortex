@@ -1,1 +1,0 @@
-../../../sw-dev-blueprint/scripts/selftest/verify-sandbox-in-vm.sh

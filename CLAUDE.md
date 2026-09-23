@@ -21,6 +21,25 @@ The process is called modelmux; `vortex` is the app and repository name.
 
 ---
 
+## Running the pipeline (D-186 — this app carries no control plane)
+
+Vortex is a builder-targeted app: it holds product code, `tests/`, the frozen
+spec (`scripts/.approved/`) and its own adaptations — nothing of the pipeline.
+Every `scripts/<name>.sh` named below means running that step **from the
+builder, against this app**:
+
+```
+~/dev/sw-dev-blueprint/scripts/swbp <name> --app ~/dev/vortex [-- args]
+```
+
+e.g. `swbp refreeze`, `swbp orchestrate`, `swbp tpm-pack`. The builder version
+is pinned in `.swbp` (`ref=`); change it only between milestones. A person's
+change to tests, the frozen spec, or pipeline adaptations (`CLAUDE.md`,
+`ci.yml`, `.gate-paths`, …) goes through `swbp commit --app ~/dev/vortex --
+"<subject>" <files>` — `swbp-guard` in CI flags anything else.
+
+---
+
 ## Tech Stack
 
 > Adapted from template default (Rule 3) — FastAPI + SQLite app with no DB.

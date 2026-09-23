@@ -1,1 +1,0 @@
-../../sw-dev-blueprint/scripts/check-swallowed-errors.py

@@ -1,1 +1,0 @@
-../../sw-dev-blueprint/scripts/check-provenance.py

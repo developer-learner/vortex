@@ -1,1 +1,0 @@
-../../../sw-dev-blueprint/scripts/selftest/selftest_lint_changed.py

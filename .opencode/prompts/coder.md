@@ -1,1 +1,0 @@
-../../../sw-dev-blueprint/.opencode/prompts/coder.md

@@ -1,1 +1,0 @@
-../../sw-dev-blueprint/scripts/extract-test-functions.py

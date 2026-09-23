@@ -1,1 +1,0 @@
-../../sw-dev-blueprint/scripts/manifest-drift-guard.sh

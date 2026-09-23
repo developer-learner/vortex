@@ -1,1 +1,0 @@
-../../../sw-dev-blueprint/scripts/selftest/selftest_provenance_m2.py

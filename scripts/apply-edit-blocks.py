@@ -1,1 +1,0 @@
-../../sw-dev-blueprint/scripts/apply-edit-blocks.py

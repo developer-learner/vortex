@@ -1,1 +1,0 @@
-../../../sw-dev-blueprint/scripts/selftest/selftest_release_gate.py
