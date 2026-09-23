@@ -1,19 +1,12 @@
 {
-  "erd_version": 33,
+  "erd_version": 36,
   "files": [
-    "src/vortex/memory.py",
-    "src/vortex/discovery.py",
-    "src/vortex/app.py",
-    "src/vortex/ui.py"
+    "src/vortex/manager.py"
   ],
   "changed_files": [
-    "src/vortex/discovery.py",
-    "src/vortex/app.py",
-    "src/vortex/ui.py"
+    "src/vortex/manager.py"
   ],
-  "no_edit_files": [
-    "src/vortex/memory.py"
-  ],
+  "no_edit_files": [],
   "entry_points": [
     "src.vortex.ui",
     "src.vortex.ui:UI_PAGE",
@@ -27,8 +20,10 @@
     "src.vortex.discovery:discover_models",
     "src.vortex.discovery:DiscoveredModel"
   ],
+  "smoke_checks": {
+    "src/vortex/manager.py": "grep -q 'def admits' src/vortex/manager.py"
+  },
   "test_mapping": {},
-  "smoke_checks": {},
   "routes": [
     {
       "id": "route:GET /",

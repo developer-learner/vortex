@@ -186,3 +186,44 @@ add on the same route shape).
   on the existing poll cadence, and provides a Scan control such that clicking
   it calls `POST /api/discovered-models/discover` and marks discovered models
   absent from the catalog.
+
+## v36 scope (fail-safe admission under uncertain occupancy — T1)
+
+Scope brief: the outcome is that Vortex never admits a load it cannot cover
+because a catalog port is held by a process it cannot identify, or because a
+port scan was incomplete. Such an entry's catalog RAM estimate is counted —
+once — in admission, it is never offered for eviction, and a load that cannot
+fit is refused even when nothing is evictable. Policy chosen: option 2 of the
+T1 decision note (count the catalog estimate); host-available memory as an
+extra bound (option 3) is deferred. One file changes: `src/vortex/manager.py`.
+Expected time band: 10–25 minutes of pipeline time.
+
+## Explicitly out of scope for v36
+
+Using host-available memory (`psutil.virtual_memory().available`) as an
+additional bound, evicting or killing unidentified processes, and any change
+to how ports are scanned or processes identified.
+
+## v36 acceptance criteria
+
+- **AC-12:** WHEN another catalog entry's port scan is incomplete or its port
+  holds a process Vortex cannot identify, THE SYSTEM SHALL count that entry's
+  catalog RAM estimate in load admission, such that a load that only fits by
+  ignoring it is refused with MemoryConflict and no load operation starts.
+- **AC-13:** THE SYSTEM SHALL never offer such an uncertain entry as an
+  eviction candidate, such that `eviction_required` lists only identified
+  loaded entries.
+- **AC-14:** WHEN another entry's runtime is identified (verified this session
+  or not), THE SYSTEM SHALL keep counting its estimate and offering it for
+  eviction as before, such that an over-subscribing load is still refused
+  with that entry among the eviction candidates.
+- **AC-15:** WHEN other catalog entries are simply unloaded (no process on
+  their port), THE SYSTEM SHALL not count them, such that a load that fits the
+  budget is admitted.
+- **AC-16:** THE SYSTEM SHALL count an uncertain entry already held as ready
+  only once, and SHALL never count the load target against itself, such that
+  a load that fits under single counting is admitted.
+- **AC-17:** WHEN a load is refused and nothing loaded can be evicted, THE
+  SYSTEM SHALL say in the MemoryConflict message that the memory is held by a
+  process Vortex cannot identify and name the uncertain entries, such that
+  the refusal explains itself.
