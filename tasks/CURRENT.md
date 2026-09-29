@@ -2,6 +2,30 @@
 
 ## State
 
+- **2026-09-29 — v38 Restart Vortex shipped (`fb9842f`); EM/coder = Qwen3.8 Flash Next.**
+  - CEO ask: a Restart button beside Stop that unloads every model and brings
+    Vortex back live and clean. Routed as a milestone (D-132: new behaviour +
+    new route contract); TPM seat = Claude (claude-opus-5-5), CEO-assigned
+    (D-139). Disclosure: this TPM had read `src/vortex/app.py`/`manager.py`
+    earlier the same session while debugging, so INV-1's src read-wall did not
+    hold structurally for v38; tests were authored from the frozen spec and
+    the v27–v29 Stop Vortex artifacts.
+  - Seat change (host + VM `models.env`, backups `*.bak-2026-09-29-*`): EM and
+    coder = `Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit` on mlx-serve :8112
+    (`--mtp`), addressed direct so `--expect-model` matches (via Vortex :9000
+    the reply carries the upstream alias). Smoke + coder sentinel verified in
+    the VM before the run.
+  - Run: refreeze v38 (`5129875`, 12 delta tests red pre-impl) → plan
+    synthesized from TPM briefs, no EM call (`887618d`) → T1 restart.py pass
+    a1, T3 ui.py pass a1, T2 app.py pass a2 (a1: F401 from a TPM brief defect)
+    → `[success]` in 63 s of pipeline time, 4 coder calls.
+  - **Post-`[success]` hand-fixes: 1** (`cef7de3`, ruff I001 import order —
+    CI-only lint; see correction log 2026-09-29).
+  - Host verification: ruff + mypy clean, 165 passed, coverage 90.74%.
+    Live: `POST /api/restart` unloaded the loaded model, old daemon exited,
+    new daemon answered in 11 s with nothing loaded; restart during a load →
+    409 busy with the operation id.
+
 - **2026-09-23 — Task files refreshed; D-186 migration landed.**
   - `main` = `2f46a09`, in sync with origin, CI + swbp-guard green, spec v35,
     144 tests. Vortex is builder-targeted: run steps via
