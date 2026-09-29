@@ -1,0 +1,79 @@
+<<<<<<< SEARCH
+import logging
+import os
+import signal
+import time
+from collections.abc import Callable
+from pathlib import Path
+=======
+import logging
+import os
+import signal
+import sys
+import time
+from collections.abc import Callable
+from pathlib import Path
+
+import psutil  # type: ignore[import-untyped]
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+from .operations import OperationStore
+from .ui import UI_PAGE
+=======
+from .operations import OperationStore
+from .restart import spawn_relauncher
+from .ui import UI_PAGE
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+    on_shutdown: Callable[[], None] | None = None,
+) -> FastAPI:
+=======
+    on_shutdown: Callable[[], None] | None = None,
+    on_restart: Callable[[], None] | None = None,
+) -> FastAPI:
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+    stop_daemon = on_shutdown or _default_stop
+    log_stale_sidecars(sidecars, catalog)
+=======
+    stop_daemon = on_shutdown or _default_stop
+
+    def _default_restart() -> None:
+        spawn_relauncher(os.getpid(), [sys.executable, *sys.argv], os.getcwd())
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    restart_daemon = on_restart or _default_restart
+    log_stale_sidecars(sidecars, catalog)
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+            background=BackgroundTask(stop_daemon),
+        )
+
+    def _get_wrappers() -> list[Wrapper]:
+=======
+            background=BackgroundTask(stop_daemon),
+        )
+
+    @app.post("/api/restart")
+    def restart() -> Response:
+        active = ops.active()
+        if active is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": f"{active.kind} for {active.public_id!r} is in progress",
+                    "busy": True,
+                    "operation": active.id,
+                },
+            )
+        unloaded: list[str] = []
+        for entry in manager.all_ready():
+            if lifecycle.terminate(entry):
+                unloaded.append(entry.public_id)
+        return JSONResponse(
+            {"restarting": True, "unloaded": unloaded},
+            background=BackgroundTask(restart_daemon),
+        )
+
+    def _get_wrappers() -> list[Wrapper]:
+>>>>>>> REPLACE
