@@ -16,9 +16,8 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-import psutil  # type: ignore[import-untyped]
-
 import httpx
+import psutil  # type: ignore[import-untyped]
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
