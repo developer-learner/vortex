@@ -1,0 +1,35 @@
+Create the new file `src/vortex/restart.py` with exactly this content:
+
+    """Relaunch helper: run a command once a given process has exited."""
+
+    from __future__ import annotations
+
+    import subprocess
+
+    _WAIT_THEN_EXEC = 'while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; shift; exec "$@"'
+
+
+    def spawn_relauncher(pid: int, argv: list[str], cwd: str) -> subprocess.Popen:
+        """Start a detached helper that waits for `pid` to exit, then execs `argv` in `cwd`."""
+        return subprocess.Popen(
+            ["/bin/sh", "-c", _WAIT_THEN_EXEC, "vortex-relaunch", str(pid), *argv],
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+The module imports only `subprocess` from the standard library.
+
+Self-verify before finishing: `ruff check src/vortex/restart.py` is clean;
+`mypy --explicit-package-bases src/vortex/restart.py` is clean; the file
+defines `spawn_relauncher` and passes `start_new_session=True`.
+
+Write EXACTLY one file: src/vortex/restart.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/restart.py and confirm it satisfies every acceptance condition in this brief.
+
+Reply with ONLY this, nothing before or after it:
+=== FILE: src/vortex/restart.py ===
+<the complete file content>
+=== END FILE ===
+Your reply's VERY FIRST line must be the === FILE: line. Do not analyze,
+plan, or explain anything — every design decision is already made in the
+brief; transcribe it into working code immediately.
