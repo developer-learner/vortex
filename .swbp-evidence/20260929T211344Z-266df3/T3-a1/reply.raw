@@ -1,0 +1,43 @@
+<<<<<<< SEARCH
+  <button id="stopvortex" title="Stop Vortex" style="margin-left:auto">✕ Stop Vortex</button>
+</header>
+=======
+  <button id="stopvortex" title="Stop Vortex" style="margin-left:auto">✕ Stop Vortex</button>
+  <button id="restartvortex" title="Restart Vortex">↻ Restart Vortex</button>
+</header>
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+      .catch(function (e) { setError("Shutdown failed: " + e.message); });
+  });
+
+  pollStatus();
+=======
+      .catch(function (e) { setError("Shutdown failed: " + e.message); });
+  });
+
+  document.getElementById("restartvortex").addEventListener("click", function () {
+    var btn = this;
+    if (!confirm("Restart Vortex? This unloads all loaded models, freeing their RAM, then starts a clean server.")) return;
+    btn.disabled = true;
+    fetch("/api/restart", { method: "POST" })
+      .then(function (r) {
+        if (r.status === 409) throw new Error("a load or unload is in progress");
+        if (!r.ok) throw new Error("restart " + r.status);
+        waitForRestart(btn, 0, false);
+      })
+      .catch(function (e) { btn.disabled = false; setError("Restart failed: " + e.message); });
+  });
+  function waitForRestart(btn, tries, wentDown) {
+    if (tries > 90) { btn.disabled = false; setError("Restart failed: Vortex did not come back; see ~/Library/Logs/Vortex.log"); return; }
+    setTimeout(function () {
+      fetch("/api/status")
+        .then(function (r) {
+          if (r.ok && (wentDown || tries >= 10)) { location.reload(); return; }
+          waitForRestart(btn, tries + 1, wentDown);
+        })
+        .catch(function () { waitForRestart(btn, tries + 1, true); });
+    }, 500);
+  }
+
+  pollStatus();
+>>>>>>> REPLACE

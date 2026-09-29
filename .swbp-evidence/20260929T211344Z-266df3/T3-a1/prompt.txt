@@ -1,3 +1,56 @@
+`UI_PAGE` is one HTML string. In the `<header>`, directly after the existing
+`<button id="stopvortex" ...>✕ Stop Vortex</button>`, add:
+    <button id="restartvortex" title="Restart Vortex">↻ Restart Vortex</button>
+
+In the page's `<script>`, directly after the existing `stopvortex` click
+handler block, add:
+    document.getElementById("restartvortex").addEventListener("click", function () {
+      var btn = this;
+      if (!confirm("Restart Vortex? This unloads all loaded models, freeing their RAM, then starts a clean server.")) return;
+      btn.disabled = true;
+      fetch("/api/restart", { method: "POST" })
+        .then(function (r) {
+          if (r.status === 409) throw new Error("a load or unload is in progress");
+          if (!r.ok) throw new Error("restart " + r.status);
+          waitForRestart(btn, 0, false);
+        })
+        .catch(function (e) { btn.disabled = false; setError("Restart failed: " + e.message); });
+    });
+    function waitForRestart(btn, tries, wentDown) {
+      if (tries > 90) { btn.disabled = false; setError("Restart failed: Vortex did not come back; see ~/Library/Logs/Vortex.log"); return; }
+      setTimeout(function () {
+        fetch("/api/status")
+          .then(function (r) {
+            if (r.ok && (wentDown || tries >= 10)) { location.reload(); return; }
+            waitForRestart(btn, tries + 1, wentDown);
+          })
+          .catch(function () { waitForRestart(btn, tries + 1, true); });
+      }, 500);
+    }
+
+Self-verify before finishing: `id="restartvortex"` is inside the header; the
+Stop Vortex button and handler are unchanged; the page adds no http/https URL.
+
+Write EXACTLY one file: src/vortex/ui.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/ui.py and confirm it satisfies every acceptance condition in this brief.
+
+Reply with ONLY edit blocks in this exact format, nothing else:
+<<<<<<< SEARCH
+(an EXACT, character-for-character copy of a short existing section — 3 to 10 lines)
+=======
+(that same section with the change applied)
+>>>>>>> REPLACE
+Rules:
+- Each SEARCH must appear EXACTLY ONCE in the file. Copy it verbatim — same spaces, same quotes.
+- Several small blocks, not one big one. Do not touch code outside your blocks. Do not reformat or reorder anything.
+- Never include any line containing a think tag in a SEARCH section — anchor on nearby tag-free lines instead.
+- In new code, never write the think tag as one literal string — construct it by concatenation, e.g. '<' + 'think>'.
+- If the file already satisfies the brief, reply with exactly this line and nothing else: === NO CHANGES ===
+- Verify each SEARCH against the file one more time before answering.
+- Your reply's VERY FIRST line must be '<<<<<<< SEARCH' (or the NO CHANGES line). Do not analyze, plan, or explain anything — every design decision is already made in the brief. Prose before the blocks burns your output budget and truncates the edit mid-block.
+- Every block must be COMPLETE working code — never a stub, placeholder, or '...' body. If the brief needs a new function, write its full body in the block.
+
+### existing (src/vortex/ui.py)
+```
 """Operator dashboard shell (router phase 2). Served at "/" by app.py;
 JS polls /api/* client-side."""
 
@@ -211,7 +264,6 @@ footer {
   <h1>vortex</h1>
   <span class="sub">model menu</span>
   <button id="stopvortex" title="Stop Vortex" style="margin-left:auto">✕ Stop Vortex</button>
-  <button id="restartvortex" title="Restart Vortex">↻ Restart Vortex</button>
 </header>
 <main>
   <div id="down">
@@ -656,30 +708,6 @@ footer {
       .catch(function (e) { setError("Shutdown failed: " + e.message); });
   });
 
-  document.getElementById("restartvortex").addEventListener("click", function () {
-    var btn = this;
-    if (!confirm("Restart Vortex? This unloads all loaded models, freeing their RAM, then starts a clean server.")) return;
-    btn.disabled = true;
-    fetch("/api/restart", { method: "POST" })
-      .then(function (r) {
-        if (r.status === 409) throw new Error("a load or unload is in progress");
-        if (!r.ok) throw new Error("restart " + r.status);
-        waitForRestart(btn, 0, false);
-      })
-      .catch(function (e) { btn.disabled = false; setError("Restart failed: " + e.message); });
-  });
-  function waitForRestart(btn, tries, wentDown) {
-    if (tries > 90) { btn.disabled = false; setError("Restart failed: Vortex did not come back; see ~/Library/Logs/Vortex.log"); return; }
-    setTimeout(function () {
-      fetch("/api/status")
-        .then(function (r) {
-          if (r.ok && (wentDown || tries >= 10)) { location.reload(); return; }
-          waitForRestart(btn, tries + 1, wentDown);
-        })
-        .catch(function () { waitForRestart(btn, tries + 1, true); });
-    }, 500);
-  }
-
   pollStatus();
   pollCatalog();
   pollWrappers();
@@ -693,3 +721,5 @@ footer {
 </body>
 </html>
 """
+
+```
