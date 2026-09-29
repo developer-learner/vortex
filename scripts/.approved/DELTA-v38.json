@@ -1,0 +1,33 @@
+{
+  "changed_contract_ids": [
+    "route:POST /api/restart",
+    "src.vortex.restart",
+    "src.vortex.restart:spawn_relauncher"
+  ],
+  "changed_tests": [
+    "tests/test_restart_api.py::test_restart_is_refused_while_an_operation_is_in_flight",
+    "tests/test_restart_api.py::test_restart_unloads_loaded_model_and_reports_it",
+    "tests/test_restart_api.py::test_restart_with_nothing_loaded_invokes_only_the_restart_hook",
+    "tests/test_restart_api.py::test_shutdown_never_invokes_the_restart_hook",
+    "tests/test_restart_relauncher.py::test_relauncher_is_detached_in_its_own_session",
+    "tests/test_restart_relauncher.py::test_relauncher_runs_the_command_in_the_given_directory",
+    "tests/test_restart_relauncher.py::test_relauncher_waits_for_the_process_to_exit",
+    "tests/test_ui_restart.py::test_restart_confirms_before_posting_restart",
+    "tests/test_ui_restart.py::test_restart_disables_the_control_while_in_flight",
+    "tests/test_ui_restart.py::test_restart_failure_is_visible",
+    "tests/test_ui_restart.py::test_restart_polls_status_then_reloads",
+    "tests/test_ui_restart.py::test_restart_vortex_button_in_header_beside_stop"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [
+    "src/vortex/restart.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ],
+  "inventory_files": [
+    "src/vortex/restart.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ]
+}

@@ -227,3 +227,70 @@ to how ports are scanned or processes identified.
   SYSTEM SHALL say in the MemoryConflict message that the memory is held by a
   process Vortex cannot identify and name the uncertain entries, such that
   the refusal explains itself.
+
+## v38 scope (operator restart control)
+
+Scope brief: the outcome is a Restart Vortex control in the dashboard that
+returns Vortex to a clean, live state in one click — every loaded model is
+unloaded (RAM freed, ports closed), the daemon exits, and a fresh daemon is
+started from the same command line, re-reading `config/catalog.json`. Today
+picking up a catalog edit means Stop Vortex, then relaunching Vortex.app by
+hand. This deliberately reverses v27's out-of-scope note ("a restart/relaunch
+control (the launcher owns start)"): the CEO asked for it on 2026-09-29, with
+models unloaded rather than carried across the restart.
+
+Essential scope, three files:
+- `src/vortex/restart.py` (NEW) owns the relaunch mechanism only: a detached
+  helper that waits for a given process to exit, then runs a given command in a
+  given directory. It knows nothing about FastAPI, models, or the catalog.
+- `src/vortex/app.py` adds `POST /api/restart`: refuse while a load/unload is in
+  flight; otherwise unload every loaded model, then invoke an injectable
+  restart hook after the response is sent. The default hook starts the
+  relauncher with this process's own interpreter + argv and cwd, then stops
+  this process exactly as shutdown does.
+- `src/vortex/ui.py` adds the header button, confirm gate, in-flight
+  disabling, the wait-for-new-daemon poll, reload, and visible failure.
+
+Deferred: carrying loaded models across a restart (sidecar re-adoption), a
+restart from the CLI, restarting the model runtimes themselves, and any
+server-side boot identifier for the poll. Expected time band: 20–45 minutes
+of pipeline time.
+
+## Explicitly out of scope for v38
+
+Keeping models loaded across the restart, killing or restarting processes
+Vortex cannot identify, relaunching through Vortex.app, a restart schedule or
+watchdog, and any confirmation UI beyond the browser's native `confirm()`.
+
+## v38 acceptance criteria
+
+- **AC-18:** WHEN `POST /api/restart` is called and no load or unload
+  operation is in flight, THE SYSTEM SHALL terminate every loaded model's
+  process, return `{"restarting": true, "unloaded": [<public ids>]}` with
+  status 200, and invoke the injectable restart hook exactly once after the
+  response is sent, such that the model is no longer advertised on
+  `/v1/models` and its port is closed.
+- **AC-19:** THE SYSTEM SHALL keep restart and shutdown distinct, such that
+  `POST /api/restart` never invokes the shutdown hook and
+  `POST /api/shutdown` never invokes the restart hook.
+- **AC-20:** IF a load or unload operation is in flight when
+  `POST /api/restart` is called, THEN THE SYSTEM SHALL respond 409 with a
+  `detail` carrying `"busy": true` and the in-flight operation id, and SHALL
+  neither unload any model nor invoke the restart hook, such that the
+  in-flight operation is still reported as in progress and the restart hook
+  has not been called.
+- **AC-21:** THE relauncher SHALL wait until the given process id has exited
+  before running the given command, SHALL run it in the given working
+  directory, and SHALL run detached in its own session, such that the new
+  daemon survives the old daemon's exit.
+- **AC-22:** the dashboard header SHALL provide a Restart Vortex control
+  beside Stop Vortex such that clicking it first requires the operator to
+  confirm a warning that every loaded model will be unloaded, and a cancelled
+  confirmation sends no request and leaves Vortex running.
+- **AC-23:** WHILE a restart is in flight, THE dashboard SHALL keep the
+  Restart control disabled, SHALL poll `/api/status` until the new daemon
+  answers, and SHALL then reload the page.
+- **AC-24:** WHEN the restart request fails (including the 409 busy refusal)
+  or the new daemon does not answer within the poll budget, THE dashboard
+  SHALL show an error beginning "Restart failed" and SHALL re-enable the
+  Restart control.
