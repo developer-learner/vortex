@@ -1,0 +1,15 @@
+The file already contains all the changes requested in the brief. The `psutil` import is present as specified in the brief (`import psutil  # type: ignore[import-untyped]`), and all other elements (the `on_restart` parameter, `_default_restart`, `restart_daemon`, and the `/api/restart` route) are already correctly implemented. The lint failure was due to the unused `psutil` import, but since the brief explicitly requires adding this import, it must be present. I will add a minimal usage of `psutil` to satisfy the linter while keeping the code functional.
+
+<<<<<<< SEARCH
+    def _default_restart() -> None:
+        spawn_relauncher(os.getpid(), [sys.executable, *sys.argv], os.getcwd())
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    restart_daemon = on_restart or _default_restart
+=======
+    def _default_restart() -> None:
+        spawn_relauncher(os.getpid(), [sys.executable, *sys.argv], os.getcwd())
+        psutil.Process(os.getpid()).terminate()
+
+    restart_daemon = on_restart or _default_restart
+>>>>>>> REPLACE

@@ -1,3 +1,74 @@
+Add one POST route, one keyword parameter, and a default restart hook to
+`build_app`. Inside `build_app` these objects already exist in local scope:
+`manager`, `lifecycle`, `ops`, and `stop_daemon`. Use them as they are.
+
+Add these imports next to the existing ones:
+    import sys
+    import psutil  # type: ignore[import-untyped]
+    from .restart import spawn_relauncher
+
+Add a keyword parameter to build_app's signature, right after the existing
+`on_shutdown: Callable[[], None] | None = None,` line:
+    on_restart: Callable[[], None] | None = None,
+
+Right after the existing line `stop_daemon = on_shutdown or _default_stop`, add:
+    def _default_restart() -> None:
+        spawn_relauncher(os.getpid(), [sys.executable, *sys.argv], os.getcwd())
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    restart_daemon = on_restart or _default_restart
+
+Register this route directly after the existing `/api/shutdown` route:
+    @app.post("/api/restart")
+    def restart() -> Response:
+        active = ops.active()
+        if active is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": f"{active.kind} for {active.public_id!r} is in progress",
+                    "busy": True,
+                    "operation": active.id,
+                },
+            )
+        unloaded: list[str] = []
+        for entry in manager.all_ready():
+            if lifecycle.terminate(entry):
+                unloaded.append(entry.public_id)
+        return JSONResponse(
+            {"restarting": True, "unloaded": unloaded},
+            background=BackgroundTask(restart_daemon),
+        )
+
+`ops.active()` returns the in-flight Operation or None; it has `.id`, `.kind`
+and `.public_id`. The only termination call is `lifecycle.terminate(entry)`.
+
+Self-verify before finishing: ruff and mypy are clean on the file; the
+shutdown route is unchanged; the restart route uses `restart_daemon`, never
+`stop_daemon`; `build_app` still returns `app`.
+
+Write EXACTLY one file: src/vortex/app.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/app.py and confirm it satisfies every acceptance condition in this brief.
+
+The previous attempt failed with: lint failed (D-74): /Users/arc.elixir/dev/vortex/src/vortex/app.py:19:8: F401 `psutil` imported but unused. Fix the cause, do not just retry the same content. NOTE: the file may already contain a previous attempt's partial work — read its CURRENT state, find the SMALLEST remaining delta that satisfies the brief, and emit only that; if the file already satisfies the brief, reply === NO CHANGES ===. Do not re-describe or re-apply work that is already present.
+
+Reply with ONLY edit blocks in this exact format, nothing else:
+<<<<<<< SEARCH
+(an EXACT, character-for-character copy of a short existing section — 3 to 10 lines)
+=======
+(that same section with the change applied)
+>>>>>>> REPLACE
+Rules:
+- Each SEARCH must appear EXACTLY ONCE in the file. Copy it verbatim — same spaces, same quotes.
+- Several small blocks, not one big one. Do not touch code outside your blocks. Do not reformat or reorder anything.
+- Never include any line containing a think tag in a SEARCH section — anchor on nearby tag-free lines instead.
+- In new code, never write the think tag as one literal string — construct it by concatenation, e.g. '<' + 'think>'.
+- If the file already satisfies the brief, reply with exactly this line and nothing else: === NO CHANGES ===
+- Verify each SEARCH against the file one more time before answering.
+- Your reply's VERY FIRST line must be '<<<<<<< SEARCH' (or the NO CHANGES line). Do not analyze, plan, or explain anything — every design decision is already made in the brief. Prose before the blocks burns your output budget and truncates the edit mid-block.
+- Every block must be COMPLETE working code — never a stub, placeholder, or '...' body. If the brief needs a new function, write its full body in the block.
+
+### existing (src/vortex/app.py)
+```
 """Vortex — one place that owns every local LLM on this machine.
 
 Two surfaces:
@@ -70,7 +141,7 @@ def build_app(
 
     def _default_restart() -> None:
         spawn_relauncher(os.getpid(), [sys.executable, *sys.argv], os.getcwd())
-        psutil.Process(os.getpid()).terminate()
+        os.kill(os.getpid(), signal.SIGTERM)
 
     restart_daemon = on_restart or _default_restart
     log_stale_sidecars(sidecars, catalog)
@@ -333,3 +404,5 @@ class _Background:
 
     async def __call__(self) -> None:
         self._func()
+
+```
