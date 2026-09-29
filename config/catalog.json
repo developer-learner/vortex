@@ -103,7 +103,11 @@
         "--host",
         "127.0.0.1",
         "--port",
-        "8009"
+        "8009",
+        "--model-dir",
+        "/Users/arc.elixir/.omlx/models",
+        "--memory-guard",
+        "balanced"
       ],
       "port": 8009,
       "ready_url": "http://127.0.0.1:8009/v1/models",
@@ -153,7 +157,11 @@
         "--host",
         "127.0.0.1",
         "--port",
-        "8007"
+        "8007",
+        "--model-dir",
+        "/Users/arc.elixir/.omlx/models",
+        "--memory-guard",
+        "balanced"
       ],
       "port": 8007,
       "ready_url": "http://127.0.0.1:8007/v1/models",
@@ -175,6 +183,74 @@
       "chat_endpoint": "http://127.0.0.1:8600/v1/chat/completions",
       "upstream_alias": "dealignai/Nemotron-3-Super-120B-A12B-UNCENSORED-JANG_2L",
       "ram_estimate_gb": 60.0,
+      "exclusive": true
+    },
+    {
+      "public_id": "qwen3.8-flash-next-2bit",
+      "runtime": "omlx",
+      "engine": "omlx",
+      "launch_command": [
+        "/Users/arc.elixir/.omlx/bin/omlx",
+        "serve",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8108",
+        "--model-dir",
+        "/Users/arc.elixir/.omlx/models-flash-next",
+        "--memory-guard",
+        "aggressive"
+      ],
+      "port": 8108,
+      "ready_url": "http://127.0.0.1:8108/v1/models",
+      "chat_endpoint": "http://127.0.0.1:8108/v1/chat/completions",
+      "upstream_alias": "Qwen3.8-Flash-Next-MLX-Mixed-2bit",
+      "ram_estimate_gb": 72.0,
+      "exclusive": true
+    },
+    {
+      "public_id": "qwen3.8-flash-next-4bit",
+      "runtime": "omlx",
+      "engine": "omlx",
+      "launch_command": [
+        "/Users/arc.elixir/.omlx/bin/omlx",
+        "serve",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8111",
+        "--model-dir",
+        "/Users/arc.elixir/.omlx/models-flash-next-4bit",
+        "--memory-guard",
+        "aggressive"
+      ],
+      "port": 8111,
+      "ready_url": "http://127.0.0.1:8111/v1/models",
+      "chat_endpoint": "http://127.0.0.1:8111/v1/chat/completions",
+      "upstream_alias": "Qwen3.8-Flash-Next-MLX-4bit",
+      "ram_estimate_gb": 98.0,
+      "exclusive": true
+    },
+    {
+      "public_id": "qwen3.8-flash-next-4-8bit",
+      "runtime": "mlx-serve",
+      "engine": "mlx-serve",
+      "launch_command": [
+        "/opt/homebrew/bin/mlx-serve",
+        "--model",
+        "/Users/arc.elixir/.lmstudio/models/ddalcu/Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit",
+        "--serve",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8112",
+        "--mtp"
+      ],
+      "port": 8112,
+      "ready_url": "http://127.0.0.1:8112/v1/models",
+      "chat_endpoint": "http://127.0.0.1:8112/v1/chat/completions",
+      "upstream_alias": "Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit",
+      "ram_estimate_gb": 72.0,
       "exclusive": true
     }
   ]
