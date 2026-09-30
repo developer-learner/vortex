@@ -2,6 +2,26 @@
 
 ## State
 
+- **2026-09-30 — v39-v43 "Add to Vortex" shipped (`d566092` + hand-fixes `d65e468`).**
+  - Feature: per-model Add, "Add all new", and Remove for discovery-added
+    entries; MLX -> mlx-serve, GGUF -> llama-server on ports 8200-8299;
+    added entries persist in gitignored `config/catalog.local.json`;
+    in_catalog now also matches by `lms ls --json` path. New modules
+    `catalog_synth.py`, `catalog_routes.py`.
+  - Path: v39 (EM planned, no verbatim briefs) -> T3 escalated twice (v40
+    imports, v41 verbatim briefs) -> v42 pin fix -> builder bug on
+    parametrized families (blueprint `2693704`; halted state archived to
+    `~/dev/.swbp-archive/vortex-v39-v42-halted-20260930`; adopted `535834d`
+    via SWBP_REBUILD_FROM_SCRATCH) -> v43 moved routes to a new module after
+    the coder kept replying to app.py edits with a Read tool call.
+  - EM seat (Flash Next ddalcu) exercised for real: planned 5 files, rescued
+    discovery.py and app.py with revised briefs, misdiagnosed T3 once
+    ("decomposition_wrong"), overran the revised-brief cap once.
+  - **Post-`[success]` hand-fixes: 4** (`d65e468`): I001 lint, stdlib
+    allowlist (json), first-confirm() order, reserved `s.` variable (+ an
+    "Added N" count bug). All were TPM spec omissions; see correction log.
+  - Host verification: ruff + mypy clean, full suite 204/204, coverage 92.42%.
+
 - **2026-09-29 — v38 Restart Vortex shipped (`fb9842f`); EM/coder = Qwen3.8 Flash Next.**
   - CEO ask: a Restart button beside Stop that unloads every model and brings
     Vortex back live and clean. Routed as a milestone (D-132: new behaviour +
