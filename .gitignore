@@ -29,3 +29,6 @@ scripts/.approved/incoming/
 
 # Review working documents (session inputs at the repo root, not template content)
 /REVIEW.md
+
+# Vortex entries added from discovery (per-machine, written by the daemon)
+config/catalog.local.json

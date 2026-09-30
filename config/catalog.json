@@ -1,20 +1,6 @@
 {
   "entries": [
     {
-      "public_id": "deepseek-v4-flash-0731",
-      "runtime": "ds4",
-      "engine": "mtplx",
-      "launch_command": [
-        "/Users/arc.elixir/dev/ds4/run-server-0731.sh"
-      ],
-      "port": 8005,
-      "ready_url": "http://127.0.0.1:8005/v1/models",
-      "chat_endpoint": "http://127.0.0.1:8005/v1/chat/completions",
-      "upstream_alias": "deepseek-v4-flash-0731",
-      "ram_estimate_gb": 90.0,
-      "exclusive": true
-    },
-    {
       "public_id": "Flash_IQ3XXS",
       "runtime": "llama-server",
       "engine": "llama.cpp",
