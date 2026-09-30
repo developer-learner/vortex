@@ -1,3 +1,83 @@
+In build_app, use the existing `catalog`, `lifecycle`, `ops`, `model_cache`,
+`_get_models()`. Add `save_local_entries` to the `from .catalog import` line;
+add `from .catalog_synth import SynthesisError, synthesize_entry`. Add keyword
+`local_catalog_path: Path | None = None` last in the signature. Replace
+`catalog = catalog or load_catalog(...)` with:
+
+    if catalog is None:
+        local_catalog_path = local_catalog_path or _REPO_ROOT / "config/catalog.local.json"
+        catalog = load_catalog(_REPO_ROOT / "config/catalog.json", local_path=local_catalog_path)
+
+    def _persist() -> None:
+        if local_catalog_path is not None:
+            save_local_entries(catalog, local_catalog_path)
+        model_cache.clear()
+
+`/api/catalog` rows must include `origin`, `source_path`. Routes:
+
+    @app.post("/api/discovered-models/{key}/add", status_code=201)
+    def add_model(key: str) -> dict:
+        model_cache.clear()
+        model = next((m for m in _get_models() if m.key == key), None)
+        if model is None:
+            raise HTTPException(404, detail="unknown")
+        try:
+            entry = synthesize_entry(model, catalog)
+        except SynthesisError as exc:
+            raise HTTPException(422, detail={"message": str(exc), "key": key}) from exc
+        catalog.add(entry)
+        _persist()
+        return {"added": entry.model_dump(mode="json")}
+
+    @app.post("/api/discovered-models/add-new")
+    def add_new() -> dict:
+        model_cache.clear()
+        added, skipped = [], []
+        for m in [m for m in _get_models() if not m.in_catalog]:
+            try:
+                entry = synthesize_entry(m, catalog)
+            except SynthesisError as exc:
+                skipped.append({"key": m.key, "reason": str(exc)})
+                continue
+            catalog.add(entry)
+            added.append(entry.public_id)
+        _persist()
+        return {"added": added, "skipped": skipped}
+
+    @app.delete("/api/catalog/{public_id}")
+    def remove_model(public_id: str) -> dict:
+        entry = catalog.by_public_id(public_id)
+        if entry is None:
+            raise HTTPException(404, detail="unknown")
+        busy = lifecycle.occupying_pid(entry) is not None or ops.active_for(public_id)
+        if entry.origin != "local" or busy:
+            raise HTTPException(409, detail={"message": "config entry, or loaded/busy"})
+        catalog.remove(public_id)
+        _persist()
+        return {"removed": public_id}
+
+Self-verify: ruff and mypy clean.
+
+Write EXACTLY one file: src/vortex/app.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/app.py and confirm it satisfies every acceptance condition in this brief.
+
+Reply with ONLY edit blocks in this exact format, nothing else:
+<<<<<<< SEARCH
+(an EXACT, character-for-character copy of a short existing section — 3 to 10 lines)
+=======
+(that same section with the change applied)
+>>>>>>> REPLACE
+Rules:
+- Each SEARCH must appear EXACTLY ONCE in the file. Copy it verbatim — same spaces, same quotes.
+- Several small blocks, not one big one. Do not touch code outside your blocks. Do not reformat or reorder anything.
+- Never include any line containing a think tag in a SEARCH section — anchor on nearby tag-free lines instead.
+- In new code, never write the think tag as one literal string — construct it by concatenation, e.g. '<' + 'think>'.
+- If the file already satisfies the brief, reply with exactly this line and nothing else: === NO CHANGES ===
+- Verify each SEARCH against the file one more time before answering.
+- Your reply's VERY FIRST line must be '<<<<<<< SEARCH' (or the NO CHANGES line). Do not analyze, plan, or explain anything — every design decision is already made in the brief. Prose before the blocks burns your output budget and truncates the edit mid-block.
+- Every block must be COMPLETE working code — never a stub, placeholder, or '...' body. If the brief needs a new function, write its full body in the block.
+
+### existing (src/vortex/app.py)
+```
 """Vortex — one place that owns every local LLM on this machine.
 
 Two surfaces:
@@ -22,8 +102,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
-from .catalog import Catalog, load_catalog, save_local_entries
-from .catalog_synth import SynthesisError, synthesize_entry
+from .catalog import Catalog, load_catalog
 from .discovery import DiscoveredModel, Wrapper, discover_models, discover_wrappers
 from .lifecycle import (
     Lifecycle,
@@ -56,17 +135,8 @@ def build_app(
     model_discovery=discover_models,
     on_shutdown: Callable[[], None] | None = None,
     on_restart: Callable[[], None] | None = None,
-    local_catalog_path: Path | None = None,
 ) -> FastAPI:
-    if catalog is None:
-        local_catalog_path = local_catalog_path or _REPO_ROOT / "config/catalog.local.json"
-        catalog = load_catalog(_REPO_ROOT / "config/catalog.json", local_path=local_catalog_path)
-
-    def _persist() -> None:
-        if local_catalog_path is not None:
-            save_local_entries(catalog, local_catalog_path)
-        model_cache.clear()
-
+    catalog = catalog or load_catalog(_REPO_ROOT / "config/catalog.json")
     sidecars = SidecarStore(sidecar_dir or _REPO_ROOT / "data/sidecars")
     ops = OperationStore()
     lifecycle = Lifecycle(catalog, sidecars)
@@ -342,3 +412,5 @@ class _Background:
 
     async def __call__(self) -> None:
         self._func()
+
+```

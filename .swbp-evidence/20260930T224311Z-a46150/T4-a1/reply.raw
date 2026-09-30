@@ -1,0 +1,48 @@
+I'll start by examining the file to understand its current structure, then apply the changes.
+
+Let me work through the required changes:
+
+1. Add `save_local_entries` to the `from .catalog import` line
+2. Add `from .catalog_synth import SynthesisError, synthesize_entry`
+3. Add `local_catalog_path: Path | None = None` last in the signature
+4. Replace `catalog = catalog or load_catalog(...)` with the new block including `_persist()`
+5. Update `/api/catalog` rows to include `origin`, `source_path`
+6. Add three new routes
+
+Let me apply these edits:
+
+<<<<<<< SEARCH
+from .catalog import Catalog, load_catalog
+=======
+from .catalog import Catalog, load_catalog, save_local_entries
+>>>>>>> REPLACE
+
+<<<<<<< SEARCH
+from .discovery import DiscoveredModel, Wrapper, discover_models, discover_wrappers
+=======
+from .catalog_synth import SynthesisError, synthesize_entry
+from .discovery import DiscoveredModel, Wrapper, discover_models, discover_wrappers
+>>>>>>> REPLACE
+
+<<<<<<< SEARCH
+    on_shutdown: Callable[[], None] | None = None,
+    on_restart: Callable[[], None] | None = None,
+) -> FastAPI:
+    catalog = catalog or load_catalog(_REPO_ROOT / "config/catalog.json")
+    sidecars = SidecarStore(sidecar_dir or _REPO_ROOT / "data/sidecars")
+=======
+    on_shutdown: Callable[[], None] | None = None,
+    on_restart: Callable[[], None] | None = None,
+    local_catalog_path: Path | None = None,
+) -> FastAPI:
+    if catalog is None:
+        local_catalog_path = local_catalog_path or _REPO_ROOT / "config/catalog.local.json"
+        catalog = load_catalog(_REPO_ROOT / "config/catalog.json", local_path=local_catalog_path)
+
+    def _persist() -> None:
+        if local_catalog_path is not None:
+            save_local_entries(catalog, local_catalog_path)
+        model_cache.clear()
+
+    sidecars = SidecarStore(sidecar_dir or _REPO_ROOT / "data/sidecars")
+>>>>>>> REPLACE
