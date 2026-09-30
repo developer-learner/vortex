@@ -1,0 +1,14 @@
+Looking at the file, I can see that most of the brief's requirements are already implemented. The only issue is the SIM102 lint warning about nested `if` statements in the `discover_models` function. Let me fix that.
+
+<<<<<<< SEARCH
+            model_path = paths_map.get(key)
+            in_catalog = key in aliases
+            if not in_catalog and model_path is not None:
+                if model_path in source_paths or model_path in launch_cmds:
+                    in_catalog = True
+=======
+            model_path = paths_map.get(key)
+            in_catalog = key in aliases
+            if not in_catalog and model_path is not None and (model_path in source_paths or model_path in launch_cmds):
+                in_catalog = True
+>>>>>>> REPLACE
