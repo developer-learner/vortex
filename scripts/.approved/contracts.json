@@ -1,5 +1,5 @@
 {
-  "erd_version": 41,
+  "erd_version": 42,
   "files": [
     "src/vortex/catalog.py",
     "src/vortex/discovery.py",
