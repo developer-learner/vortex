@@ -1,0 +1,13 @@
+<<<<<<< SEARCH
+from .catalog import Catalog
+from .catalog_synth import SynthesisError, synthesize_entry
+from . import discovery
+from .lifecycle import Lifecycle
+from .operations import OperationStore
+=======
+from . import discovery
+from .catalog import Catalog
+from .catalog_synth import SynthesisError, synthesize_entry
+from .lifecycle import Lifecycle
+from .operations import OperationStore
+>>>>>>> REPLACE

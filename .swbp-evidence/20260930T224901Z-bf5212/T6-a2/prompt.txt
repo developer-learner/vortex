@@ -1,0 +1,142 @@
+Create the new file with exactly this content:
+
+    """Catalog add / add-new / remove routes."""
+    from __future__ import annotations
+
+    from collections.abc import Callable
+
+    from fastapi import FastAPI, HTTPException
+
+    from .catalog import Catalog
+    from .catalog_synth import SynthesisError, synthesize_entry
+    from . import discovery
+    from .lifecycle import Lifecycle
+    from .operations import OperationStore
+
+
+    def register_catalog_routes(
+        app: FastAPI, catalog: Catalog, lifecycle: Lifecycle, ops: OperationStore,
+        fresh_models: Callable[[], list[discovery.DiscoveredModel]], persist: Callable[[], None],
+    ) -> None:
+        @app.post("/api/discovered-models/{key}/add", status_code=201)
+        def add_model(key: str) -> dict:
+            model = next((m for m in fresh_models() if m.key == key), None)
+            if model is None:
+                raise HTTPException(404, detail="unknown")
+            try:
+                entry = synthesize_entry(model, catalog)
+            except SynthesisError as exc:
+                raise HTTPException(422, detail={"message": str(exc), "key": key}) from exc
+            catalog.add(entry)
+            persist()
+            return {"added": entry.model_dump(mode="json")}
+
+        @app.post("/api/discovered-models/add-new")
+        def add_new() -> dict:
+            added: list[str] = []
+            skipped: list[dict[str, str]] = []
+            for m in [m for m in fresh_models() if not m.in_catalog]:
+                try:
+                    entry = synthesize_entry(m, catalog)
+                except SynthesisError as exc:
+                    skipped.append({"key": m.key, "reason": str(exc)})
+                    continue
+                catalog.add(entry)
+                added.append(entry.public_id)
+            persist()
+            return {"added": added, "skipped": skipped}
+
+        @app.delete("/api/catalog/{public_id}")
+        def remove_model(public_id: str) -> dict:
+            entry = catalog.by_public_id(public_id)
+            if entry is None:
+                raise HTTPException(404, detail="unknown")
+            busy = lifecycle.occupying_pid(entry) is not None or ops.active_for(public_id)
+            if entry.origin != "local" or busy:
+                raise HTTPException(409, detail={"message": "config entry, or loaded/busy"})
+            catalog.remove(public_id)
+            persist()
+            return {"removed": public_id}
+
+Self-verify: ruff and mypy clean.
+
+Write EXACTLY one file: src/vortex/catalog_routes.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/catalog_routes.py and confirm it satisfies every acceptance condition in this brief.
+
+The previous attempt failed with: lint failed (D-74): /Users/arc.elixir/dev/vortex/src/vortex/catalog_routes.py:2:1: I001 Import block is un-sorted or un-formatted. Fix the cause, do not just retry the same content. NOTE: the file may already contain a previous attempt's partial work — read its CURRENT state, find the SMALLEST remaining delta that satisfies the brief, and emit only that; if the file already satisfies the brief, reply === NO CHANGES ===. Do not re-describe or re-apply work that is already present.
+
+Reply with ONLY edit blocks in this exact format, nothing else:
+<<<<<<< SEARCH
+(an EXACT, character-for-character copy of a short existing section — 3 to 10 lines)
+=======
+(that same section with the change applied)
+>>>>>>> REPLACE
+Rules:
+- Each SEARCH must appear EXACTLY ONCE in the file. Copy it verbatim — same spaces, same quotes.
+- Several small blocks, not one big one. Do not touch code outside your blocks. Do not reformat or reorder anything.
+- Never include any line containing a think tag in a SEARCH section — anchor on nearby tag-free lines instead.
+- In new code, never write the think tag as one literal string — construct it by concatenation, e.g. '<' + 'think>'.
+- If the file already satisfies the brief, reply with exactly this line and nothing else: === NO CHANGES ===
+- Verify each SEARCH against the file one more time before answering.
+- Your reply's VERY FIRST line must be '<<<<<<< SEARCH' (or the NO CHANGES line). Do not analyze, plan, or explain anything — every design decision is already made in the brief. Prose before the blocks burns your output budget and truncates the edit mid-block.
+- Every block must be COMPLETE working code — never a stub, placeholder, or '...' body. If the brief needs a new function, write its full body in the block.
+
+### existing (src/vortex/catalog_routes.py)
+```
+"""Catalog add / add-new / remove routes."""
+from __future__ import annotations
+
+from collections.abc import Callable
+
+from fastapi import FastAPI, HTTPException
+
+from .catalog import Catalog
+from .catalog_synth import SynthesisError, synthesize_entry
+from . import discovery
+from .lifecycle import Lifecycle
+from .operations import OperationStore
+
+
+def register_catalog_routes(
+    app: FastAPI, catalog: Catalog, lifecycle: Lifecycle, ops: OperationStore,
+    fresh_models: Callable[[], list[discovery.DiscoveredModel]], persist: Callable[[], None],
+) -> None:
+    @app.post("/api/discovered-models/{key}/add", status_code=201)
+    def add_model(key: str) -> dict:
+        model = next((m for m in fresh_models() if m.key == key), None)
+        if model is None:
+            raise HTTPException(404, detail="unknown")
+        try:
+            entry = synthesize_entry(model, catalog)
+        except SynthesisError as exc:
+            raise HTTPException(422, detail={"message": str(exc), "key": key}) from exc
+        catalog.add(entry)
+        persist()
+        return {"added": entry.model_dump(mode="json")}
+
+    @app.post("/api/discovered-models/add-new")
+    def add_new() -> dict:
+        added: list[str] = []
+        skipped: list[dict[str, str]] = []
+        for m in [m for m in fresh_models() if not m.in_catalog]:
+            try:
+                entry = synthesize_entry(m, catalog)
+            except SynthesisError as exc:
+                skipped.append({"key": m.key, "reason": str(exc)})
+                continue
+            catalog.add(entry)
+            added.append(entry.public_id)
+        persist()
+        return {"added": added, "skipped": skipped}
+
+    @app.delete("/api/catalog/{public_id}")
+    def remove_model(public_id: str) -> dict:
+        entry = catalog.by_public_id(public_id)
+        if entry is None:
+            raise HTTPException(404, detail="unknown")
+        busy = lifecycle.occupying_pid(entry) is not None or ops.active_for(public_id)
+        if entry.origin != "local" or busy:
+            raise HTTPException(409, detail={"message": "config entry, or loaded/busy"})
+        catalog.remove(public_id)
+        persist()
+        return {"removed": public_id}
+```

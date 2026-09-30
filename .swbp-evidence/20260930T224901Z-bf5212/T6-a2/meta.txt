@@ -1,0 +1,3 @@
+model=Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit
+call_id=chatcmpl-1790808644750
+ts=2026-09-30T22:50:44Z

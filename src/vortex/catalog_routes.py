@@ -5,9 +5,9 @@ from collections.abc import Callable
 
 from fastapi import FastAPI, HTTPException
 
+from . import discovery
 from .catalog import Catalog
 from .catalog_synth import SynthesisError, synthesize_entry
-from . import discovery
 from .lifecycle import Lifecycle
 from .operations import OperationStore
 
