@@ -1,0 +1,478 @@
+Decompose the frozen ERD into atomic ONE-FILE tasks and reply with ONLY the plan as JSON matching the schema you were given — no prose, no markdown fence. SCHEMA — name these keys verbatim; the validator rejects any others. Top-level object: {"erd_version": N, "version": N, "tasks": [ ... ]} — the tasks array is under the key "tasks" (never "plan"). Each task object has EXACTLY these six keys: {"id": "...", "file": "...", "depends_on": [], "brief": "...", "contracts": [], "tests": ["<node-id>", ...]}. The names test_nodes, acceptance, regression, and status are NOT valid task keys and are rejected. CONTRACT IDS — the task "contracts" array holds ONLY exact strings from the valid-id list the shell prints after this rule (or is empty). Copy ids VERBATIM: a registered id is its exact string — never convert a file path to dotted form (src/api/models.py is a path; "src.api.models" is not a registered id), never add or drop a file extension, never invent a prefix. The validator rejects any contracts entry not on the list. Valid contract ids (copy verbatim): src/vortex/catalog.py, src/vortex/discovery.py, src/vortex/catalog_synth.py, src/vortex/app.py, src/vortex/ui.py, src.vortex.ui, src.vortex.ui:UI_PAGE, src.vortex.app, src.vortex.app:build_app, src.vortex.discovery, src.vortex.discovery:discover_wrappers, src.vortex.discovery:Wrapper, src.vortex.discovery:WrapperSpec, src.vortex.discovery:WRAPPER_SPECS, src.vortex.discovery:discover_models, src.vortex.discovery:DiscoveredModel, src.vortex.catalog, src.vortex.catalog:Catalog, src.vortex.catalog:CatalogEntry, src.vortex.catalog:load_catalog, src.vortex.catalog:save_local_entries, src.vortex.discovery:lmstudio_model_paths, src.vortex.catalog_synth, src.vortex.catalog_synth:synthesize_entry, src.vortex.catalog_synth:SynthesisError, src.vortex.catalog_synth:PORT_RANGE, src.vortex.catalog_synth:RUNTIME_BINARIES, route:GET /api/engine-wrappers, route:POST /api/engine-wrappers/discover, route:POST /api/shutdown, route:GET /api/discovered-models, route:POST /api/discovered-models/discover, route:POST /api/restart, route:POST /api/discovered-models/{key}/add, route:POST /api/discovered-models/add-new, route:DELETE /api/catalog/{public_id} ERD-DELTA active packet is the authoritative current-change slice; it includes every skipped freeze since the last successful milestone. Requirements: exactly one task per file in this exact active inventory and no others: src/vortex/catalog.py, src/vortex/discovery.py, src/vortex/catalog_synth.py, src/vortex/app.py, src/vortex/ui.py. Every test node-id in test-nodeids that exercises an active-inventory file maps to exactly one task (the task after which it should pass, given its depends_on) — node-ids testing only carried-forward files are handled by the shell: do NOT map them and do NOT emit a 'regression' key (the validator rejects it); when unsure, omit the node-id — the validator names any you must map. Placement is gate-owned, never yours: a node-id pinned by contracts.json's test_mapping is auto-placed by the gate at the task owning its pinned file; a node-id from a Playwright-importing test file with no mapping entry is auto-placed at the DAG's final task (D-64) — map every node-id where natural and add NO depends_on edges for this. Every task's contracts list uses ids that exist in contracts.json; when no registered id covers a file, use an empty contracts array and never invent one. Every brief self-contained per BLUEPRINT.md Rule 8 (exact path, signatures, inputs/outputs, acceptance) — the coder sees only the brief. For an EXISTING file (D-59 edit mode: the coder gets the file content and emits anchored SEARCH/REPLACE blocks; carried behavior is structurally untouched) the brief describes ONLY the change from current behavior — do NOT restate what the file already does (the plan gate rejects an existing-file brief that backticks a symbol the file already defines but the active ERD-delta packet never names as changed — restated carried behavior, D-133); for a NEW file the brief describes the whole file (target under 150 lines). Do NOT include a smoke_check field — smoke checks are TPM-authored and live in contracts.json. Set erd_version to 40. Set the top-level version key to an integer >= 1 (1 for a fresh plan; bump it on every re-emit). NO status fields. The previous plan failed validation with these errors — fix all of them: PLAN GATE FAIL: task T4 claims contract(s) ['src.vortex.app', 'src.vortex.app:build_app'] that are unchanged in the active milestone delta range and pinned to its own file 'src/vortex/app.py' — a task claims only contracts this milestone changed and interfaces it directly depends on; unchanged self-owned contracts must not ride (v99: GET-only milestone claiming PUT/DELETE). Trim these claims or the milestone's acceptance and invalidation both over-reach.
+
+### standing (.pipeline-state/standing-summary.md)
+```
+# ERD — vortex M1: operator dashboard (erd_version 1)
+
+Stack: the existing FastAPI app (`src/vortex/app.py`, package `vortex`).
+NO new dependencies, NO new files beyond the one below, NO external
+assets (everything inline in one HTML document). Zero new endpoints.
+
+The dashboard's design source is `examples/ui-demo/index.html` (committed,
+CEO-approved look). Task 1 PORTS that document into Python; task 2 WIRES
+the route. The JS logic is already proven — port it verbatim except for
+the exact adjustments listed.
+
+## Constraints (both files)
+
+Type hints on the new function signature. No new imports beyond
+`UI_PAGE`. No global mutable state. No external asset references
+(no `src="http…"` / `href="http…"` anywhere in the page). Each file
+under 300 lines. No TODO comments. No print/logging in ui.py.
+
+## File map
+
+(no architecture file bullets)
+
+```
+
+### ERD-delta (.pipeline-state/active-erd-delta.md)
+```
+## Active freeze instructions — compacted v39..v40
+
+<!-- latest freeze preamble: v40 -->
+# ERD-DELTA v39 — add discovered models to Vortex (Add / Add all new / Remove)
+
+v39 turns a discovered LM Studio model into a loadable catalog entry on the
+operator's click. The discovered-model → entry rule is a pure new module
+(`catalog_synth.py`); the catalog gains an entry origin, a source path, and a
+separate local file for added entries; the app gains three routes; the
+dashboard gains the controls. This delta deliberately carries NO verbatim
+coder briefs: the EM decomposes it from the per-file detail below (the CEO
+asked to exercise the EM seat). The DAG and ownership pins are authoritative.
+
+<!-- active freeze section: v39 -->
+## Changed acceptance criteria
+
+New criteria introduced by this milestone (PRD v39):
+
+- AC-25: discovered models carry their `lms ls --json` path (discovery.py).
+- AC-26: in_catalog also matches by path (discovery.py).
+- AC-27: MLX → mlx-serve entry on the lowest free 8200–8299 port (catalog_synth.py).
+- AC-28: GGUF → llama-server entry (catalog_synth.py).
+- AC-29: unsynthesizable models raise SynthesisError with a reason (catalog_synth.py).
+- AC-30: RAM estimate = size + 10%, exclusive above 40 GB (catalog_synth.py).
+- AC-31: add route adds live + persists; 201 (app.py, catalog.py).
+- AC-32: add route 404 unknown key / 422 synthesis refusal (app.py).
+- AC-33: add-new adds all new models on distinct ports, reports skips (app.py).
+- AC-34: remove route for local entries; 404 / 409 refusals (app.py, catalog.py).
+- AC-35: local catalog file merged at load with origin "local" (catalog.py).
+- AC-36: dashboard Add / Add all new / Remove controls with confirms (ui.py).
+- AC-37: dashboard shows Add failed / Remove failed and lists skips (ui.py).
+
+<!-- active freeze section: v39 -->
+## Superseded acceptance criteria
+
+AC-10 is narrowed, not replaced: the discovered-model wire schema now also
+carries `path` (AC-25). `tests/test_discovered_models_api.py::
+test_wire_schema_carries_all_discovered_model_fields` is re-frozen with `path`
+added to the expected field set; its other assertions are unchanged.
+
+<!-- active freeze section: v40 -->
+## Changed files
+
+- `src/vortex/catalog.py` — EDIT.
+- `src/vortex/discovery.py` — EDIT.
+- `src/vortex/catalog_synth.py` — NEW.
+- `src/vortex/app.py` — EDIT.
+- `src/vortex/ui.py` — EDIT.
+
+<!-- active freeze section: v40 -->
+## Per-file behavioral detail
+
+### src/vortex/catalog.py
+
+- `CatalogEntry` gains two optional fields, both carried through
+  `model_dump()`/validation: `source_path: str | None = None` (the model files
+  an added entry serves) and `origin: Literal["config", "local"] = "config"`.
+- `load_catalog(path, local_path=None)`: loads `path` as today (origin
+  "config"). When `local_path` is given AND the file exists, its
+  `{"entries": [...]}` rows are loaded with origin forced to "local" and
+  merged after the config rows; the merged catalog is validated by the same
+  duplicate public id / duplicate port rules (same messages: "duplicate
+  public id", "duplicate port"). A missing local file is not an error.
+- `Catalog.add(entry)`: raises `ValueError` whose message contains "duplicate
+  public id" or "duplicate port" when either collides with an existing entry;
+  otherwise appends to `self.entries` IN PLACE (other components hold this
+  same list).
+- `Catalog.remove(public_id) -> CatalogEntry`: `KeyError` for an unknown id;
+  `ValueError` with a message containing "config" for an entry whose origin is
+  "config"; otherwise removes it from `self.entries` in place and returns it.
+- `save_local_entries(catalog, local_path)`: writes
+  `{"entries": [<every origin "local" entry as model_dump(mode="json")>]}`
+  (indent 2) to a temp file beside `local_path`, then `os.replace` onto it.
+  Only local entries are written; config entries never are.
+
+### src/vortex/discovery.py
+
+- `DiscoveredModel` gains `path: str | None = None` (field order: after
+  `in_catalog`). It appears in the wire schema of `/api/discovered-models`.
+- New `LMS_BIN = Path.home() / ".lmstudio/bin/lms"` and
+  `LMSTUDIO_MODELS_ROOT = Path.home() / ".lmstudio/models"`.
+- New `lmstudio_model_paths(run=None, models_root=None) -> dict[str, str]`:
+  `run` is a zero-argument callable returning the stdout text of
+  `lms ls --json`; the default runs `[str(LMS_BIN), "ls", "--json"]` with
+  `subprocess.run(..., capture_output=True, text=True, timeout=10,
+  check=False)` and returns its stdout. The text is a JSON array (see the frozen
+  capture `captures/lms-ls.json`); each row with both a `modelKey` and a
+  `path` maps `modelKey -> str(models_root / path)` (`models_root` defaults to
+  `LMSTUDIO_MODELS_ROOT`). ANY exception or non-list JSON returns `{}` — log
+  it at debug level, never raise.
+- `discover_models(catalog_entries=None, fetch=None, probes=None, paths=None)`:
+  `paths` is a zero-argument callable returning that map (default
+  `lmstudio_model_paths`). Each DiscoveredModel's `path` is `paths_map.get(key)`.
+  `in_catalog` is true when the key equals an entry's `upstream_alias` (as
+  today) OR the model's path is not None and equals an entry's `source_path`
+  or is one of the strings in an entry's `launch_command`.
+
+### src/vortex/catalog_synth.py (NEW, stdlib + vortex imports only)
+
+- **Imports (exact — v40 escalation response):** these three types live in
+  existing modules of the `vortex` package and are imported RELATIVELY, the
+  way every other module in the package imports its siblings. There is no
+  `vortex.models` module.
+
+      from .catalog import Catalog, CatalogEntry
+      from .discovery import DiscoveredModel
+
+  plus stdlib `os` and `re`. Annotate optional values as `X | None`.
+
+- `PORT_RANGE = range(8200, 8300)`;
+  `RUNTIME_BINARIES = {"mlx": "/opt/homebrew/bin/mlx-serve", "gguf": "/opt/homebrew/bin/llama-server"}`.
+- `class SynthesisError(ValueError)`.
+- `synthesize_entry(model: DiscoveredModel, catalog: Catalog, binaries=RUNTIME_BINARIES) -> CatalogEntry`,
+  checks in this order, each raising SynthesisError whose message contains the
+  quoted word: path is None → "no local path known for <key>" ("path");
+  `model.fmt` not a key of `binaries` → "unsupported format <fmt>" ("format");
+  architecture is None → "no architecture reported (not a chat model)"
+  ("architecture"); public id (below) already used, or path equal to an
+  entry's `source_path` or present in its `launch_command` → "already in the
+  catalog as <id>" ("already"); no port of PORT_RANGE free of catalog ports →
+  "no free port in 8200-8299" ("port").
+- public id = `re.sub(r"[^a-z0-9._-]", "-", model.key.lower())`.
+- port = lowest port in PORT_RANGE not used by any catalog entry.
+- mlx: runtime and engine "mlx-serve", launch
+  `[binaries["mlx"], "--model", path, "--serve", "--host", "127.0.0.1", "--port", str(port)]`.
+- gguf: runtime "llama-server", engine "llama.cpp", launch
+  `[binaries["gguf"], "-m", path, "--host", "127.0.0.1", "--port", str(port)]`.
+- ready_url `http://127.0.0.1:<port>/v1/models`, chat_endpoint
+  `http://127.0.0.1:<port>/v1/chat/completions`, upstream_alias =
+  `os.path.basename(path.rstrip("/"))`, `ram_estimate_gb =
+  round(size_bytes * 1.1 / 1e9, 1)` when size_bytes else None, `exclusive =
+  ram_estimate_gb is not None and ram_estimate_gb > 40`, `source_path = path`,
+  `origin = "local"`. Return `CatalogEntry.model_validate(...)` of that dict.
+
+### src/vortex/app.py
+
+- **Imports (exact — v40 escalation response):** extend the existing
+  `from .catalog import ...` line so it also imports `save_local_entries`,
+  and add `from .catalog_synth import SynthesisError, synthesize_entry` next
+  to the other relative imports. There is no `vortex.models` module.
+
+- `build_app` gains keyword `local_catalog_path: Path | None = None`. When
+  `catalog` is None, the app loads
+  `load_catalog(<repo>/config/catalog.json, local_path=<repo>/config/catalog.local.json)`
+  and persists to that local path. When `catalog` is passed explicitly,
+  persistence goes to `local_catalog_path` only if it was given (otherwise
+  adds/removes stay in memory). `model_discovery` is still called with ONLY
+  `catalog_entries=...` (frozen tests pass one-argument fakes).
+- `/api/catalog` rows add `"origin"` and `"source_path"`.
+- `POST /api/discovered-models/{key}/add`: find `key` in the discovered models
+  (cached list; rescan once if absent) → 404 `{"detail": "..."}` if absent;
+  `synthesize_entry(model, catalog)` → on SynthesisError 422
+  `{"detail": {"message": str(exc), "key": key}}`; else `catalog.add`, persist,
+  clear the discovered-model cache, and return 201
+  `{"added": entry.model_dump(mode="json")}`.
+- `POST /api/discovered-models/add-new`: clear the cache, rescan, and for each
+  discovered model with `in_catalog` False try synthesize + add (the catalog
+  grows as it goes, so ports never collide); SynthesisError rows go to
+  `skipped` as `{"key", "reason"}`. Persist once, clear the cache, return 200
+  `{"added": [<public ids>], "skipped": [...]}`.
+- `DELETE /api/catalog/{public_id}`: 404 when unknown; 409
+  `{"detail": {"message": ...}}` when origin is "config", when the entry is
+  loaded (its port is occupied — `lifecycle.occupying_pid(entry)` is not None)
+  or when an operation for it is active (`ops.active_for(public_id)`);
+  otherwise `catalog.remove`, persist, clear the cache, return 200
+  `{"removed": public_id}`.
+
+### src/vortex/ui.py
+
+- Beside the existing Scan control (`data-act="scan-models"`) add
+  `<button id="addnewmodels">Add all new</button>` and an empty
+  `<div id="addresult"></div>`.
+- Its handler: `document.getElementById("addnewmodels").addEventListener("click", function () {`
+  → `confirm("Add every discovered model not yet in Vortex to the loadable list?")`,
+  `return` on cancel; else `fetch("/api/discovered-models/add-new", { method: "POST" })`;
+  on success write "Added N" plus each skipped `s.key + " (" + s.reason + ")"`
+  (reading `body.skipped` / `.reason`) into `#addresult`, then call
+  `pollCatalog()` and `pollModels()`; on failure `setError("Add failed: " + message)`.
+- In the discovered-model row renderer: when `!m.in_catalog`, render
+  `<button data-act="add-model" data-key="...">Add</button>`; its click POSTs
+  `"/api/discovered-models/" + encodeURIComponent(key) + "/add"` with
+  `{ method: "POST" }`, then re-polls both lists; failure →
+  `setError("Add failed: " + <server detail message>)`.
+- In the catalog row renderer: when `m.origin === "local"`, render
+  `<button data-act="remove-model" data-id="...">Remove</button>`; its click
+  `confirm("Remove <id> from Vortex? The model files are not deleted.")`, then
+  `fetch("/api/catalog/" + encodeURIComponent(id), { method: "DELETE" })`,
+  re-polls both lists; failure → `setError("Remove failed: " + <detail message>)`.
+- Every `m.*` field the page reads must be returned by `/api/catalog` or
+  `/api/discovered-models` (frozen ERD-33 contract test).
+
+<!-- active freeze section: v40 -->
+## v40 escalation response (T3, caps-exhausted)
+
+T3 failed twice because the coder imported `vortex.models`, which does not
+exist: neither this delta nor the EM's brief named the modules the types come
+from. The EM's consult verdict (decomposition_wrong, citing the DAG) was
+incorrect — T3 already depended on T1 and T2. The fix is spec-side: exact
+import lines are now stated for catalog_synth.py and app.py above. Behavior,
+acceptance criteria and tests are unchanged. catalog.py, discovery.py and
+ui.py passed in v39 and are no-edit for this resume.
+
+<!-- active freeze section: v40 -->
+## Task DAG
+
+`src/vortex/ui.py` depends on nothing in this delta.
+
+## Test-to-file mapping (active, deduplicated)
+
+* `tests/test_catalog_local.py::test_entries_default_to_config_origin_and_no_source_path` -> `src/vortex/catalog.py`
+* `tests/test_catalog_local.py::test_load_merges_the_local_file_as_local_origin` -> `src/vortex/catalog.py`
+* `tests/test_catalog_local.py::test_load_without_a_local_file_is_just_the_config` -> `src/vortex/catalog.py`
+* `tests/test_catalog_local.py::test_local_entries_colliding_with_config_are_rejected` -> `src/vortex/catalog.py`
+* `tests/test_catalog_local.py::test_add_appends_and_rejects_duplicates` -> `src/vortex/catalog.py`
+* `tests/test_catalog_local.py::test_remove_only_removes_local_entries` -> `src/vortex/catalog.py`
+* `tests/test_catalog_local.py::test_save_writes_only_local_entries_and_round_trips` -> `src/vortex/catalog.py`
+* `tests/test_discovery_paths.py::test_path_map_joins_cli_paths_onto_the_models_root` -> `src/vortex/discovery.py`
+* `tests/test_discovery_paths.py::test_path_map_is_empty_when_the_listing_cannot_be_read` -> `src/vortex/discovery.py`
+* `tests/test_discovery_paths.py::test_path_map_skips_rows_without_key_or_path` -> `src/vortex/discovery.py`
+* `tests/test_discovery_paths.py::test_discovered_models_carry_their_path_or_none` -> `src/vortex/discovery.py`
+* `tests/test_discovery_paths.py::test_in_catalog_matches_a_path_in_an_entry_launch_command` -> `src/vortex/discovery.py`
+* `tests/test_discovery_paths.py::test_in_catalog_matches_an_entry_source_path` -> `src/vortex/discovery.py`
+* `tests/test_discovery_paths.py::test_unrelated_entry_does_not_mark_the_model_in_catalog` -> `src/vortex/discovery.py`
+* `tests/test_catalog_synth.py::test_port_range_and_binaries_are_the_ceo_policy` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_mlx_model_becomes_an_mlx_serve_entry` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_gguf_model_becomes_a_llama_server_entry` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_lowest_free_port_skips_ports_the_catalog_uses` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_public_id_is_sanitized_from_the_key` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_ram_estimate_is_size_plus_ten_percent_and_sets_exclusive` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_a_model_already_in_the_catalog_is_refused` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_no_free_port_is_refused` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_add_api.py::test_add_puts_the_model_in_the_live_catalog_and_the_local_file` -> `src/vortex/app.py`
+* `tests/test_catalog_add_api.py::test_added_model_is_no_longer_newly_found` -> `src/vortex/app.py`
+* `tests/test_catalog_add_api.py::test_add_unknown_key_is_404_and_changes_nothing` -> `src/vortex/app.py`
+* `tests/test_catalog_add_api.py::test_add_unsynthesizable_is_422_with_the_reason` -> `src/vortex/app.py`
+* `tests/test_catalog_add_api.py::test_add_new_adds_every_synthesizable_new_model_on_distinct_ports` -> `src/vortex/app.py`
+* `tests/test_catalog_add_api.py::test_remove_deletes_a_local_entry_from_catalog_and_file` -> `src/vortex/app.py`
+* `tests/test_catalog_add_api.py::test_remove_refuses_config_entries_and_unknown_ids` -> `src/vortex/app.py`
+* `tests/test_catalog_add_api.py::test_remove_refuses_a_loaded_local_entry` -> `src/vortex/app.py`
+* `tests/test_discovered_models_api.py::test_wire_schema_carries_all_discovered_model_fields` -> `src/vortex/discovery.py`
+* `tests/test_ui_catalog_add.py::test_add_all_new_control_sits_with_the_discovered_models_scan` -> `src/vortex/ui.py`
+* `tests/test_ui_catalog_add.py::test_add_all_new_confirms_then_posts` -> `src/vortex/ui.py`
+* `tests/test_ui_catalog_add.py::test_add_all_reports_skips_and_failures` -> `src/vortex/ui.py`
+* `tests/test_ui_catalog_add.py::test_each_new_discovered_model_gets_an_add_control` -> `src/vortex/ui.py`
+* `tests/test_ui_catalog_add.py::test_local_entries_get_a_confirmed_remove_control` -> `src/vortex/ui.py`
+* `tests/test_ui_catalog_add.py::test_successful_changes_refresh_both_lists` -> `src/vortex/ui.py`
+
+## Task DAG (active, deduplicated)
+
+`src/vortex/discovery.py` depends on `src/vortex/catalog.py`
+`src/vortex/catalog_synth.py` depends on `src/vortex/catalog.py`
+`src/vortex/catalog_synth.py` depends on `src/vortex/discovery.py`
+`src/vortex/app.py` depends on `src/vortex/catalog_synth.py`
+
+
+## Changed contracts (machine-computed from the active DELTA range)
+
+The milestone's DELTA snapshots declare these contracts changed:
+- `route:DELETE /api/catalog/{public_id}`
+- `route:POST /api/discovered-models/add-new`
+- `route:POST /api/discovered-models/{key}/add`
+- `src.vortex.catalog`
+- `src.vortex.catalog:Catalog`
+- `src.vortex.catalog:CatalogEntry`
+- `src.vortex.catalog:load_catalog`
+- `src.vortex.catalog:save_local_entries`
+- `src.vortex.catalog_synth`
+- `src.vortex.catalog_synth:PORT_RANGE`
+- `src.vortex.catalog_synth:RUNTIME_BINARIES`
+- `src.vortex.catalog_synth:SynthesisError`
+- `src.vortex.catalog_synth:synthesize_entry`
+- `src.vortex.discovery:lmstudio_model_paths`
+
+Claim rule: a task claims only ids listed here, plus cross-file interfaces its work directly depends on (pinned to another file, or unpinned). A contract pinned to the task's OWN file that is not listed here must not be claimed — the plan gate rejects ride-along claims (v99: a GET-only milestone claiming PUT/DELETE dragged unchanged behavior into acceptance and invalidation).
+
+```
+
+### contracts (.pipeline-state/contracts-delta.json)
+```
+{"erd_version":40,"files":["src/vortex/catalog.py","src/vortex/discovery.py","src/vortex/catalog_synth.py","src/vortex/app.py","src/vortex/ui.py"],"changed_files":["src/vortex/catalog_synth.py","src/vortex/app.py"],"no_edit_files":["src/vortex/catalog.py","src/vortex/discovery.py","src/vortex/ui.py"],"smoke_checks":{},"entry_points":["src.vortex.ui","src.vortex.ui:UI_PAGE","src.vortex.app","src.vortex.app:build_app","src.vortex.discovery","src.vortex.discovery:discover_wrappers","src.vortex.discovery:Wrapper","src.vortex.discovery:WrapperSpec","src.vortex.discovery:WRAPPER_SPECS","src.vortex.discovery:discover_models","src.vortex.discovery:DiscoveredModel","src.vortex.catalog","src.vortex.catalog:Catalog","src.vortex.catalog:CatalogEntry","src.vortex.catalog:load_catalog","src.vortex.catalog:save_local_entries","src.vortex.discovery:lmstudio_model_paths","src.vortex.catalog_synth","src.vortex.catalog_synth:synthesize_entry","src.vortex.catalog_synth:SynthesisError","src.vortex.catalog_synth:PORT_RANGE","src.vortex.catalog_synth:RUNTIME_BINARIES"],"externals":[{"id":"external:lms-ls-json","probe":"~/.lmstudio/bin/lms ls --json","capture":"captures/lms-ls.json","notes":"JSON array; the spec relies on each row's modelKey and path (relative to ~/.lmstudio/models)."},{"id":"external:lmstudio-api-v1-models","probe":"curl -s http://127.0.0.1:1234/api/v1/models","capture":"captures/lmstudio-api-v1-models.json","notes":"Object with a models array; the spec relies on key, format (mlx|gguf), architecture, size_bytes. Discovery has read it since v32; declared here for the first time."}],"test_mapping":{},"routes":[{"id":"route:GET /","method":"GET","path":"/"},{"id":"route:GET /v1/models","method":"GET","path":"/v1/models"},{"id":"route:POST /v1/chat/completions","method":"POST","path":"/v1/chat/completions"},{"id":"route:GET /api/catalog","method":"GET","path":"/api/catalog"},{"id":"route:GET /api/status","method":"GET","path":"/api/status"},{"id":"route:POST /api/models/{public_id}/load","method":"POST","path":"/api/models/{public_id}/load"},{"id":"route:POST /api/models/{public_id}/unload","method":"POST","path":"/api/models/{public_id}/unload"},{"id":"route:GET /api/operations/{op_id}","method":"GET","path":"/api/operations/{op_id}"},{"id":"route:GET /api/engine-wrappers","method":"GET","path":"/api/engine-wrappers","file":"src/vortex/app.py"},{"id":"route:POST /api/engine-wrappers/discover","method":"POST","path":"/api/engine-wrappers/discover","file":"src/vortex/app.py"},{"id":"route:POST /api/shutdown","method":"POST","path":"/api/shutdown","file":"src/vortex/app.py"},{"id":"route:GET /api/discovered-models","method":"GET","path":"/api/discovered-models","file":"src/vortex/app.py"},{"id":"route:POST /api/discovered-models/discover","method":"POST","path":"/api/discovered-models/discover","file":"src/vortex/app.py"},{"id":"route:POST /api/restart","method":"POST","path":"/api/restart","file":"src/vortex/app.py"},{"id":"route:POST /api/discovered-models/{key}/add","method":"POST","path":"/api/discovered-models/{key}/add","file":"src/vortex/app.py"},{"id":"route:POST /api/discovered-models/add-new","method":"POST","path":"/api/discovered-models/add-new","file":"src/vortex/app.py"},{"id":"route:DELETE /api/catalog/{public_id}","method":"DELETE","path":"/api/catalog/{public_id}","file":"src/vortex/app.py"}],"schemas":[],"errors":[],"ui":[]}
+
+```
+
+### test-nodeids (.pipeline-state/nodeids-scope.txt)
+```
+tests/test_catalog_add_api.py::test_add_new_adds_every_synthesizable_new_model_on_distinct_ports
+tests/test_catalog_add_api.py::test_add_puts_the_model_in_the_live_catalog_and_the_local_file
+tests/test_catalog_add_api.py::test_add_unknown_key_is_404_and_changes_nothing
+tests/test_catalog_add_api.py::test_add_unsynthesizable_is_422_with_the_reason
+tests/test_catalog_add_api.py::test_added_model_is_no_longer_newly_found
+tests/test_catalog_add_api.py::test_remove_deletes_a_local_entry_from_catalog_and_file
+tests/test_catalog_add_api.py::test_remove_refuses_a_loaded_local_entry
+tests/test_catalog_add_api.py::test_remove_refuses_config_entries_and_unknown_ids
+tests/test_catalog_local.py::test_add_appends_and_rejects_duplicates
+tests/test_catalog_local.py::test_entries_default_to_config_origin_and_no_source_path
+tests/test_catalog_local.py::test_load_merges_the_local_file_as_local_origin
+tests/test_catalog_local.py::test_load_without_a_local_file_is_just_the_config
+tests/test_catalog_local.py::test_local_entries_colliding_with_config_are_rejected
+tests/test_catalog_local.py::test_remove_only_removes_local_entries
+tests/test_catalog_local.py::test_save_writes_only_local_entries_and_round_trips
+tests/test_catalog_synth.py::test_a_model_already_in_the_catalog_is_refused
+tests/test_catalog_synth.py::test_gguf_model_becomes_a_llama_server_entry
+tests/test_catalog_synth.py::test_lowest_free_port_skips_ports_the_catalog_uses
+tests/test_catalog_synth.py::test_mlx_model_becomes_an_mlx_serve_entry
+tests/test_catalog_synth.py::test_no_free_port_is_refused
+tests/test_catalog_synth.py::test_port_range_and_binaries_are_the_ceo_policy
+tests/test_catalog_synth.py::test_public_id_is_sanitized_from_the_key
+tests/test_catalog_synth.py::test_ram_estimate_is_size_plus_ten_percent_and_sets_exclusive
+tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason
+tests/test_discovered_models_api.py::test_wire_schema_carries_all_discovered_model_fields
+tests/test_discovery_paths.py::test_discovered_models_carry_their_path_or_none
+tests/test_discovery_paths.py::test_in_catalog_matches_a_path_in_an_entry_launch_command
+tests/test_discovery_paths.py::test_in_catalog_matches_an_entry_source_path
+tests/test_discovery_paths.py::test_path_map_is_empty_when_the_listing_cannot_be_read
+tests/test_discovery_paths.py::test_path_map_joins_cli_paths_onto_the_models_root
+tests/test_discovery_paths.py::test_path_map_skips_rows_without_key_or_path
+tests/test_discovery_paths.py::test_unrelated_entry_does_not_mark_the_model_in_catalog
+tests/test_ui_catalog_add.py::test_add_all_new_confirms_then_posts
+tests/test_ui_catalog_add.py::test_add_all_new_control_sits_with_the_discovered_models_scan
+tests/test_ui_catalog_add.py::test_add_all_reports_skips_and_failures
+tests/test_ui_catalog_add.py::test_each_new_discovered_model_gets_an_add_control
+tests/test_ui_catalog_add.py::test_local_entries_get_a_confirmed_remove_control
+tests/test_ui_catalog_add.py::test_successful_changes_refresh_both_lists
+
+```
+
+### plan-being-revised (tasks/plan.json)
+```
+{
+  "version": 4,
+  "erd_version": 40,
+  "tasks": [
+    {
+      "id": "T1",
+      "file": "src/vortex/catalog.py",
+      "depends_on": [],
+      "brief": "Edit `src/vortex/catalog.py` only. Add no new imports beyond what the file already has.\n\n1. `CatalogEntry`: add two optional fields, both carried through `model_dump()`/validation: `source_path: str | None = None` (the model files an added entry serves) and `origin: Literal[\"config\", \"local\"] = \"config\"` (import `Literal` from typing if absent).\n\n2. `load_catalog(path, local_path=None)`: loads `path` as today (origin \"config\"). When `local_path` is given AND the file exists, its `{\"entries\": [...]}` rows are loaded with origin forced to \"local\" and merged after the config rows; the merged catalog is validated by the same duplicate public id / duplicate port rules (same messages: \"duplicate public id\", \"duplicate port\"). A missing local file is not an error.\n\n3. `Catalog.add(entry)`: raises `ValueError` whose message contains \"duplicate public id\" or \"duplicate port\" when either collides with an existing entry; otherwise appends to `self.entries` IN PLACE (other components hold this same list).\n\n4. `Catalog.remove(public_id) -> CatalogEntry`: `KeyError` for an unknown id; `ValueError` with a message containing \"config\" for an entry whose origin is \"config\"; otherwise removes it from `self.entries` in place and returns it.\n\n5. `save_local_entries(catalog, local_path)`: writes `{\"entries\": [<every origin \"local\" entry as model_dump(mode=\"json\")>]}` (indent 2) to a temp file beside `local_path`, then `os.replace` onto it. Only local entries are written; config entries never are.\n\nAcceptance: `ruff check` and `mypy --explicit-package-bases src/vortex/catalog.py` clean; the file defines the two new fields and the add/remove/save_local_entries behavior exactly as above.",
+      "contracts": [
+        "src.vortex.catalog",
+        "src.vortex.catalog:Catalog",
+        "src.vortex.catalog:CatalogEntry",
+        "src.vortex.catalog:load_catalog",
+        "src.vortex.catalog:save_local_entries"
+      ],
+      "tests": [
+        "tests/test_catalog_local.py::test_entries_default_to_config_origin_and_no_source_path",
+        "tests/test_catalog_local.py::test_load_merges_the_local_file_as_local_origin",
+        "tests/test_catalog_local.py::test_load_without_a_local_file_is_just_the_config",
+        "tests/test_catalog_local.py::test_local_entries_colliding_with_config_are_rejected",
+        "tests/test_catalog_local.py::test_add_appends_and_rejects_duplicates",
+        "tests/test_catalog_local.py::test_remove_only_removes_local_entries",
+        "tests/test_catalog_local.py::test_save_writes_only_local_entries_and_round_trips"
+      ]
+    },
+    {
+      "id": "T2",
+      "file": "src/vortex/discovery.py",
+      "depends_on": [
+        "T1"
+      ],
+      "brief": "Edit `src/vortex/discovery.py` only.\n\n1. `DiscoveredModel`: add field `path: str | None = None` (field order: after `in_catalog`). It appears in the wire schema of `/api/discovered-models`.\n\n2. Add module constants: `LMS_BIN = Path.home() / \".lmstudio/bin/lms\"` and `LMSTUDIO_MODELS_ROOT = Path.home() / \".lmstudio/models\"`.\n\n3. New `lmstudio_model_paths(run=None, models_root=None) -> dict[str, str]`: `run` is a zero-argument callable returning the stdout text of `lms ls --json`; the default runs `[str(LMS_BIN), \"ls\", \"--json\"]` with `subprocess.run(..., capture_output=True, text=True, timeout=10, check=False)` and returns its stdout. The text is a JSON array (see frozen capture `captures/lms-ls.json`); each row with both a `modelKey` and a `path` maps `modelKey -> str(models_root / path)` (`models_root` defaults to `LMSTUDIO_MODELS_ROOT`). ANY exception or non-list JSON returns `{}` \u2014 log at debug level, never raise.\n\n4. `discover_models(catalog_entries=None, fetch=None, probes=None, paths=None)`: `paths` is a zero-argument callable returning that map (default `lmstudio_model_paths`). Each DiscoveredModel's `path` is `paths_map.get(key)`. `in_catalog` is true when the key equals an entry's `upstream_alias` (as today) OR the model's path is not None and equals an entry's `source_path` or is one of the strings in an entry's `launch_command`.\n\nAcceptance: ruff and mypy clean; the wire schema of `/api/discovered-models` carries `path`.",
+      "contracts": [
+        "src.vortex.discovery:lmstudio_model_paths"
+      ],
+      "tests": [
+        "tests/test_discovery_paths.py::test_path_map_joins_cli_paths_onto_the_models_root",
+        "tests/test_discovery_paths.py::test_path_map_is_empty_when_the_listing_cannot_be_read",
+        "tests/test_discovery_paths.py::test_path_map_skips_rows_without_key_or_path",
+        "tests/test_discovery_paths.py::test_discovered_models_carry_their_path_or_none",
+        "tests/test_discovery_paths.py::test_in_catalog_matches_a_path_in_an_entry_launch_command",
+        "tests/test_discovery_paths.py::test_in_catalog_matches_an_entry_source_path",
+        "tests/test_discovery_paths.py::test_unrelated_entry_does_not_mark_the_model_in_catalog"
+      ]
+    },
+    {
+      "id": "T5",
+      "file": "src/vortex/ui.py",
+      "depends_on": [],
+      "brief": "Edit `src/vortex/ui.py` only; `UI_PAGE` is one HTML string. No external asset references.\n\n1. Beside the existing Scan control (`data-act=\"scan-models\"`) add `<button id=\"addnewmodels\">Add all new</button>` and an empty `<div id=\"addresult\"></div>`.\n\n2. Its handler: `document.getElementById(\"addnewmodels\").addEventListener(\"click\", function () {` -> `confirm(\"Add every discovered model not yet in Vortex to the loadable list?\")`, `return` on cancel; else `fetch(\"/api/discovered-models/add-new\", { method: \"POST\" })`; on success write \"Added N\" plus each skipped `s.key + \" (\" + s.reason + \")\"` (reading `body.skipped` / `.reason`) into `#addresult`, then call `pollCatalog()` and `pollModels()`; on failure `setError(\"Add failed: \" + message)`.\n\n3. In the discovered-model row renderer: when `!m.in_catalog`, render `<button data-act=\"add-model\" data-key=\"...\">Add</button>`; its click POSTs `\"/api/discovered-models/\" + encodeURIComponent(key) + \"/add\"` with `{ method: \"POST\" }`, then re-polls both lists; failure -> `setError(\"Add failed: \" + <server detail message>)`.\n\n4. In the catalog row renderer: when `m.origin === \"local\"`, render `<button data-act=\"remove-model\" data-id=\"...\">Remove</button>`; its click `confirm(\"Remove <id> from Vortex? The model files are not deleted.\")`, then `fetch(\"/api/catalog/\" + encodeURIComponent(id), { method: \"DELETE\" })`, re-polls both lists; failure -> `setError(\"Remove failed: \" + <detail message>)`.\n\n5. Every `m.*` field the page reads must be returned by `/api/catalog` or `/api/discovered-models`.\n\nAcceptance: ruff and mypy clean; the new controls and handlers exist; no http/https asset URL added.",
+      "contracts": [],
+      "tests": [
+        "tests/test_ui_catalog_add.py::test_add_all_new_control_sits_with_the_discovered_models_scan",
+        "tests/test_ui_catalog_add.py::test_add_all_new_confirms_then_posts",
+        "tests/test_ui_catalog_add.py::test_add_all_reports_skips_and_failures",
+        "tests/test_ui_catalog_add.py::test_each_new_discovered_model_gets_an_add_control",
+        "tests/test_ui_catalog_add.py::test_local_entries_get_a_confirmed_remove_control",
+        "tests/test_ui_catalog_add.py::test_successful_changes_refresh_both_lists"
+      ]
+    },
+    {
+      "id": "T3",
+      "file": "src/vortex/catalog_synth.py",
+      "depends_on": [
+        "T1",
+        "T2"
+      ],
+      "brief": "CREATE src/vortex/catalog_synth.py (NEW file, under 150 lines). Constraints: stdlib `os` and `re` only, plus EXACT relative imports: `from .catalog import Catalog, CatalogEntry` and `from .discovery import DiscoveredModel`. No other imports. No global mutable state. Annotate optional values as `X | None`.\n\nDefine:\n- `PORT_RANGE = range(8200, 8300)`\n- `RUNTIME_BINARIES = {\"mlx\": \"/opt/homebrew/bin/mlx-serve\", \"gguf\": \"/opt/homebrew/bin/llama-server\"}`\n- `class SynthesisError(ValueError)`\n- `synthesize_entry(model: DiscoveredModel, catalog: Catalog, binaries=RUNTIME_BINARIES) -> CatalogEntry`\n\nBehavior \u2014 checks in this order, each raising SynthesisError with the quoted word in the message:\n1. `model.path` is None \u2192 \"no local path known for <key>\" (contains \"path\")\n2. `model.fmt` not a key of `binaries` \u2192 \"unsupported format <fmt>\" (contains \"format\")\n3. `model.architecture` is None \u2192 \"no architecture reported (not a chat model)\" (contains \"architecture\")\n4. public_id already used, or path equals an entry's `source_path` or is present in its `launch_command` \u2192 \"already in the catalog as <id>\" (contains \"already\")\n5. no port of PORT_RANGE free of catalog ports \u2192 \"no free port in 8200-8299\" (contains \"port\")\n\npublic_id = `re.sub(r\"[^a-z0-9._-]\", \"-\", model.key.lower())`\nport = lowest port in PORT_RANGE not used by any catalog entry\n\nmlx: runtime and engine \"mlx-serve\", launch `[binaries[\"mlx\"], \"--model\", path, \"--serve\", \"--host\", \"127.0.0.1\", \"--port\", str(port)]`\ngguf: runtime \"llama-server\", engine \"llama.cpp\", launch `[binaries[\"gguf\"], \"-m\", path, \"--host\", \"127.0.0.1\", \"--port\", str(port)]`\n\nready_url `http://127.0.0.1:<port>/v1/models`, chat_endpoint `http://127.0.0.1:<port>/v1/chat/completions`, upstream_alias = `os.path.basename(path.rstrip(\"/\"))`, `ram_estimate_gb = round(size_bytes * 1.1 / 1e9, 1)` when size_bytes else None, `exclusive = ram_estimate_gb is not None and ram_estimate_gb > 40`, `source_path = path`, `origin = \"local\"`. Return `CatalogEntry.model_validate(...)` of that dict.\n\nAcceptance: all 9 tests in tests/test_catalog_synth.py pass.",
+      "contracts": [
+        "src.vortex.catalog_synth",
+        "src.vortex.catalog_synth:PORT_RANGE",
+        "src.vortex.catalog_synth:RUNTIME_BINARIES",
+        "src.vortex.catalog_synth:SynthesisError",
+        "src.vortex.catalog_synth:synthesize_entry"
+      ],
+      "tests": [
+        "tests/test_catalog_synth.py::test_a_model_already_in_the_catalog_is_refused",
+        "tests/test_catalog_synth.py::test_gguf_model_becomes_a_llama_server_entry",
+        "tests/test_catalog_synth.py::test_lowest_free_port_skips_ports_the_catalog_uses",
+        "tests/test_catalog_synth.py::test_mlx_model_becomes_an_mlx_serve_entry",
+        "tests/test_catalog_synth.py::test_no_free_port_is_refused",
+        "tests/test_catalog_synth.py::test_port_range_and_binaries_are_the_ceo_policy",
+        "tests/test_catalog_synth.py::test_public_id_is_sanitized_from_the_key",
+        "tests/test_catalog_synth.py::test_ram_estimate_is_size_plus_ten_percent_and_sets_exclusive",
+        "tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason"
+      ]
+    },
+    {
+      "id": "T4",
+      "file": "src/vortex/app.py",
+      "depends_on": [
+        "T3"
+      ],
+      "brief": "EDIT src/vortex/app.py. Constraints: NO new dependencies. Extend the existing `from .catalog import ...` line so it also imports `save_local_entries`. Add `from .catalog_synth import SynthesisError, synthesize_entry` next to the other relative imports. No `vortex.models` module exists. No global mutable state.\n\nChanges from current behavior:\n- `build_app` gains keyword `local_catalog_path: Path | None = None`. When `catalog` is None, the app loads `load_catalog(<repo>/config/catalog.json, local_path=<repo>/config/catalog.local.json)` and persists to that local path. When `catalog` is passed explicitly, persistence goes to `local_catalog_path` only if it was given (otherwise adds/removes stay in memory). `model_discovery` is still called with ONLY `catalog_entries=...`.\n- `/api/catalog` rows add `\"origin\"` and `\"source_path\"`.\n- `POST /api/discovered-models/{key}/add`: find `key` in the discovered models (cached list; rescan once if absent) \u2192 404 `{\"detail\": \"...\"}` if absent; `synthesize_entry(model, catalog)` \u2192 on SynthesisError 422 `{\"detail\": {\"message\": str(exc), \"key\": key}}`; else `catalog.add`, persist, clear the discovered-model cache, and return 201 `{\"added\": entry.model_dump(mode=\"json\")}`.\n- `POST /api/discovered-models/add-new`: clear the cache, rescan, and for each discovered model with `in_catalog` False try synthesize + add (the catalog grows as it goes, so ports never collide); SynthesisError rows go to `skipped` as `{\"key\", \"reason\"}`. Persist once, clear the cache, return 200 `{\"added\": [<public ids>], \"skipped\": [...]}`.\n- `DELETE /api/catalog/{public_id}`: 404 when unknown; 409 `{\"detail\": {\"message\": ...}}` when origin is \"config\", when the entry is loaded (its port is occupied \u2014 `lifecycle.occupying_pid(entry)` is not None) or when an operation for it is active (`ops.active_for(public_id)`); otherwise `catalog.remove`, persist, clear the cache, return 200 `{\"removed\": public_id}`.\n\nAcceptance: all 8 tests in tests/test_catalog_add_api.py pass.",
+      "contracts": [
+        "route:POST /api/discovered-models/{key}/add",
+        "route:POST /api/discovered-models/add-new",
+        "route:DELETE /api/catalog/{public_id}",
+        "src.vortex.app",
+        "src.vortex.app:build_app",
+        "src.vortex.catalog_synth:synthesize_entry",
+        "src.vortex.catalog:save_local_entries"
+      ],
+      "tests": [
+        "tests/test_catalog_add_api.py::test_add_new_adds_every_synthesizable_new_model_on_distinct_ports",
+        "tests/test_catalog_add_api.py::test_add_puts_the_model_in_the_live_catalog_and_the_local_file",
+        "tests/test_catalog_add_api.py::test_add_unknown_key_is_404_and_changes_nothing",
+        "tests/test_catalog_add_api.py::test_add_unsynthesizable_is_422_with_the_reason",
+        "tests/test_catalog_add_api.py::test_added_model_is_no_longer_newly_found",
+        "tests/test_catalog_add_api.py::test_remove_deletes_a_local_entry_from_catalog_and_file",
+        "tests/test_catalog_add_api.py::test_remove_refuses_a_loaded_local_entry",
+        "tests/test_catalog_add_api.py::test_remove_refuses_config_entries_and_unknown_ids"
+      ]
+    }
+  ]
+}
+
+```
