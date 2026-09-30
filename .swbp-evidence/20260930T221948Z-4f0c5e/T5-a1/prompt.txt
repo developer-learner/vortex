@@ -1,3 +1,37 @@
+Edit `src/vortex/ui.py` only; `UI_PAGE` is one HTML string. No external asset references.
+
+1. Beside the existing Scan control (`data-act="scan-models"`) add `<button id="addnewmodels">Add all new</button>` and an empty `<div id="addresult"></div>`.
+
+2. Its handler: `document.getElementById("addnewmodels").addEventListener("click", function () {` -> `confirm("Add every discovered model not yet in Vortex to the loadable list?")`, `return` on cancel; else `fetch("/api/discovered-models/add-new", { method: "POST" })`; on success write "Added N" plus each skipped `s.key + " (" + s.reason + ")"` (reading `body.skipped` / `.reason`) into `#addresult`, then call `pollCatalog()` and `pollModels()`; on failure `setError("Add failed: " + message)`.
+
+3. In the discovered-model row renderer: when `!m.in_catalog`, render `<button data-act="add-model" data-key="...">Add</button>`; its click POSTs `"/api/discovered-models/" + encodeURIComponent(key) + "/add"` with `{ method: "POST" }`, then re-polls both lists; failure -> `setError("Add failed: " + <server detail message>)`.
+
+4. In the catalog row renderer: when `m.origin === "local"`, render `<button data-act="remove-model" data-id="...">Remove</button>`; its click `confirm("Remove <id> from Vortex? The model files are not deleted.")`, then `fetch("/api/catalog/" + encodeURIComponent(id), { method: "DELETE" })`, re-polls both lists; failure -> `setError("Remove failed: " + <detail message>)`.
+
+5. Every `m.*` field the page reads must be returned by `/api/catalog` or `/api/discovered-models`.
+
+Acceptance: ruff and mypy clean; the new controls and handlers exist; no http/https asset URL added.
+
+Write EXACTLY one file: src/vortex/ui.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/ui.py and confirm it satisfies every acceptance condition in this brief.
+
+Reply with ONLY edit blocks in this exact format, nothing else:
+<<<<<<< SEARCH
+(an EXACT, character-for-character copy of a short existing section — 3 to 10 lines)
+=======
+(that same section with the change applied)
+>>>>>>> REPLACE
+Rules:
+- Each SEARCH must appear EXACTLY ONCE in the file. Copy it verbatim — same spaces, same quotes.
+- Several small blocks, not one big one. Do not touch code outside your blocks. Do not reformat or reorder anything.
+- Never include any line containing a think tag in a SEARCH section — anchor on nearby tag-free lines instead.
+- In new code, never write the think tag as one literal string — construct it by concatenation, e.g. '<' + 'think>'.
+- If the file already satisfies the brief, reply with exactly this line and nothing else: === NO CHANGES ===
+- Verify each SEARCH against the file one more time before answering.
+- Your reply's VERY FIRST line must be '<<<<<<< SEARCH' (or the NO CHANGES line). Do not analyze, plan, or explain anything — every design decision is already made in the brief. Prose before the blocks burns your output budget and truncates the edit mid-block.
+- Every block must be COMPLETE working code — never a stub, placeholder, or '...' body. If the brief needs a new function, write its full body in the block.
+
+### existing (src/vortex/ui.py)
+```
 """Operator dashboard shell (router phase 2). Served at "/" by app.py;
 JS polls /api/* client-side."""
 
@@ -293,9 +327,7 @@ footer {
     <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
       <span id="modelstatus"></span>
       <button data-act="scan-models">Scan</button>
-      <button id="addnewmodels">Add all new</button>
     </div>
-    <div id="addresult"></div>
   </section>
 </main>
 <footer>served at :9000/ by the daemon · polls /api/* every 2s</footer>
@@ -387,10 +419,7 @@ footer {
           + 'title="Copy endpoint: ' + esc(endpoint) + '">localhost:' + esc(m.port) + '</button>'
         : '<span class="dim">—</span>';
       html += "<td>" + portCell + "</td>";
-      var rmBtn = (m.origin === "local")
-        ? '<button data-act="remove-model" data-id="' + esc(m.public_id) + '">Remove</button>'
-        : "";
-      html += "<td>" + actBtn + rmBtn + "</td>";
+      html += "<td>" + actBtn + "</td>";
       html += "</tr>";
     }
     rows.innerHTML = html;
@@ -489,11 +518,7 @@ footer {
       html += "<td>" + esc(m.params) + "</td>";
       html += "<td>" + esc(m.max_context) + "</td>";
       html += "<td>" + (m.loaded ? "yes" : "no") + "</td>";
-      var catalogCell = (m.in_catalog ? "yes" : "no")
-        + (!m.in_catalog
-          ? ' <button data-act="add-model" data-key="' + esc(m.key) + '">Add</button>'
-          : "");
-      html += "<td>" + catalogCell + "</td>";
+      html += "<td>" + (m.in_catalog ? "yes" : "no") + "</td>";
       html += "</tr>";
     }
     rows.innerHTML = html;
@@ -569,27 +594,6 @@ footer {
     if (!btn) return;
     var act = btn.getAttribute("data-act");
     var id = btn.getAttribute("data-id");
-    if (act === "remove-model") {
-      if (!confirm("Remove " + id + " from Vortex? The model files are not deleted.")) return;
-      fetch("/api/catalog/" + encodeURIComponent(id), { method: "DELETE" })
-        .then(function (r) {
-          if (!r.ok) {
-            return r.json().then(function (b) {
-              throw new Error((b && b.detail && b.detail.message) || ("remove " + r.status));
-            });
-          }
-          return r.json();
-        })
-        .then(function () {
-          setError(null);
-          pollCatalog();
-          pollModels();
-        })
-        .catch(function (e) {
-          setError("Remove failed: " + e.message);
-        });
-      return;
-    }
     var path = "/api/models/" + encodeURIComponent(id) + "/" + act;
     fetch(path, { method: "POST" })
       .then(function (r) {
@@ -651,29 +655,7 @@ footer {
   document.getElementById("discoveredmodels").addEventListener("click", function (e) {
     var btn = e.target.closest("button[data-act]");
     if (!btn) return;
-    var act = btn.getAttribute("data-act");
-    if (act === "add-model") {
-      var akey = btn.getAttribute("data-key");
-      fetch("/api/discovered-models/" + encodeURIComponent(akey) + "/add", { method: "POST" })
-        .then(function (r) {
-          if (!r.ok) {
-            return r.json().then(function (b) {
-              throw new Error((b && b.detail && b.detail.message) || ("add " + r.status));
-            });
-          }
-          return r.json();
-        })
-        .then(function () {
-          setError(null);
-          pollCatalog();
-          pollModels();
-        })
-        .catch(function (e) {
-          setError("Add failed: " + e.message);
-        });
-      return;
-    }
-    if (act !== "scan-models") return;
+    if (btn.getAttribute("data-act") !== "scan-models") return;
     fetch("/api/discovered-models/discover", { method: "POST" })
       .then(function (r) {
         if (!r.ok) throw new Error("scan " + r.status);
@@ -695,34 +677,6 @@ footer {
       })
       .catch(function (e) {
         setError("Model discovery failed: " + e.message);
-      });
-  });
-
-  document.getElementById("addnewmodels").addEventListener("click", function () {
-    if (!confirm("Add every discovered model not yet in Vortex to the loadable list?")) return;
-    fetch("/api/discovered-models/add-new", { method: "POST" })
-      .then(function (r) {
-        if (!r.ok) {
-          return r.json().then(function (b) {
-            throw new Error((b && b.detail && b.detail.message) || ("add-new " + r.status));
-          });
-        }
-        return r.json();
-      })
-      .then(function (body) {
-        setError(null);
-        var out = "Added " + (body.added || 0);
-        var skipped = body.skipped || [];
-        for (var i = 0; i < skipped.length; i++) {
-          var s = skipped[i];
-          out += " · " + s.key + " (" + s.reason + ")";
-        }
-        document.getElementById("addresult").textContent = out;
-        pollCatalog();
-        pollModels();
-      })
-      .catch(function (e) {
-        setError("Add failed: " + e.message);
       });
   });
 
@@ -773,3 +727,5 @@ footer {
 </body>
 </html>
 """
+
+```

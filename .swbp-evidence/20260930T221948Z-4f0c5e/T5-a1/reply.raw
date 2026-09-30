@@ -1,0 +1,152 @@
+<<<<<<< SEARCH
+      <span id="modelstatus"></span>
+      <button data-act="scan-models">Scan</button>
+    </div>
+  </section>
+</main>
+=======
+      <span id="modelstatus"></span>
+      <button data-act="scan-models">Scan</button>
+      <button id="addnewmodels">Add all new</button>
+    </div>
+    <div id="addresult"></div>
+  </section>
+</main>
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+      html += "<td>" + esc(m.public_id) + engBadge + "</td>";
+      html += "<td>" + esc(m.ram_estimate_gb) + " GiB</td>";
+      var endpoint = m.chat_endpoint || ("http://localhost:" + m.port + "/v1/chat/completions");
+      var portCell = (loaded && m.port)
+        ? '<button type="button" class="port" data-copy="' + esc(endpoint) + '" '
+          + 'title="Copy endpoint: ' + esc(endpoint) + '">localhost:' + esc(m.port) + '</button>'
+        : '<span class="dim">—</span>';
+      html += "<td>" + portCell + "</td>";
+      html += "<td>" + actBtn + "</td>";
+      html += "</tr>";
+=======
+      html += "<td>" + esc(m.public_id) + engBadge + "</td>";
+      html += "<td>" + esc(m.ram_estimate_gb) + " GiB</td>";
+      var endpoint = m.chat_endpoint || ("http://localhost:" + m.port + "/v1/chat/completions");
+      var portCell = (loaded && m.port)
+        ? '<button type="button" class="port" data-copy="' + esc(endpoint) + '" '
+          + 'title="Copy endpoint: ' + esc(endpoint) + '">localhost:' + esc(m.port) + '</button>'
+        : '<span class="dim">—</span>';
+      html += "<td>" + portCell + "</td>";
+      var rmBtn = (m.origin === "local")
+        ? '<button data-act="remove-model" data-id="' + esc(m.public_id) + '">Remove</button>'
+        : "";
+      html += "<td>" + actBtn + rmBtn + "</td>";
+      html += "</tr>";
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+      html += "<td>" + (m.loaded ? "yes" : "no") + "</td>";
+      html += "<td>" + (m.in_catalog ? "yes" : "no") + "</td>";
+      html += "</tr>";
+=======
+      html += "<td>" + (m.loaded ? "yes" : "no") + "</td>";
+      var catalogCell = (m.in_catalog ? "yes" : "no")
+        + (!m.in_catalog
+          ? ' <button data-act="add-model" data-key="' + esc(m.key) + '">Add</button>'
+          : "");
+      html += "<td>" + catalogCell + "</td>";
+      html += "</tr>";
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+    var act = btn.getAttribute("data-act");
+    var id = btn.getAttribute("data-id");
+    var path = "/api/models/" + encodeURIComponent(id) + "/" + act;
+    fetch(path, { method: "POST" })
+=======
+    var act = btn.getAttribute("data-act");
+    var id = btn.getAttribute("data-id");
+    if (act === "remove-model") {
+      if (!confirm("Remove " + id + " from Vortex? The model files are not deleted.")) return;
+      fetch("/api/catalog/" + encodeURIComponent(id), { method: "DELETE" })
+        .then(function (r) {
+          if (!r.ok) {
+            return r.json().then(function (b) {
+              throw new Error((b && b.detail && b.detail.message) || ("remove " + r.status));
+            });
+          }
+          return r.json();
+        })
+        .then(function () {
+          setError(null);
+          pollCatalog();
+          pollModels();
+        })
+        .catch(function (e) {
+          setError("Remove failed: " + e.message);
+        });
+      return;
+    }
+    var path = "/api/models/" + encodeURIComponent(id) + "/" + act;
+    fetch(path, { method: "POST" })
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+    var btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    if (btn.getAttribute("data-act") !== "scan-models") return;
+    fetch("/api/discovered-models/discover", { method: "POST" })
+=======
+    var btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    var act = btn.getAttribute("data-act");
+    if (act === "add-model") {
+      var akey = btn.getAttribute("data-key");
+      fetch("/api/discovered-models/" + encodeURIComponent(akey) + "/add", { method: "POST" })
+        .then(function (r) {
+          if (!r.ok) {
+            return r.json().then(function (b) {
+              throw new Error((b && b.detail && b.detail.message) || ("add " + r.status));
+            });
+          }
+          return r.json();
+        })
+        .then(function () {
+          setError(null);
+          pollCatalog();
+          pollModels();
+        })
+        .catch(function (e) {
+          setError("Add failed: " + e.message);
+        });
+      return;
+    }
+    if (act !== "scan-models") return;
+    fetch("/api/discovered-models/discover", { method: "POST" })
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+  document.getElementById("stopvortex").addEventListener("click", function () {
+=======
+  document.getElementById("addnewmodels").addEventListener("click", function () {
+    if (!confirm("Add every discovered model not yet in Vortex to the loadable list?")) return;
+    fetch("/api/discovered-models/add-new", { method: "POST" })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.json().then(function (b) {
+            throw new Error((b && b.detail && b.detail.message) || ("add-new " + r.status));
+          });
+        }
+        return r.json();
+      })
+      .then(function (body) {
+        setError(null);
+        var out = "Added " + (body.added || 0);
+        var skipped = body.skipped || [];
+        for (var i = 0; i < skipped.length; i++) {
+          var s = skipped[i];
+          out += " · " + s.key + " (" + s.reason + ")";
+        }
+        document.getElementById("addresult").textContent = out;
+        pollCatalog();
+        pollModels();
+      })
+      .catch(function (e) {
+        setError("Add failed: " + e.message);
+      });
+  });
+
+  document.getElementById("stopvortex").addEventListener("click", function () {
+>>>>>>> REPLACE
