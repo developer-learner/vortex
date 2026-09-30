@@ -1,0 +1,194 @@
+Replace the whole file with exactly:
+
+    """Discovered model -> catalog entry (the operator's Add click)."""
+    from __future__ import annotations
+
+    import os
+    import re
+
+    from .catalog import Catalog, CatalogEntry
+    from .discovery import DiscoveredModel
+
+    PORT_RANGE = range(8200, 8300)
+    RUNTIME_BINARIES = {"mlx": "/opt/homebrew/bin/mlx-serve",
+                        "gguf": "/opt/homebrew/bin/llama-server"}
+
+
+    class SynthesisError(ValueError):
+        """A discovered model that cannot become a catalog entry."""
+
+
+    def synthesize_entry(model: DiscoveredModel, catalog: Catalog,
+                         binaries: dict[str, str] = RUNTIME_BINARIES) -> CatalogEntry:
+        path, fmt = model.path, model.fmt
+        if path is None:
+            raise SynthesisError(f"no local path known for {model.key}")
+        if fmt not in binaries:
+            raise SynthesisError(f"unsupported format {fmt}")
+        if model.architecture is None:
+            raise SynthesisError("no architecture reported (not a chat model)")
+        pid = re.sub(r"[^a-z0-9._-]", "-", model.key.lower())
+        for e in catalog.entries:
+            if e.public_id == pid or e.source_path == path or path in e.launch_command:
+                raise SynthesisError(f"already in the catalog as {e.public_id}")
+        free = [p for p in PORT_RANGE if p not in {e.port for e in catalog.entries}]
+        if not free:
+            raise SynthesisError("no free port in 8200-8299")
+        port = free[0]
+        net = ["--host", "127.0.0.1", "--port", str(port)]
+        if fmt == "mlx":
+            rt, eng, cmd = "mlx-serve", "mlx-serve", [binaries[fmt], "--model", path, "--serve"]
+        else:
+            rt, eng, cmd = "llama-server", "llama.cpp", [binaries[fmt], "-m", path]
+        ram = round(model.size_bytes * 1.1 / 1e9, 1) if model.size_bytes else None
+        base = f"http://127.0.0.1:{port}/v1"
+        return CatalogEntry.model_validate({
+            "public_id": pid, "runtime": rt, "engine": eng,
+            "launch_command": cmd + net, "port": port,
+            "ready_url": f"{base}/models", "chat_endpoint": f"{base}/chat/completions",
+            "upstream_alias": os.path.basename(path.rstrip("/")),
+            "ram_estimate_gb": ram, "exclusive": ram is not None and ram > 40,
+            "source_path": path, "origin": "local"})
+
+Self-verify: ruff and mypy clean; dict keys are exactly the fields shown.
+
+Write EXACTLY one file: src/vortex/catalog_synth.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/catalog_synth.py and confirm it satisfies every acceptance condition in this brief.
+
+The previous attempt failed with: edit-block FAIL: malformed or truncated edit block (opener without separator/closer). Fix the cause, do not just retry the same content. NOTE: the file may already contain a previous attempt's partial work — read its CURRENT state, find the SMALLEST remaining delta that satisfies the brief, and emit only that; if the file already satisfies the brief, reply === NO CHANGES ===. Do not re-describe or re-apply work that is already present.
+
+Reply with ONLY edit blocks in this exact format, nothing else:
+<<<<<<< SEARCH
+(an EXACT, character-for-character copy of a short existing section — 3 to 10 lines)
+=======
+(that same section with the change applied)
+>>>>>>> REPLACE
+Rules:
+- Each SEARCH must appear EXACTLY ONCE in the file. Copy it verbatim — same spaces, same quotes.
+- Several small blocks, not one big one. Do not touch code outside your blocks. Do not reformat or reorder anything.
+- Never include any line containing a think tag in a SEARCH section — anchor on nearby tag-free lines instead.
+- In new code, never write the think tag as one literal string — construct it by concatenation, e.g. '<' + 'think>'.
+- If the file already satisfies the brief, reply with exactly this line and nothing else: === NO CHANGES ===
+- Verify each SEARCH against the file one more time before answering.
+- Your reply's VERY FIRST line must be '<<<<<<< SEARCH' (or the NO CHANGES line). Do not analyze, plan, or explain anything — every design decision is already made in the brief. Prose before the blocks burns your output budget and truncates the edit mid-block.
+- Every block must be COMPLETE working code — never a stub, placeholder, or '...' body. If the brief needs a new function, write its full body in the block.
+
+### existing (src/vortex/catalog_synth.py)
+```
+import os
+import re
+
+from .catalog import Catalog, CatalogEntry
+from .discovery import DiscoveredModel
+
+PORT_RANGE = range(8200, 8300)
+RUNTIME_BINARIES = {
+    "mlx": "/opt/homebrew/bin/mlx-serve",
+    "gguf": "/opt/homebrew/bin/llama-server",
+}
+
+
+class SynthesisError(ValueError):
+    pass
+
+
+def _public_id(key: str) -> str:
+    return re.sub(r"[^a-z0-9._-]", "-", key.lower())
+
+
+def _free_port(catalog: Catalog) -> int:
+    used = set()
+    for entry in catalog.entries:
+        for token in entry.launch_command:
+            if token.isdigit():
+                port = int(token)
+                if port in PORT_RANGE:
+                    used.add(port)
+    for port in PORT_RANGE:
+        if port not in used:
+            return port
+    raise SynthesisError("no free port in 8200-8299")
+
+
+def synthesize_entry(
+    model: DiscoveredModel,
+    catalog: Catalog,
+    binaries: dict[str, str] = RUNTIME_BINARIES,
+) -> CatalogEntry:
+
+    path = model.path
+    if path is None:
+        raise SynthesisError(f"no local path known for {model.key}")
+
+    fmt = model.fmt
+    if fmt not in binaries:
+        raise SynthesisError(f"unsupported format {fmt}")
+
+    architecture = model.architecture
+    if architecture is None:
+        raise SynthesisError("no architecture reported (not a chat model)")
+
+    public_id = _public_id(model.key)
+    for entry in catalog.entries:
+        if entry.public_id == public_id:
+            raise SynthesisError(f"already in the catalog as {entry.public_id}")
+        if entry.source_path == path:
+            raise SynthesisError(f"already in the catalog as {entry.public_id}")
+        if path in entry.launch_command:
+            raise SynthesisError(f"already in the catalog as {entry.public_id}")
+
+    port = _free_port(catalog)
+
+    if fmt == "mlx":
+        runtime = "mlx-serve"
+        engine = "mlx-serve"
+        launch_command = [
+            binaries["mlx"],
+            "--model",
+            path,
+            "--serve",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+        ]
+    else:
+        runtime = "llama-server"
+        engine = "llama.cpp"
+        launch_command = [
+            binaries["gguf"],
+            "-m",
+            path,
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+        ]
+
+    ready_url = f"http://127.0.0.1:{port}/v1/models"
+    chat_endpoint = f"http://127.0.0.1:{port}/v1/chat/completions"
+    upstream_alias = os.path.basename(path.rstrip("/"))
+
+    size_bytes = model.size_bytes
+    ram_estimate_gb: float | None = None
+    if size_bytes:
+        ram_estimate_gb = round(size_bytes * 1.1 / 1e9, 1)
+
+    exclusive = ram_estimate_gb is not None and ram_estimate_gb > 40
+
+    return CatalogEntry.model_validate({
+        "id": public_id,
+        "name": model.key,
+        "port": port,
+        "runtime": runtime,
+        "engine": engine,
+        "architecture": architecture,
+        "launch_command": launch_command,
+        "ready_url": ready_url,
+        "chat_endpoint": chat_endpoint,
+        "upstream_alias": upstream_alias,
+        "ram_estimate_gb": ram_estimate_gb,
+        "exclusive": exclusive,
+        "source_path": path,
+        "origin": "local",
+    })
+```
