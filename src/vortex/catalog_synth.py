@@ -1,10 +1,8 @@
-import logging
 import os
 import re
 
-from vortex.models import Catalog, CatalogEntry, DiscoveredModel
-
-logger = logging.getLogger(__name__)
+from .catalog import Catalog, CatalogEntry
+from .discovery import DiscoveredModel
 
 PORT_RANGE = range(8200, 8300)
 RUNTIME_BINARIES = {

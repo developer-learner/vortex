@@ -1,0 +1,17 @@
+The previous attempt failed because it used absolute imports (`from vortex.models import ...`) instead of the required relative imports (`from .catalog import ...` and `from .discovery import ...`). The file also contains a `logging` import and logger which are not in the allowed import list (`os`, `re`, and the two relative imports).
+
+<<<<<<< SEARCH
+import logging
+import os
+import re
+
+from vortex.models import Catalog, CatalogEntry, DiscoveredModel
+
+logger = logging.getLogger(__name__)
+=======
+import os
+import re
+
+from .catalog import Catalog, CatalogEntry
+from .discovery import DiscoveredModel
+>>>>>>> REPLACE
