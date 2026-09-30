@@ -1,5 +1,5 @@
 {
-  "erd_version": 39,
+  "erd_version": 40,
   "files": [
     "src/vortex/catalog.py",
     "src/vortex/discovery.py",
@@ -8,13 +8,14 @@
     "src/vortex/ui.py"
   ],
   "changed_files": [
+    "src/vortex/catalog_synth.py",
+    "src/vortex/app.py"
+  ],
+  "no_edit_files": [
     "src/vortex/catalog.py",
     "src/vortex/discovery.py",
-    "src/vortex/catalog_synth.py",
-    "src/vortex/app.py",
     "src/vortex/ui.py"
   ],
-  "no_edit_files": [],
   "smoke_checks": {},
   "entry_points": [
     "src.vortex.ui",
@@ -42,6 +43,21 @@
     "src.vortex.catalog_synth:PORT_RANGE",
     "src.vortex.catalog_synth:RUNTIME_BINARIES"
   ],
+  "externals": [
+    {
+      "id": "external:lms-ls-json",
+      "probe": "~/.lmstudio/bin/lms ls --json",
+      "capture": "captures/lms-ls.json",
+      "notes": "JSON array; the spec relies on each row's modelKey and path (relative to ~/.lmstudio/models)."
+    },
+    {
+      "id": "external:lmstudio-api-v1-models",
+      "probe": "curl -s http://127.0.0.1:1234/api/v1/models",
+      "capture": "captures/lmstudio-api-v1-models.json",
+      "notes": "Object with a models array; the spec relies on key, format (mlx|gguf), architecture, size_bytes. Discovery has read it since v32; declared here for the first time."
+    }
+  ],
+  "test_mapping": {},
   "routes": [
     {
       "id": "route:GET /",
@@ -137,20 +153,5 @@
       "path": "/api/catalog/{public_id}",
       "file": "src/vortex/app.py"
     }
-  ],
-  "externals": [
-    {
-      "id": "external:lms-ls-json",
-      "probe": "~/.lmstudio/bin/lms ls --json",
-      "capture": "captures/lms-ls.json",
-      "notes": "JSON array; the spec relies on each row's modelKey and path (relative to ~/.lmstudio/models)."
-    },
-    {
-      "id": "external:lmstudio-api-v1-models",
-      "probe": "curl -s http://127.0.0.1:1234/api/v1/models",
-      "capture": "captures/lmstudio-api-v1-models.json",
-      "notes": "Object with a models array; the spec relies on key, format (mlx|gguf), architecture, size_bytes. Discovery has read it since v32; declared here for the first time."
-    }
-  ],
-  "test_mapping": {}
+  ]
 }
