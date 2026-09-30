@@ -1,0 +1,22 @@
+<<<<<<< SEARCH
+from .catalog_synth import SynthesisError, synthesize_entry
+=======
+from .catalog_routes import register_catalog_routes
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+        newly_found = [m.key for m in findings if not m.in_catalog]
+        return {"models": models, "newly_found": newly_found}
+
+    return app
+=======
+        newly_found = [m.key for m in findings if not m.in_catalog]
+        return {"models": models, "newly_found": newly_found}
+
+    def _fresh_models() -> list:
+        model_cache.clear()
+        return _get_models()
+
+    register_catalog_routes(app, catalog, lifecycle, ops, _fresh_models, _persist)
+
+    return app
+>>>>>>> REPLACE

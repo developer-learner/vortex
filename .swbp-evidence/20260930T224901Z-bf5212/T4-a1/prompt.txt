@@ -1,3 +1,38 @@
+In `src/vortex/app.py`, perform exactly two edits:
+
+1. Locate the line `from .catalog_synth import SynthesisError, synthesize_entry` and replace it with `from .catalog_routes import register_catalog_routes`.
+
+2. Locate the final line of the `build_app` function, which is `return app`. Immediately before this line, insert the following code block with a 4-space indent:
+```
+    def _fresh_models() -> list:
+        model_cache.clear()
+        return _get_models()
+
+    register_catalog_routes(app, catalog, lifecycle, ops, _fresh_models, _persist)
+```
+
+Ensure `model_cache`, `_get_models`, `_persist`, `catalog`, `lifecycle`, and `ops` are correctly referenced in scope. No other changes are permitted. Self-verify: ruff and mypy clean.
+
+Write EXACTLY one file: src/vortex/app.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/app.py and confirm it satisfies every acceptance condition in this brief.
+
+Reply with ONLY edit blocks in this exact format, nothing else:
+<<<<<<< SEARCH
+(an EXACT, character-for-character copy of a short existing section — 3 to 10 lines)
+=======
+(that same section with the change applied)
+>>>>>>> REPLACE
+Rules:
+- Each SEARCH must appear EXACTLY ONCE in the file. Copy it verbatim — same spaces, same quotes.
+- Several small blocks, not one big one. Do not touch code outside your blocks. Do not reformat or reorder anything.
+- Never include any line containing a think tag in a SEARCH section — anchor on nearby tag-free lines instead.
+- In new code, never write the think tag as one literal string — construct it by concatenation, e.g. '<' + 'think>'.
+- If the file already satisfies the brief, reply with exactly this line and nothing else: === NO CHANGES ===
+- Verify each SEARCH against the file one more time before answering.
+- Your reply's VERY FIRST line must be '<<<<<<< SEARCH' (or the NO CHANGES line). Do not analyze, plan, or explain anything — every design decision is already made in the brief. Prose before the blocks burns your output budget and truncates the edit mid-block.
+- Every block must be COMPLETE working code — never a stub, placeholder, or '...' body. If the brief needs a new function, write its full body in the block.
+
+### existing (src/vortex/app.py)
+```
 """Vortex — one place that owns every local LLM on this machine.
 
 Two surfaces:
@@ -23,7 +58,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
 from .catalog import Catalog, load_catalog, save_local_entries
-from .catalog_routes import register_catalog_routes
+from .catalog_synth import SynthesisError, synthesize_entry
 from .discovery import DiscoveredModel, Wrapper, discover_models, discover_wrappers
 from .lifecycle import (
     Lifecycle,
@@ -333,12 +368,6 @@ def build_app(
         newly_found = [m.key for m in findings if not m.in_catalog]
         return {"models": models, "newly_found": newly_found}
 
-    def _fresh_models() -> list:
-        model_cache.clear()
-        return _get_models()
-
-    register_catalog_routes(app, catalog, lifecycle, ops, _fresh_models, _persist)
-
     return app
 
 
@@ -348,3 +377,5 @@ class _Background:
 
     async def __call__(self) -> None:
         self._func()
+
+```
