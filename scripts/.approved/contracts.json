@@ -1,22 +1,26 @@
 {
-  "erd_version": 42,
+  "erd_version": 43,
   "files": [
     "src/vortex/catalog.py",
     "src/vortex/discovery.py",
     "src/vortex/catalog_synth.py",
+    "src/vortex/catalog_routes.py",
     "src/vortex/app.py",
     "src/vortex/ui.py"
   ],
   "changed_files": [
-    "src/vortex/catalog_synth.py",
+    "src/vortex/catalog_routes.py",
     "src/vortex/app.py"
   ],
   "no_edit_files": [
     "src/vortex/catalog.py",
     "src/vortex/discovery.py",
+    "src/vortex/catalog_synth.py",
     "src/vortex/ui.py"
   ],
-  "smoke_checks": {},
+  "smoke_checks": {
+    "src/vortex/catalog_routes.py": "grep -q 'def register_catalog_routes' src/vortex/catalog_routes.py"
+  },
   "entry_points": [
     "src.vortex.ui",
     "src.vortex.ui:UI_PAGE",
@@ -43,21 +47,6 @@
     "src.vortex.catalog_synth:PORT_RANGE",
     "src.vortex.catalog_synth:RUNTIME_BINARIES"
   ],
-  "externals": [
-    {
-      "id": "external:lms-ls-json",
-      "probe": "~/.lmstudio/bin/lms ls --json",
-      "capture": "captures/lms-ls.json",
-      "notes": "JSON array; the spec relies on each row's modelKey and path (relative to ~/.lmstudio/models)."
-    },
-    {
-      "id": "external:lmstudio-api-v1-models",
-      "probe": "curl -s http://127.0.0.1:1234/api/v1/models",
-      "capture": "captures/lmstudio-api-v1-models.json",
-      "notes": "Object with a models array; the spec relies on key, format (mlx|gguf), architecture, size_bytes. Discovery has read it since v32; declared here for the first time."
-    }
-  ],
-  "test_mapping": {},
   "routes": [
     {
       "id": "route:GET /",
@@ -139,19 +128,34 @@
       "id": "route:POST /api/discovered-models/{key}/add",
       "method": "POST",
       "path": "/api/discovered-models/{key}/add",
-      "file": "src/vortex/app.py"
+      "file": "src/vortex/catalog_routes.py"
     },
     {
       "id": "route:POST /api/discovered-models/add-new",
       "method": "POST",
       "path": "/api/discovered-models/add-new",
-      "file": "src/vortex/app.py"
+      "file": "src/vortex/catalog_routes.py"
     },
     {
       "id": "route:DELETE /api/catalog/{public_id}",
       "method": "DELETE",
       "path": "/api/catalog/{public_id}",
-      "file": "src/vortex/app.py"
+      "file": "src/vortex/catalog_routes.py"
     }
-  ]
+  ],
+  "externals": [
+    {
+      "id": "external:lms-ls-json",
+      "probe": "~/.lmstudio/bin/lms ls --json",
+      "capture": "captures/lms-ls.json",
+      "notes": "JSON array; the spec relies on each row's modelKey and path (relative to ~/.lmstudio/models)."
+    },
+    {
+      "id": "external:lmstudio-api-v1-models",
+      "probe": "curl -s http://127.0.0.1:1234/api/v1/models",
+      "capture": "captures/lmstudio-api-v1-models.json",
+      "notes": "Object with a models array; the spec relies on key, format (mlx|gguf), architecture, size_bytes. Discovery has read it since v32; declared here for the first time."
+    }
+  ],
+  "test_mapping": {}
 }

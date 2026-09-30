@@ -1,0 +1,22 @@
+{
+  "changed_contract_ids": [
+    "route:DELETE /api/catalog/{public_id}",
+    "route:POST /api/discovered-models/add-new",
+    "route:POST /api/discovered-models/{key}/add"
+  ],
+  "changed_tests": [],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [
+    "src/vortex/catalog_routes.py",
+    "src/vortex/app.py"
+  ],
+  "inventory_files": [
+    "src/vortex/catalog.py",
+    "src/vortex/discovery.py",
+    "src/vortex/catalog_synth.py",
+    "src/vortex/catalog_routes.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ]
+}

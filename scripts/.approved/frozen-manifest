@@ -1,7 +1,7 @@
 ad991a3465cc6a5279c77a70ecd92e76610f63eeac431dbb389bca29734962cc  scripts/.approved/PRD.md
 c55f4f8a4330fde02a8805176395b184d1bd17b714255d7029a326b45a495cd1  scripts/.approved/ERD.md
-3945705c42dd5b8eafb458b95c4531b5d4c59135477a92efede6ceb5cc82f9fc  scripts/.approved/ERD-DELTA.md
-6690909569f098eff361bc5badd03150909224cd4005101882f241bdbaae2618  scripts/.approved/contracts.json
+a8bbc30bd8f9f775052436fa47146a8be7e7806e89a90a89b83be60bf919c765  scripts/.approved/ERD-DELTA.md
+02428bbf770b5423a917ac229d39f15354e117a872ca2d7b4ce6d65d15772189  scripts/.approved/contracts.json
 be72fdde96e332ad1776c65a7cf4000a94c0779c60208d223e04fddc4ade0cbb  scripts/.approved/test-nodeids
 c55f4f8a4330fde02a8805176395b184d1bd17b714255d7029a326b45a495cd1  scripts/.approved/ERD-DELTA-v1.md
 334ce359b55de32531d76b94d2f027ebb5d1d7fe4d87d03c92a97e548aab5e42  scripts/.approved/ERD-DELTA-v10.md
@@ -40,6 +40,7 @@ b64a581a1b6240f86b987325f7a8c94c63e098074792d21577f7ee0d0988bda8  scripts/.appro
 a4ba6e0aaddff986d6a69e7da81a77e90c650213b74d18b73da8a57d86be0ad9  scripts/.approved/ERD-DELTA-v40.md
 9e7eb73ae49195b54add64f6fdb44dffc3a924dc15406f509a97aaaa78b2dca4  scripts/.approved/ERD-DELTA-v41.md
 3945705c42dd5b8eafb458b95c4531b5d4c59135477a92efede6ceb5cc82f9fc  scripts/.approved/ERD-DELTA-v42.md
+a8bbc30bd8f9f775052436fa47146a8be7e7806e89a90a89b83be60bf919c765  scripts/.approved/ERD-DELTA-v43.md
 6a3b6a6b9fcc08a996aa97ccd80ded6e14618046bc192ebec99d7c9dafad9d0c  scripts/.approved/ERD-DELTA-v5.md
 1567975ac022c05a417a73a6cf56e80af6e94c321275fdc82e1be86e8340b22d  scripts/.approved/ERD-DELTA-v6.md
 c04ebe52ef1cb8fff689c8ee64e706eb0c59eae9971140a502debba1adcb591d  scripts/.approved/ERD-DELTA-v7.md
