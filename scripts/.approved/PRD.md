@@ -294,3 +294,99 @@ watchdog, and any confirmation UI beyond the browser's native `confirm()`.
   or the new daemon does not answer within the poll budget, THE dashboard
   SHALL show an error beginning "Restart failed" and SHALL re-enable the
   Restart control.
+
+## v39 scope (add discovered models to Vortex)
+
+Scope brief: the outcome is that a model the operator downloads in LM Studio
+becomes loadable in Vortex with one click — no hand-written catalog entry.
+Today discovery (v32) only lists library models; making one loadable means
+editing `config/catalog.json` by hand. v39 adds an "Add to Vortex" control per
+discovered model, an "Add all new" control, and a Remove control for entries
+added this way. Config-first is preserved and restated: scanning still never
+makes a model loadable — only the operator's click does, and every added entry
+is an ordinary catalog entry with the same validation and safety invariants
+(single-owner ports, identified-process termination).
+
+The CEO fixed four policies on 2026-09-30:
+1. Runtime rule: an MLX model is served by `mlx-serve --model <path>`; a GGUF
+   model by `llama-server -m <path>`; anything else (embeddings, unknown
+   formats) is refused with a stated reason.
+2. Added entries persist in a separate, gitignored `config/catalog.local.json`
+   merged at startup, so clicks never dirty the committed catalog.
+3. Controls: one Add per discovered model plus "Add all new" (confirmed).
+4. A Remove control for added entries.
+
+Essential scope, five files: `src/vortex/discovery.py` (each discovered model
+carries its on-disk path, read from LM Studio's `lms ls --json`; "in catalog"
+also matches by path), `src/vortex/catalog_synth.py` (NEW — the pure
+discovered-model → catalog-entry rule), `src/vortex/catalog.py` (entry origin
+and source path, local-catalog merge, add, remove, save), `src/vortex/app.py`
+(three routes and local-catalog persistence), `src/vortex/ui.py` (the
+controls). Deferred: auto-add on download, per-model runtime override, tuning
+flags (MTP, context size) on added entries, non-LM-Studio libraries, and
+verifying an added model can actually load (the first load's readiness probe
+is that check). Expected time band: 45–90 minutes of pipeline time.
+
+## Explicitly out of scope for v39
+
+Loading a model as part of adding it, editing an added entry, removing
+entries that came from `config/catalog.json`, choosing among several runtimes
+per format, downloading models, and any limit on how many models are loaded.
+
+## v39 acceptance criteria
+
+- **AC-25:** THE discovery layer SHALL report, for each discovered model, the
+  absolute on-disk path LM Studio's `lms ls --json` gives for that model key
+  (joined onto the LM Studio models root), or no path when the listing omits
+  the key or cannot be read, such that a model whose files are known carries a
+  path and an unreadable listing never raises.
+- **AC-26:** THE discovery layer SHALL mark a discovered model as in the
+  catalog WHEN its key equals an entry's upstream alias OR its path equals an
+  entry's source path or appears in an entry's launch command, such that a
+  model already served by a hand-written entry is not reported as newly found.
+- **AC-27:** WHEN a discovered MLX model with a known path is synthesized, THE
+  SYSTEM SHALL produce an entry whose launch command runs mlx-serve on that
+  path on the lowest free port in 8200–8299, such that the entry passes catalog
+  validation, records the path as its source path, and has origin "local".
+- **AC-28:** WHEN a discovered GGUF model with a known path is synthesized, THE
+  SYSTEM SHALL produce an entry whose launch command runs llama-server with
+  `-m <path>` on the lowest free port in 8200–8299, such that it passes catalog
+  validation with origin "local".
+- **AC-29:** IF a discovered model has no known path, an unsupported format, no
+  architecture, an id or path already in the catalog, or no free port remains,
+  THEN synthesis SHALL raise SynthesisError naming the reason, such that no
+  entry is produced.
+- **AC-30:** THE synthesized entry SHALL estimate RAM as the model size plus
+  10% (rounded to 0.1 GB) and SHALL be exclusive exactly when that estimate
+  exceeds 40 GB, such that large models evict others on load as hand entries do.
+- **AC-31:** WHEN `POST /api/discovered-models/{key}/add` names a discovered
+  model that synthesizes, THE SYSTEM SHALL add the entry to the live catalog
+  and persist it to the local catalog file, such that the response is 201 with
+  the added entry, `/api/catalog` lists it with origin "local", and the model
+  can be loaded without a restart.
+- **AC-32:** IF the key is not a discovered model, THEN the add route SHALL
+  respond 404; IF synthesis raises SynthesisError, THEN it SHALL respond 422
+  with the reason, such that nothing is added and the local file is unchanged.
+- **AC-33:** WHEN `POST /api/discovered-models/add-new` is called, THE SYSTEM
+  SHALL rescan and add every discovered model not in the catalog that
+  synthesizes, such that the response lists added ids and skipped keys with
+  their reasons, and ports never collide between models added in one call.
+- **AC-34:** WHEN `DELETE /api/catalog/{public_id}` names an entry with origin
+  "local" that is not loaded and has no operation in flight, THE SYSTEM SHALL
+  remove it from the live catalog and the local file, such that it is no
+  longer listed or loadable; IF the entry is unknown THEN 404; IF it came from
+  `config/catalog.json`, is loaded, or has an operation in flight THEN 409
+  with the reason, such that nothing is removed.
+- **AC-35:** WHEN the daemon starts, THE SYSTEM SHALL merge the entries of
+  `config/catalog.local.json` (if present) into the catalog with origin
+  "local", rejecting duplicate ids or ports exactly as config entries are,
+  such that added models survive a restart.
+- **AC-36:** THE dashboard SHALL offer an Add control on each discovered model
+  not in the catalog and an "Add all new" control that first confirms, SHALL
+  offer a Remove control that first confirms on each catalog entry whose
+  origin is "local", and SHALL refresh the catalog and discovered lists after
+  each succeeds, such that a cancelled confirm sends no request.
+- **AC-37:** WHEN an add, add-all, or remove request fails, THE dashboard
+  SHALL show an error beginning "Add failed" or "Remove failed" with the
+  server's reason, and WHEN add-all skips models THE dashboard SHALL list the
+  skipped keys and reasons, such that no failure or skip is silent.

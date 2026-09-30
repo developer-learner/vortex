@@ -1,0 +1,264 @@
+{
+  "models": [
+    {
+      "type": "llm",
+      "publisher": "butterf1ying",
+      "key": "qwen3.8-flash-next-uncensored-reap288-mtp-mlx",
+      "display_name": "Qwen3.8 Flash Next Uncensored REAP288 MTP",
+      "architecture": "qwen4_exp",
+      "quantization": {
+        "name": "4bit",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 76950364862,
+      "params_string": null,
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "mlx",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true
+      },
+      "description": null
+    },
+    {
+      "type": "llm",
+      "publisher": "itrejomx",
+      "key": "qwen3.8-27b-uncensored-hauhaucs-aggressive-mtplx",
+      "display_name": "Qwen3.8 27B Uncensored HauhauCS Aggressive MTPLX",
+      "architecture": "qwen3_5",
+      "quantization": {
+        "name": "6bit",
+        "bits_per_weight": 6
+      },
+      "size_bytes": 22725979049,
+      "params_string": "27B",
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "mlx",
+      "capabilities": {
+        "vision": false,
+        "trained_for_tool_use": true
+      },
+      "description": null
+    },
+    {
+      "type": "llm",
+      "publisher": "OBLITERATUS",
+      "key": "qwen3.8-27b-obliterated",
+      "display_name": "Qwen3.8 27B OBLITERATED",
+      "architecture": "qwen35",
+      "quantization": {
+        "name": "Q4_K_M",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 17741855528,
+      "params_string": "27B",
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "gguf",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": false,
+        "reasoning": {
+          "allowed_options": [
+            "off",
+            "on"
+          ],
+          "default": "on"
+        }
+      },
+      "description": null
+    },
+    {
+      "type": "llm",
+      "publisher": "Sawfwair",
+      "key": "qwen3.8-flash-next-mlx-mixed",
+      "display_name": "Qwen3.8 Flash Next Mixed",
+      "architecture": "qwen4_exp",
+      "quantization": {
+        "name": "4bit",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 73118838576,
+      "params_string": null,
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "mlx",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true
+      },
+      "description": null
+    },
+    {
+      "type": "llm",
+      "publisher": "nopmobiel",
+      "key": "qwen3.8-flash-next-mlx",
+      "display_name": "Qwen3.8 Flash Next",
+      "architecture": "qwen4_exp",
+      "quantization": {
+        "name": "4bit",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 103691814937,
+      "params_string": null,
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "mlx",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true
+      },
+      "description": null
+    },
+    {
+      "type": "llm",
+      "publisher": "Youssofal",
+      "key": "qwen3.8-27b-mtplx-optimized-speed",
+      "display_name": "Qwen3.8 27B MTPLX Optimized Speed",
+      "architecture": "qwen3_5",
+      "quantization": {
+        "name": "4bit",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 20703484600,
+      "params_string": "27B",
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "mlx",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true
+      },
+      "description": null
+    },
+    {
+      "type": "llm",
+      "publisher": "unsloth",
+      "key": "deepseek-v4-flash-0731-ud",
+      "display_name": "DeepSeek v4 Flash 0731 UD",
+      "architecture": "deepseek4",
+      "quantization": {
+        "name": "IQ3_XXS",
+        "bits_per_weight": 3
+      },
+      "size_bytes": 104207848032,
+      "params_string": "256x8.4B",
+      "loaded_instances": [],
+      "max_context_length": 1048576,
+      "format": "gguf",
+      "capabilities": {
+        "vision": false,
+        "trained_for_tool_use": false,
+        "reasoning": {
+          "allowed_options": [
+            "off",
+            "on"
+          ],
+          "default": "on"
+        }
+      },
+      "description": null
+    },
+    {
+      "type": "llm",
+      "publisher": "Youssofal",
+      "key": "qwen3.8-27b-mtplx-optimized-quality",
+      "display_name": "Qwen3.8 27B MTPLX Optimized Quality",
+      "architecture": "qwen3_5",
+      "quantization": {
+        "name": "8bit",
+        "bits_per_weight": 8
+      },
+      "size_bytes": 30370835268,
+      "params_string": "27B",
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "mlx",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true
+      },
+      "description": null
+    },
+    {
+      "type": "llm",
+      "publisher": "mlx-community",
+      "key": "qwen3.8-27b@8bit",
+      "display_name": "Qwen3.8 27B",
+      "architecture": "qwen3_5",
+      "quantization": {
+        "name": "8bit",
+        "bits_per_weight": 8
+      },
+      "size_bytes": 29531519120,
+      "params_string": "27B",
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "mlx",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true
+      },
+      "description": null
+    },
+    {
+      "type": "llm",
+      "publisher": "mlx-community",
+      "key": "qwen3.8-27b@4bit",
+      "display_name": "Qwen3.8 27B",
+      "architecture": "qwen3_5",
+      "quantization": {
+        "name": "4bit",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 16081488731,
+      "params_string": "27B",
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "mlx",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true
+      },
+      "description": null
+    },
+    {
+      "type": "llm",
+      "publisher": "lmstudio-community",
+      "key": "qwen3.8-27b-mlx",
+      "display_name": "Qwen3.8 27B",
+      "architecture": "qwen3_5",
+      "quantization": {
+        "name": "8bit",
+        "bits_per_weight": 8
+      },
+      "size_bytes": 29528174882,
+      "params_string": "27B",
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "mlx",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true
+      },
+      "description": null
+    },
+    {
+      "type": "embedding",
+      "publisher": "nomic-ai",
+      "key": "text-embedding-nomic-embed-text-v1.5",
+      "display_name": "Nomic Embed Text v1.5",
+      "quantization": {
+        "name": "Q4_K_M",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 84106624,
+      "params_string": null,
+      "loaded_instances": [],
+      "max_context_length": 2048,
+      "format": "gguf"
+    }
+  ]
+}

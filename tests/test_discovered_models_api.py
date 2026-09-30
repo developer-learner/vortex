@@ -79,6 +79,7 @@ def test_wire_schema_carries_all_discovered_model_fields():
         "loaded",
         "source",
         "in_catalog",
+        "path",  # v39 (AC-25): the model's on-disk path, or null when unknown
     }
     assert model["key"] == "qwen3-1.7b-mlx@bf16"
     assert model["display_name"] == "Qwen3 1.7B"
