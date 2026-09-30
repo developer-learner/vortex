@@ -55,12 +55,12 @@ def synthesize_entry(
 
     public_id = _public_id(model.key)
     for entry in catalog.entries:
-        if entry.id == public_id:
-            raise SynthesisError(f"already in the catalog as {entry.id}")
+        if entry.public_id == public_id:
+            raise SynthesisError(f"already in the catalog as {entry.public_id}")
         if entry.source_path == path:
-            raise SynthesisError(f"already in the catalog as {entry.id}")
+            raise SynthesisError(f"already in the catalog as {entry.public_id}")
         if path in entry.launch_command:
-            raise SynthesisError(f"already in the catalog as {entry.id}")
+            raise SynthesisError(f"already in the catalog as {entry.public_id}")
 
     port = _free_port(catalog)
 
