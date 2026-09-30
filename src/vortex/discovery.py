@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import logging
 import os
 import shutil
 import socket
@@ -14,10 +12,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import httpx
-from pydantic import BaseModel
-
-
-logger = logging.getLogger(__name__)
+from pydantic import BaseModel, TypeAdapter
 
 
 class WrapperSpec(BaseModel):
@@ -204,9 +199,7 @@ def lmstudio_model_paths(
         models_root = LMSTUDIO_MODELS_ROOT
     try:
         text = run()
-        rows = json.loads(text)
-        if not isinstance(rows, list):
-            return {}
+        rows = TypeAdapter(list).validate_json(text)
         paths: dict[str, str] = {}
         for row in rows:
             if not isinstance(row, dict):
@@ -216,9 +209,8 @@ def lmstudio_model_paths(
             if model_key and rel_path:
                 paths[model_key] = str(models_root / rel_path)
         return paths
-    except Exception:
+    except Exception:  # noqa: BLE001 — best-effort: an unreadable listing means no paths
         # Safe to ignore: discovery is best-effort; missing paths are handled downstream
-        logger.debug("lmstudio_model_paths failed", exc_info=True)
         return {}
 
 

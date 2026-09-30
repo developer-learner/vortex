@@ -549,6 +549,16 @@ footer {
     }, OP_POLL_MS);
   }
 
+  document.getElementById("stopvortex").addEventListener("click", function () {
+    if (!confirm("Stop Vortex? This unloads all loaded models, freeing their RAM, and shuts down the server.")) return;
+    fetch("/api/shutdown", { method: "POST" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("shutdown " + r.status);
+        document.getElementById("down").style.display = "block";
+      })
+      .catch(function (e) { setError("Shutdown failed: " + e.message); });
+  });
+
   document.getElementById("rows").addEventListener("click", function (e) {
     var copyBtn = e.target.closest("button[data-copy]");
     if (copyBtn) {
@@ -711,11 +721,11 @@ footer {
       })
       .then(function (body) {
         setError(null);
-        var out = "Added " + (body.added || 0);
+        var out = "Added " + (body.added || []).length;
         var skipped = body.skipped || [];
         for (var i = 0; i < skipped.length; i++) {
-          var s = skipped[i];
-          out += " · " + s.key + " (" + s.reason + ")";
+          var sk = skipped[i];
+          out += " · " + sk.key + " (" + sk.reason + ")";
         }
         document.getElementById("addresult").textContent = out;
         pollCatalog();
@@ -724,16 +734,6 @@ footer {
       .catch(function (e) {
         setError("Add failed: " + e.message);
       });
-  });
-
-  document.getElementById("stopvortex").addEventListener("click", function () {
-    if (!confirm("Stop Vortex? This unloads all loaded models, freeing their RAM, and shuts down the server.")) return;
-    fetch("/api/shutdown", { method: "POST" })
-      .then(function (r) {
-        if (!r.ok) throw new Error("shutdown " + r.status);
-        document.getElementById("down").style.display = "block";
-      })
-      .catch(function (e) { setError("Shutdown failed: " + e.message); });
   });
 
   document.getElementById("restartvortex").addEventListener("click", function () {
