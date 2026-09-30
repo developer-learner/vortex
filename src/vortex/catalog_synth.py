@@ -1,0 +1,121 @@
+import os
+import re
+import logging
+from typing import Optional
+
+from vortex.models import Catalog, CatalogEntry, DiscoveredModel
+
+logger = logging.getLogger(__name__)
+
+PORT_RANGE = range(8200, 8300)
+RUNTIME_BINARIES = {
+    "mlx": "/opt/homebrew/bin/mlx-serve",
+    "gguf": "/opt/homebrew/bin/llama-server",
+}
+
+
+class SynthesisError(ValueError):
+    pass
+
+
+def _public_id(key: str) -> str:
+    return re.sub(r"[^a-z0-9._-]", "-", key.lower())
+
+
+def _free_port(catalog: Catalog) -> int:
+    used = set()
+    for entry in catalog.entries:
+        for token in entry.launch_command:
+            if token.isdigit():
+                port = int(token)
+                if port in PORT_RANGE:
+                    used.add(port)
+    for port in PORT_RANGE:
+        if port not in used:
+            return port
+    raise SynthesisError("no free port in 8200-8299")
+
+
+def synthesize_entry(
+    model: DiscoveredModel,
+    catalog: Catalog,
+    binaries: Optional[dict[str, str]] = None,
+) -> CatalogEntry:
+    if binaries is None:
+        binaries = RUNTIME_BINARIES
+
+    path = model.path
+    if path is None:
+        raise SynthesisError(f"no local path known for {model.key}")
+
+    fmt = model.fmt
+    if fmt not in binaries:
+        raise SynthesisError(f"unsupported format {fmt}")
+
+    architecture = model.architecture
+    if architecture is None:
+        raise SynthesisError("no architecture reported (not a chat model)")
+
+    public_id = _public_id(model.key)
+    for entry in catalog.entries:
+        if entry.id == public_id:
+            raise SynthesisError(f"already in the catalog as {entry.id}")
+        if entry.source_path == path:
+            raise SynthesisError(f"already in the catalog as {entry.id}")
+        if path in entry.launch_command:
+            raise SynthesisError(f"already in the catalog as {entry.id}")
+
+    port = _free_port(catalog)
+
+    if fmt == "mlx":
+        runtime = "mlx-serve"
+        engine = "mlx-serve"
+        launch_command = [
+            binaries["mlx"],
+            "--model",
+            path,
+            "--serve",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+        ]
+    else:
+        runtime = "llama-server"
+        engine = "llama.cpp"
+        launch_command = [
+            binaries["gguf"],
+            "-m",
+            path,
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+        ]
+
+    ready_url = f"http://127.0.0.1:{port}/v1/models"
+    chat_endpoint = f"http://127.0.0.1:{port}/v1/chat/completions"
+    upstream_alias = os.path.basename(path.rstrip("/"))
+
+    size_bytes = model.size_bytes
+    ram_estimate_gb: Optional[float] = None
+    if size_bytes:
+        ram_estimate_gb = round(size_bytes * 1.1 / 1e9, 1)
+
+    exclusive = ram_estimate_gb is not None and ram_estimate_gb > 40
+
+    return CatalogEntry.model_validate({
+        "id": public_id,
+        "name": model.key,
+        "runtime": runtime,
+        "engine": engine,
+        "architecture": architecture,
+        "launch_command": launch_command,
+        "ready_url": ready_url,
+        "chat_endpoint": chat_endpoint,
+        "upstream_alias": upstream_alias,
+        "ram_estimate_gb": ram_estimate_gb,
+        "exclusive": exclusive,
+        "source_path": path,
+        "origin": "local",
+    })

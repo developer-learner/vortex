@@ -1,0 +1,25 @@
+Create the new file `src/vortex/catalog_synth.py` (stdlib + vortex imports only; target under 150 lines).
+
+1. `PORT_RANGE = range(8200, 8300)`; `RUNTIME_BINARIES = {"mlx": "/opt/homebrew/bin/mlx-serve", "gguf": "/opt/homebrew/bin/llama-server"}`.
+
+2. `class SynthesisError(ValueError)`.
+
+3. `synthesize_entry(model: DiscoveredModel, catalog: Catalog, binaries=RUNTIME_BINARIES) -> CatalogEntry`, checks in this order, each raising SynthesisError whose message contains the quoted word: path is None -> "no local path known for <key>" ("path"); `model.fmt` not a key of `binaries` -> "unsupported format <fmt>" ("format"); architecture is None -> "no architecture reported (not a chat model)" ("architecture"); public id (below) already used, or path equal to an entry's `source_path` or present in its `launch_command` -> "already in the catalog as <id>" ("already"); no port of PORT_RANGE free of catalog ports -> "no free port in 8200-8299" ("port").
+
+4. public id = `re.sub(r"[^a-z0-9._-]", "-", model.key.lower())`. port = lowest port in PORT_RANGE not used by any catalog entry.
+
+5. mlx: runtime and engine "mlx-serve", launch `[binaries["mlx"], "--model", path, "--serve", "--host", "127.0.0.1", "--port", str(port)]`. gguf: runtime "llama-server", engine "llama.cpp", launch `[binaries["gguf"], "-m", path, "--host", "127.0.0.1", "--port", str(port)]`.
+
+6. ready_url `http://127.0.0.1:<port>/v1/models`, chat_endpoint `http://127.0.0.1:<port>/v1/chat/completions`, upstream_alias = `os.path.basename(path.rstrip("/"))`, `ram_estimate_gb = round(size_bytes * 1.1 / 1e9, 1)` when size_bytes else None, `exclusive = ram_estimate_gb is not None and ram_estimate_gb > 40`, `source_path = path`, `origin = "local"`. Return `CatalogEntry.model_validate(...)` of that dict.
+
+Acceptance: ruff and mypy clean; module imports only stdlib and vortex.
+
+Write EXACTLY one file: src/vortex/catalog_synth.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/catalog_synth.py and confirm it satisfies every acceptance condition in this brief.
+
+Reply with ONLY this, nothing before or after it:
+=== FILE: src/vortex/catalog_synth.py ===
+<the complete file content>
+=== END FILE ===
+Your reply's VERY FIRST line must be the === FILE: line. Do not analyze,
+plan, or explain anything — every design decision is already made in the
+brief; transcribe it into working code immediately.
