@@ -1,0 +1,24 @@
+<<<<<<< SEARCH
+import os
+import re
+import logging
+from typing import Optional
+
+from vortex.models import Catalog, CatalogEntry, DiscoveredModel
+=======
+import logging
+import os
+import re
+
+from vortex.models import Catalog, CatalogEntry, DiscoveredModel
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+    binaries: Optional[dict[str, str]] = None,
+=======
+    binaries: dict[str, str] | None = None,
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+    ram_estimate_gb: Optional[float] = None
+=======
+    ram_estimate_gb: float | None = None
+>>>>>>> REPLACE

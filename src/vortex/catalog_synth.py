@@ -1,7 +1,6 @@
+import logging
 import os
 import re
-import logging
-from typing import Optional
 
 from vortex.models import Catalog, CatalogEntry, DiscoveredModel
 
@@ -39,7 +38,7 @@ def _free_port(catalog: Catalog) -> int:
 def synthesize_entry(
     model: DiscoveredModel,
     catalog: Catalog,
-    binaries: Optional[dict[str, str]] = None,
+    binaries: dict[str, str] | None = None,
 ) -> CatalogEntry:
     if binaries is None:
         binaries = RUNTIME_BINARIES
@@ -98,7 +97,7 @@ def synthesize_entry(
     upstream_alias = os.path.basename(path.rstrip("/"))
 
     size_bytes = model.size_bytes
-    ram_estimate_gb: Optional[float] = None
+    ram_estimate_gb: float | None = None
     if size_bytes:
         ram_estimate_gb = round(size_bytes * 1.1 / 1e9, 1)
 
