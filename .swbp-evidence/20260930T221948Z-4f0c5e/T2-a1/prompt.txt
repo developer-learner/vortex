@@ -1,23 +1,49 @@
+Edit `src/vortex/discovery.py` only.
+
+1. `DiscoveredModel`: add field `path: str | None = None` (field order: after `in_catalog`). It appears in the wire schema of `/api/discovered-models`.
+
+2. Add module constants: `LMS_BIN = Path.home() / ".lmstudio/bin/lms"` and `LMSTUDIO_MODELS_ROOT = Path.home() / ".lmstudio/models"`.
+
+3. New `lmstudio_model_paths(run=None, models_root=None) -> dict[str, str]`: `run` is a zero-argument callable returning the stdout text of `lms ls --json`; the default runs `[str(LMS_BIN), "ls", "--json"]` with `subprocess.run(..., capture_output=True, text=True, timeout=10, check=False)` and returns its stdout. The text is a JSON array (see frozen capture `captures/lms-ls.json`); each row with both a `modelKey` and a `path` maps `modelKey -> str(models_root / path)` (`models_root` defaults to `LMSTUDIO_MODELS_ROOT`). ANY exception or non-list JSON returns `{}` — log at debug level, never raise.
+
+4. `discover_models(catalog_entries=None, fetch=None, probes=None, paths=None)`: `paths` is a zero-argument callable returning that map (default `lmstudio_model_paths`). Each DiscoveredModel's `path` is `paths_map.get(key)`. `in_catalog` is true when the key equals an entry's `upstream_alias` (as today) OR the model's path is not None and equals an entry's `source_path` or is one of the strings in an entry's `launch_command`.
+
+Acceptance: ruff and mypy clean; the wire schema of `/api/discovered-models` carries `path`.
+
+Write EXACTLY one file: src/vortex/discovery.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/discovery.py and confirm it satisfies every acceptance condition in this brief.
+
+Reply with ONLY edit blocks in this exact format, nothing else:
+<<<<<<< SEARCH
+(an EXACT, character-for-character copy of a short existing section — 3 to 10 lines)
+=======
+(that same section with the change applied)
+>>>>>>> REPLACE
+Rules:
+- Each SEARCH must appear EXACTLY ONCE in the file. Copy it verbatim — same spaces, same quotes.
+- Several small blocks, not one big one. Do not touch code outside your blocks. Do not reformat or reorder anything.
+- Never include any line containing a think tag in a SEARCH section — anchor on nearby tag-free lines instead.
+- In new code, never write the think tag as one literal string — construct it by concatenation, e.g. '<' + 'think>'.
+- If the file already satisfies the brief, reply with exactly this line and nothing else: === NO CHANGES ===
+- Verify each SEARCH against the file one more time before answering.
+- Your reply's VERY FIRST line must be '<<<<<<< SEARCH' (or the NO CHANGES line). Do not analyze, plan, or explain anything — every design decision is already made in the brief. Prose before the blocks burns your output budget and truncates the edit mid-block.
+- Every block must be COMPLETE working code — never a stub, placeholder, or '...' body. If the brief needs a new function, write its full body in the block.
+
+### existing (src/vortex/discovery.py)
+```
 """Wrapper discovery: locate installed model-serving binaries and report status."""
 
 from __future__ import annotations
 
-import json
-import logging
 import os
 import shutil
 import socket
 import subprocess
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from typing import Any, Literal
 
 import httpx
 from pydantic import BaseModel
-
-
-logger = logging.getLogger(__name__)
 
 
 class WrapperSpec(BaseModel):
@@ -312,3 +338,4 @@ def discover_models(
                 )
             )
     return found
+```
