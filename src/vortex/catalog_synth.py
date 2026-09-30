@@ -36,10 +36,8 @@ def _free_port(catalog: Catalog) -> int:
 def synthesize_entry(
     model: DiscoveredModel,
     catalog: Catalog,
-    binaries: dict[str, str] | None = None,
+    binaries: dict[str, str] = RUNTIME_BINARIES,
 ) -> CatalogEntry:
-    if binaries is None:
-        binaries = RUNTIME_BINARIES
 
     path = model.path
     if path is None:

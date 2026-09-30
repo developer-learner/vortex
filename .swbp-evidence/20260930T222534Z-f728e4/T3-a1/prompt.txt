@@ -19,13 +19,9 @@ port = lowest port in PORT_RANGE not used by any catalog entry
 mlx: runtime and engine "mlx-serve", launch `[binaries["mlx"], "--model", path, "--serve", "--host", "127.0.0.1", "--port", str(port)]`
 gguf: runtime "llama-server", engine "llama.cpp", launch `[binaries["gguf"], "-m", path, "--host", "127.0.0.1", "--port", str(port)]`
 
-ready_url `http://127.0.0.1:<port>/v1/models`, chat_endpoint `http://127.0.0.1:<port>/v1/chat/completions`, upstream_alias = `os.path.basename(path.rstrip("/"))`, `ram_estimate_gb = round(size_bytes * 1.1 / 1e9, 1)` when size_bytes else None, `exclusive = ram_estimate_gb is not None and ram_estimate_gb > 40`, `source_path = path`, `origin = "local"`. Return `CatalogEntry.model_validate(...)` of that dict.
-
-Acceptance: all 9 tests in tests/test_catalog_synth.py pass.
+ready_url `http://127.0.0.1:<port>/v1/models`, chat_endpoint `http://127.0.0.1:<port>/v1/chat/completions`, upstream_alias = `os.path.basename(path.rstrip("/"))`, `ram_estimate_gb = round(size_bytes * 1.1 / 1e9, 1)` when size_bytes else None, `exclusive = ram_estimate_gb is not None and ram_estimate_gb > 40`, `source_path = path`, `origin = "local"`. Return `CatalogEntry.model_validate(...)` of a dict containing `public_id`, `port`, `runtime`, `engine`, `launch_command`, `ready_url`, `chat_endpoint`, `upstream_alias`, `ram_estimate_gb`, `exclusive`, `source_path`, and `origin`. Acceptance: all 9 tests in tests/test_catalog_synth.py pass.
 
 Write EXACTLY one file: src/vortex/catalog_synth.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/catalog_synth.py and confirm it satisfies every acceptance condition in this brief.
-
-The previous attempt failed with: mapped tests failing: mypy:src/vortex/catalog_synth.py — src/vortex/catalog_synth.py:5: error: Cannot find implementation or library stub for module named "vortex.models"  [import-not-found] . Fix the cause, do not just retry the same content. NOTE: the file may already contain a previous attempt's partial work — read its CURRENT state, find the SMALLEST remaining delta that satisfies the brief, and emit only that; if the file already satisfies the brief, reply === NO CHANGES ===. Do not re-describe or re-apply work that is already present.
 
 Reply with ONLY edit blocks in this exact format, nothing else:
 <<<<<<< SEARCH
@@ -45,13 +41,11 @@ Rules:
 
 ### existing (src/vortex/catalog_synth.py)
 ```
-import logging
 import os
 import re
 
-from vortex.models import Catalog, CatalogEntry, DiscoveredModel
-
-logger = logging.getLogger(__name__)
+from .catalog import Catalog, CatalogEntry
+from .discovery import DiscoveredModel
 
 PORT_RANGE = range(8200, 8300)
 RUNTIME_BINARIES = {
@@ -104,12 +98,12 @@ def synthesize_entry(
 
     public_id = _public_id(model.key)
     for entry in catalog.entries:
-        if entry.id == public_id:
-            raise SynthesisError(f"already in the catalog as {entry.id}")
+        if entry.public_id == public_id:
+            raise SynthesisError(f"already in the catalog as {entry.public_id}")
         if entry.source_path == path:
-            raise SynthesisError(f"already in the catalog as {entry.id}")
+            raise SynthesisError(f"already in the catalog as {entry.public_id}")
         if path in entry.launch_command:
-            raise SynthesisError(f"already in the catalog as {entry.id}")
+            raise SynthesisError(f"already in the catalog as {entry.public_id}")
 
     port = _free_port(catalog)
 
