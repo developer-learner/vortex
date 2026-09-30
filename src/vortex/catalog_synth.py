@@ -102,6 +102,7 @@ def synthesize_entry(
     return CatalogEntry.model_validate({
         "id": public_id,
         "name": model.key,
+        "port": port,
         "runtime": runtime,
         "engine": engine,
         "architecture": architecture,
