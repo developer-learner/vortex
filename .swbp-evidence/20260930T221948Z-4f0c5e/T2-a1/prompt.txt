@@ -4,11 +4,11 @@ Edit `src/vortex/discovery.py` only.
 
 2. Add module constants: `LMS_BIN = Path.home() / ".lmstudio/bin/lms"` and `LMSTUDIO_MODELS_ROOT = Path.home() / ".lmstudio/models"`.
 
-3. New `lmstudio_model_paths(run=None, models_root=None) -> dict[str, str]`: `run` is a zero-argument callable returning the stdout text of `lms ls --json`; the default runs `[str(LMS_BIN), "ls", "--json"]` with `subprocess.run(..., capture_output=True, text=True, timeout=10, check=False)` and returns its stdout. The text is a JSON array (see frozen capture `captures/lms-ls.json`); each row with both a `modelKey` and a `path` maps `modelKey -> str(models_root / path)` (`models_root` defaults to `LMSTUDIO_MODELS_ROOT`). ANY exception or non-list JSON returns `{}` — log at debug level, never raise.
+3. New `lmstudio_model_paths(run=None, models_root=None) -> dict[str, str]`: `run` is a zero-argument callable returning the stdout text of `lms ls --json`; the default runs `[str(LMS_BIN), "ls", "--json"]` with `subprocess.run(..., capture_output=True, text=True, timeout=10, check=False)` and returns its stdout. The text is a JSON array (see frozen capture `captures/lms-ls.json`); each row with both a `modelKey` and a `path` maps `modelKey -> str(models_root / path)` (`models_root` defaults to `LMSTUDIO_MODELS_ROOT`). ANY exception or non-list JSON returns `{}`. In the exception handler, you MUST include a comment justifying why the error is safe to ignore (e.g., `# Safe to ignore: discovery is best-effort; missing paths are handled downstream`) and explicitly return `{}`. Do not use a bare `pass`. Log at debug level.
 
 4. `discover_models(catalog_entries=None, fetch=None, probes=None, paths=None)`: `paths` is a zero-argument callable returning that map (default `lmstudio_model_paths`). Each DiscoveredModel's `path` is `paths_map.get(key)`. `in_catalog` is true when the key equals an entry's `upstream_alias` (as today) OR the model's path is not None and equals an entry's `source_path` or is one of the strings in an entry's `launch_command`.
 
-Acceptance: ruff and mypy clean; the wire schema of `/api/discovered-models` carries `path`.
+Acceptance: ruff and mypy clean; the wire schema of `/api/discovered-models` carries `path`; no bare `pass` in exception handlers.
 
 Write EXACTLY one file: src/vortex/discovery.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/discovery.py and confirm it satisfies every acceptance condition in this brief.
 
@@ -34,16 +34,22 @@ Rules:
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import shutil
 import socket
 import subprocess
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any, Literal
 
 import httpx
 from pydantic import BaseModel
+
+
+logger = logging.getLogger(__name__)
 
 
 class WrapperSpec(BaseModel):

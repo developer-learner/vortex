@@ -49,6 +49,9 @@ class Wrapper(BaseModel):
     in_catalog: bool = False
 
 
+LMS_BIN = Path.home() / ".lmstudio/bin/lms"
+LMSTUDIO_MODELS_ROOT = Path.home() / ".lmstudio/models"
+
 WRAPPER_SPECS: tuple[WrapperSpec, ...] = (
     WrapperSpec(
         name="omlx",
@@ -178,6 +181,47 @@ def _check_port(port: int | None) -> bool:
         return False
 
 
+def _default_lms_run() -> str:
+    """Run lms ls --json and return stdout text."""
+    result = subprocess.run(
+        [str(LMS_BIN), "ls", "--json"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    return result.stdout
+
+
+def lmstudio_model_paths(
+    run: Callable[[], str] | None = None,
+    models_root: Path | None = None,
+) -> dict[str, str]:
+    """Map modelKey -> absolute path from lms ls --json output."""
+    if run is None:
+        run = _default_lms_run
+    if models_root is None:
+        models_root = LMSTUDIO_MODELS_ROOT
+    try:
+        text = run()
+        rows = json.loads(text)
+        if not isinstance(rows, list):
+            return {}
+        paths: dict[str, str] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            model_key = row.get("modelKey")
+            rel_path = row.get("path")
+            if model_key and rel_path:
+                paths[model_key] = str(models_root / rel_path)
+        return paths
+    except Exception:
+        # Safe to ignore: discovery is best-effort; missing paths are handled downstream
+        logger.debug("lmstudio_model_paths failed", exc_info=True)
+        return {}
+
+
 def _entry_matches(entry: Any, name: str) -> bool:
     """Return True when a catalog entry references the wrapper by name."""
     runtime = getattr(entry, "runtime", None)
@@ -258,6 +302,7 @@ class DiscoveredModel(BaseModel):
     loaded: bool = False
     source: str
     in_catalog: bool = False
+    path: str | None = None
 
 
 LIBRARY_PROBES: tuple[tuple[str, int], ...] = (("lmstudio", 1234),)
@@ -279,15 +324,29 @@ def _fetch_library(base_url: str) -> list[dict]:
 
 
 def discover_models(
-    catalog_entries: list | None = None,
+    catalog_entries: list[Any] | None = None,
     fetch: Callable[[str], list[dict]] = _fetch_library,
     probes: tuple[tuple[str, int], ...] = LIBRARY_PROBES,
-) -> list:
+    paths: Callable[[], dict[str, str]] | None = None,
+) -> list[DiscoveredModel]:
+    """Discover installed models and report status."""
+    if paths is None:
+        paths = lmstudio_model_paths
+    paths_map = paths()
     aliases: set[str | None] = set()
+    source_paths: set[str] = set()
+    launch_cmds: set[str] = set()
     for entry in catalog_entries or []:
         aliases.add(getattr(entry, "upstream_alias", None))
         aliases.add(getattr(entry, "public_id", None))
-    found: list = []
+        sp = getattr(entry, "source_path", None)
+        if sp:
+            source_paths.add(str(sp))
+        lc = getattr(entry, "launch_command", None)
+        if lc:
+            for part in lc:
+                launch_cmds.add(str(part))
+    found: list[DiscoveredModel] = []
     for source, port in probes:
         for raw in fetch(f"http://127.0.0.1:{port}"):
             key = raw.get("key")
@@ -295,6 +354,11 @@ def discover_models(
                 continue
             quant = raw.get("quantization")
             quant_name = quant.get("name") if isinstance(quant, dict) else quant
+            model_path = paths_map.get(key)
+            in_catalog = key in aliases
+            if not in_catalog and model_path is not None:
+                if model_path in source_paths or model_path in launch_cmds:
+                    in_catalog = True
             found.append(
                 DiscoveredModel(
                     key=key,
@@ -308,7 +372,8 @@ def discover_models(
                     fmt=raw.get("format"),
                     loaded=bool(raw.get("loaded_instances")),
                     source=source,
-                    in_catalog=key in aliases,
+                    in_catalog=in_catalog,
+                    path=model_path,
                 )
             )
     return found
