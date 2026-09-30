@@ -1,3 +1,37 @@
+Edit `src/vortex/catalog.py` only. Add no new imports beyond what the file already has.
+
+1. `CatalogEntry`: add two optional fields, both carried through `model_dump()`/validation: `source_path: str | None = None` (the model files an added entry serves) and `origin: Literal["config", "local"] = "config"` (import `Literal` from typing if absent).
+
+2. `load_catalog(path, local_path=None)`: loads `path` as today (origin "config"). When `local_path` is given AND the file exists, its `{"entries": [...]}` rows are loaded with origin forced to "local" and merged after the config rows; the merged catalog is validated by the same duplicate public id / duplicate port rules (same messages: "duplicate public id", "duplicate port"). A missing local file is not an error.
+
+3. `Catalog.add(entry)`: raises `ValueError` whose message contains "duplicate public id" or "duplicate port" when either collides with an existing entry; otherwise appends to `self.entries` IN PLACE (other components hold this same list).
+
+4. `Catalog.remove(public_id) -> CatalogEntry`: `KeyError` for an unknown id; `ValueError` with a message containing "config" for an entry whose origin is "config"; otherwise removes it from `self.entries` in place and returns it.
+
+5. `save_local_entries(catalog, local_path)`: writes `{"entries": [<every origin "local" entry as model_dump(mode="json")>]}` (indent 2) to a temp file beside `local_path`, then `os.replace` onto it. Only local entries are written; config entries never are.
+
+Acceptance: `ruff check` and `mypy --explicit-package-bases src/vortex/catalog.py` clean; the file defines the two new fields and the add/remove/save_local_entries behavior exactly as above.
+
+Write EXACTLY one file: src/vortex/catalog.py — the gate rejects any other change, including new files. Before finishing, re-open src/vortex/catalog.py and confirm it satisfies every acceptance condition in this brief.
+
+Reply with ONLY edit blocks in this exact format, nothing else:
+<<<<<<< SEARCH
+(an EXACT, character-for-character copy of a short existing section — 3 to 10 lines)
+=======
+(that same section with the change applied)
+>>>>>>> REPLACE
+Rules:
+- Each SEARCH must appear EXACTLY ONCE in the file. Copy it verbatim — same spaces, same quotes.
+- Several small blocks, not one big one. Do not touch code outside your blocks. Do not reformat or reorder anything.
+- Never include any line containing a think tag in a SEARCH section — anchor on nearby tag-free lines instead.
+- In new code, never write the think tag as one literal string — construct it by concatenation, e.g. '<' + 'think>'.
+- If the file already satisfies the brief, reply with exactly this line and nothing else: === NO CHANGES ===
+- Verify each SEARCH against the file one more time before answering.
+- Your reply's VERY FIRST line must be '<<<<<<< SEARCH' (or the NO CHANGES line). Do not analyze, plan, or explain anything — every design decision is already made in the brief. Prose before the blocks burns your output budget and truncates the edit mid-block.
+- Every block must be COMPLETE working code — never a stub, placeholder, or '...' body. If the brief needs a new function, write its full body in the block.
+
+### existing (src/vortex/catalog.py)
+```
 """Catalog model definition.
 
 The catalog is config-first: only configured entries are loadable. Scanning is
@@ -14,7 +48,6 @@ Terms (see docs/GLOSSARY.md):
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Literal
 
@@ -38,8 +71,6 @@ class CatalogEntry(BaseModel):
     ctx_size: int | None = None
     exclusive: bool = True
     pinned: bool = False
-    source_path: str | None = None
-    origin: Literal["config", "local"] = "config"
 
     @field_validator("launch_command")
     @classmethod
@@ -122,29 +153,8 @@ class Catalog(BaseModel):
                 )
             seen[e.port] = e.public_id
 
-    def add(self, entry: CatalogEntry) -> None:
-        """Add an entry in-place. Raises ValueError on duplicate public id or port."""
-        for e in self.entries:
-            if e.public_id == entry.public_id:
-                raise ValueError(
-                    f"duplicate public id {entry.public_id!r} "
-                    f"(seen in {e.runtime} and {entry.runtime})"
-                )
-            if e.port == entry.port:
-                raise ValueError(f"duplicate port {entry.port} ({e.public_id} and {entry.public_id})")
-        self.entries.append(entry)
 
-    def remove(self, public_id: str) -> CatalogEntry:
-        """Remove an entry by public_id in-place. Returns the removed entry."""
-        for i, e in enumerate(self.entries):
-            if e.public_id == public_id:
-                if e.origin == "config":
-                    raise ValueError(f"cannot remove config entry {public_id!r}")
-                return self.entries.pop(i)
-        raise KeyError(public_id)
-
-
-def load_catalog(path: Path, local_path: Path | None = None) -> Catalog:
+def load_catalog(path: Path) -> Catalog:
     """Load and validate a catalog file. Raises ValueError on any problem."""
     with open(path, encoding="utf-8") as f:
         raw = json.load(f)
@@ -152,29 +162,8 @@ def load_catalog(path: Path, local_path: Path | None = None) -> Catalog:
         catalog = Catalog.model_validate(raw)
     except ValidationError as exc:
         raise ValueError(f"catalog {path} invalid: {exc}") from exc
-    if local_path is not None and local_path.exists():
-        with open(local_path, encoding="utf-8") as f:
-            local_raw = json.load(f)
-        local_entries = local_raw.get("entries", [])
-        for row in local_entries:
-            row["origin"] = "local"
-        merged_raw = {"entries": [e.model_dump() for e in catalog.entries] + local_entries}
-        try:
-            catalog = Catalog.model_validate(merged_raw)
-        except ValidationError as exc:
-            raise ValueError(f"merged catalog invalid: {exc}") from exc
     catalog.assert_unique_public_ids()
     catalog.assert_unique_ports()
     return catalog
 
-
-def save_local_entries(catalog: Catalog, local_path: Path) -> None:
-    """Persist only origin='local' entries to local_path atomically."""
-    local_entries = [
-        e.model_dump(mode="json") for e in catalog.entries if e.origin == "local"
-    ]
-    data = {"entries": local_entries}
-    tmp_path = local_path.with_suffix(local_path.suffix + ".tmp")
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp_path, local_path)
+```

@@ -1,0 +1,111 @@
+I'll analyze the file and make the required changes. Let me work through each requirement:
+
+1. Add `source_path` and `origin` fields to `CatalogEntry` (Literal already imported)
+2. Update `load_catalog` with `local_path` parameter
+3. Add `Catalog.add()` method
+4. Add `Catalog.remove()` method
+5. Add `save_local_entries()` function
+6. Need `import os` for `os.replace` in `save_local_entries`
+
+Let me write the edit blocks:
+
+<<<<<<< SEARCH
+import json
+from pathlib import Path
+from typing import Literal
+=======
+import json
+import os
+from pathlib import Path
+from typing import Literal
+>>>>>>> REPLACE
+
+<<<<<<< SEARCH
+    exclusive: bool = True
+    pinned: bool = False
+
+    @field_validator("launch_command")
+=======
+    exclusive: bool = True
+    pinned: bool = False
+    source_path: str | None = None
+    origin: Literal["config", "local"] = "config"
+
+    @field_validator("launch_command")
+>>>>>>> REPLACE
+
+<<<<<<< SEARCH
+            seen[e.port] = e.public_id
+
+
+def load_catalog(path: Path) -> Catalog:
+    """Load and validate a catalog file. Raises ValueError on any problem."""
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    try:
+        catalog = Catalog.model_validate(raw)
+    except ValidationError as exc:
+        raise ValueError(f"catalog {path} invalid: {exc}") from exc
+    catalog.assert_unique_public_ids()
+    catalog.assert_unique_ports()
+    return catalog
+=======
+            seen[e.port] = e.public_id
+
+    def add(self, entry: CatalogEntry) -> None:
+        """Add an entry in-place. Raises ValueError on duplicate public id or port."""
+        for e in self.entries:
+            if e.public_id == entry.public_id:
+                raise ValueError(
+                    f"duplicate public id {entry.public_id!r} "
+                    f"(seen in {e.runtime} and {entry.runtime})"
+                )
+            if e.port == entry.port:
+                raise ValueError(f"duplicate port {entry.port} ({e.public_id} and {entry.public_id})")
+        self.entries.append(entry)
+
+    def remove(self, public_id: str) -> CatalogEntry:
+        """Remove an entry by public_id in-place. Returns the removed entry."""
+        for i, e in enumerate(self.entries):
+            if e.public_id == public_id:
+                if e.origin == "config":
+                    raise ValueError(f"cannot remove config entry {public_id!r}")
+                return self.entries.pop(i)
+        raise KeyError(public_id)
+
+
+def load_catalog(path: Path, local_path: Path | None = None) -> Catalog:
+    """Load and validate a catalog file. Raises ValueError on any problem."""
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    try:
+        catalog = Catalog.model_validate(raw)
+    except ValidationError as exc:
+        raise ValueError(f"catalog {path} invalid: {exc}") from exc
+    if local_path is not None and local_path.exists():
+        with open(local_path, encoding="utf-8") as f:
+            local_raw = json.load(f)
+        local_entries = local_raw.get("entries", [])
+        for row in local_entries:
+            row["origin"] = "local"
+        merged_raw = {"entries": [e.model_dump() for e in catalog.entries] + local_entries}
+        try:
+            catalog = Catalog.model_validate(merged_raw)
+        except ValidationError as exc:
+            raise ValueError(f"merged catalog invalid: {exc}") from exc
+    catalog.assert_unique_public_ids()
+    catalog.assert_unique_ports()
+    return catalog
+
+
+def save_local_entries(catalog: Catalog, local_path: Path) -> None:
+    """Persist only origin='local' entries to local_path atomically."""
+    local_entries = [
+        e.model_dump(mode="json") for e in catalog.entries if e.origin == "local"
+    ]
+    data = {"entries": local_entries}
+    tmp_path = local_path.with_suffix(local_path.suffix + ".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp_path, local_path)
+>>>>>>> REPLACE
