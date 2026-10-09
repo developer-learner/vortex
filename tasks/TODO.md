@@ -1,7 +1,11 @@
 # Vortex TODO — current actionable work
 
-> Refreshed 2026-09-23 against Vortex `main` (`2f46a09`), frozen spec **v35**,
-> and the canonical register in `tasks/BACKLOG.md`. This is the short execution
+> Refreshed 2026-10-08 against Vortex `main` (`a0f30b1`), frozen spec **v43**
+> (last `[success]` `d566092`, 2026-09-30), and the canonical register in
+> `tasks/BACKLOG.md`. Since the 2026-09-23 refresh: **R1 and T1 are done**
+> (v36 T1 admission policy + v37 under `swbp orchestrate`), v38 Restart
+> Vortex, v39–v43 Add to Vortex (4 post-`[success]` hand-fixes, `d65e468`).
+> No milestone spec is staged; the next milestone needs a feature choice. This is the short execution
 > list; `BACKLOG.md` keeps the detailed history and original item numbers.
 >
 > Baseline: product suite 144 tests (coverage ~91%); GitHub CI and swbp-guard
@@ -27,42 +31,13 @@
 
 | # | Item | Crit | Cost | Kind | Blocker |
 |---|------|------|------|------|---------|
-| R1 | First real milestone under `swbp orchestrate` | P0 | M | milestone | a spec to run (T1 is the natural candidate) |
-| T1 | Fail-safe admission under uncertain occupancy | P1 | M/L | decision → milestone | CEO/TPM policy choice |
 | T9 | Cut `LLM_ENDPOINT` over to Vortex `:9000` | P2 | M | ad hoc (config + verification) | none |
 | T10 | vmlx live exercise (+ provisioning/tuning v2) | P2 | M + operator | ad hoc (exercise); v2 = milestone | ~35 GB free RAM; drive from outside the session |
 | T3 | Remove Starlette TestClient deprecation warning | P3 | S/M | milestone (dependency change) | CEO approval for httpx2 |
 | T12 | Build `vortex ctx-tune <model>`? | P3 | L if built | decision → milestone | CEO call (recommendation: defer until after T1) |
-| T7 | Model-specific Git provenance | P3 | L if built | decision → Blueprint milestone | CEO build/no-build |
-| T11 | Mature OSS adoption subject #2 | P3 | L | decision → Blueprint milestone | CEO picks subject |
 | H1 | launchd agent so the `:9000` daemon survives reboot | P4 | XS | ad hoc | optional; confirm wanted |
 
 ## Details
-
-### R1 — First real milestone under `swbp orchestrate` (D-186 live-fire)
-
-- **Replaces:** T5 / backlog #4 (D-168 immutable-plane live-fire). D-186
-  removed the in-app control plane, so the "unchanged plane SHA across a mid-run
-  Blueprint advance" proof no longer applies; the builder pin (`.swbp ref=`)
-  is its successor.
-- **Why P0:** `swbp orchestrate` has never run end-to-end. Blueprint stage F
-  (delete the sync layer) is gated on every app completing a green real
-  milestone under swbp.
-- **Done when:** one real multi-task milestone runs via
-  `swbp orchestrate --app ~/dev/vortex` in the dev VM, ends `[success]`,
-  CI + swbp-guard green on push.
-
-### T1 — Fail-safe admission under uncertain occupancy
-
-- **Status:** decision note at `tasks/T1-admission-decision.md`
-  (recommendation: conservatively count the catalog RAM estimate for uncertain
-  non-target entries). Awaiting the policy choice.
-- **Risk:** a non-target entry with `SCAN_UNKNOWN` and no prior status, or an
-  unidentified occupant (missing/invalid sidecar), is excluded from
-  `Manager.all_ready()`, so admission can undercount RAM.
-- **Done when:** policy recorded; blind tests discriminate the uncertain cases
-  without regressing identified-unverified; lands via refreeze; gates green.
-  Running it as R1 closes both.
 
 ### T9 — Cut `LLM_ENDPOINT` over to Vortex
 
@@ -84,15 +59,17 @@
   Fix is a dependency migration touching `requirements.txt`/`pyproject.toml`
   and tests → maintenance milestone.
 
-### T12, T7, T11 — decisions
+### T12 — decision
 
-- **T12:** note at `tasks/T12-ctx-tune-decision.md` (build / no-build / defer).
-- **T7:** if approved, a trusted commit broker with author/committer separation,
-  provenance trailers, prompt/reply hashes, attestation. (Distinct from the
-  D-184 supply-chain provenance already landed.)
-- **T11:** choose the second mature OSS brownfield subject.
+- Note at `tasks/T12-ctx-tune-decision.md` (build / no-build / defer).
 
 ## Closed since the last refresh
+
+- **R1** first real milestone under `swbp orchestrate` — v37 `[success]`
+  `c1e8aba` (2026-09-23); v38 and v43 since.
+- **T1** fail-safe admission under uncertain occupancy — v36 (AC-13..AC-16).
+- **T7** model-specific Git provenance — Blueprint D-174 commit broker (M1).
+- **T11** second OSS adoption subject — rich 15.0.0 (`~/dev/rich-adoption`, D-175).
 
 - **T2** continuous readiness — no-code acceptance (2026-09-01).
 - **T4** publish docs — pushed; CI green.
@@ -102,7 +79,7 @@
 
 ## Recommended order
 
-1. CEO picks the T1 policy → author the T1 freeze → run it as **R1**.
-2. T9 cutover (ad hoc) once R1 is green.
-3. T10 when host memory allows.
-4. T3 / T12 / T7 / T11 as their decision gates open.
+1. T9 cutover (ad hoc).
+2. T10 when host memory allows.
+3. T3 / T12 as their decision gates open.
+4. Next feature milestone: none queued — needs a CEO feature choice.
