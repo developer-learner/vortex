@@ -6,6 +6,7 @@ import re
 
 from .catalog import Catalog, CatalogEntry
 from .discovery import DiscoveredModel
+from .labels import describe
 
 PORT_RANGE = range(8200, 8300)
 RUNTIME_BINARIES = {"mlx": "/opt/homebrew/bin/mlx-serve",
@@ -34,8 +35,12 @@ def synthesize_entry(model: DiscoveredModel, catalog: Catalog,
         raise SynthesisError("no free port in 8200-8299")
     port = free[0]
     net = ["--host", "127.0.0.1", "--port", str(port)]
+    labels = describe(path, fmt, model.quantization, model.architecture)
     if fmt == "mlx":
         rt, eng, cmd = "mlx-serve", "mlx-serve", [binaries[fmt], "--model", path, "--serve"]
+        if labels.has_mtp:
+            # mlx-serve only auto-enables MTP on dense models; force it for MoE too.
+            net = [*net, "--mtp"]
     else:
         rt, eng, cmd = "llama-server", "llama.cpp", [binaries[fmt], "-m", path]
     ram = round(model.size_bytes * 1.1 / 1e9, 1) if model.size_bytes else None
@@ -46,4 +51,6 @@ def synthesize_entry(model: DiscoveredModel, catalog: Catalog,
         "ready_url": f"{base}/models", "chat_endpoint": f"{base}/chat/completions",
         "upstream_alias": os.path.basename(path.rstrip("/")),
         "ram_estimate_gb": ram, "exclusive": ram is not None and ram > 40,
-        "source_path": path, "origin": "local"})
+        "source_path": path, "origin": "local",
+        "display_name": labels.display_name, "quant": labels.quant,
+        "extras": labels.extras})
