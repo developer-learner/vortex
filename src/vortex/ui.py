@@ -40,7 +40,7 @@ header h1 {
   letter-spacing: 0.02em;
 }
 header .sub { color: var(--dim); font-size: 12px; }
-main { padding: 16px 20px 40px; max-width: 960px; margin: 0 auto; }
+main { padding: 16px 20px 40px; max-width: 1200px; margin: 0 auto; }
 #down {
   display: none;
   margin-bottom: 14px;
@@ -132,7 +132,9 @@ tbody td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
+  white-space: nowrap;
 }
+tbody td.model { white-space: normal; min-width: 260px; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr.loaded td:first-child { color: var(--ok); }
 tbody tr.empty td {
@@ -162,7 +164,9 @@ tbody tr.empty td {
   color: var(--dim);
   vertical-align: middle;
 }
-.badge.dflash { border-color: var(--accent); color: var(--accent); }
+.badge.extra { border-color: var(--accent); color: var(--accent); }
+.badge:first-child { margin-left: 0; }
+.model-id { display: block; color: var(--dim); font-size: 11px; }
 button {
   font: inherit;
   font-size: 12px;
@@ -239,13 +243,16 @@ footer {
       <tr>
         <th>Status</th>
         <th>Model</th>
+        <th>Quant</th>
+        <th>Runtime</th>
+        <th>Extras</th>
         <th>Size</th>
         <th>Endpoint</th>
         <th>Actions</th>
       </tr>
     </thead>
     <tbody id="rows">
-      <tr class="empty"><td colspan="5">loading…</td></tr>
+      <tr class="empty"><td colspan="8">loading…</td></tr>
     </tbody>
   </table>
   <section id="enginewrappers">
@@ -357,7 +364,7 @@ footer {
   function renderRows(models) {
     var rows = document.getElementById("rows");
     if (!models || !models.length) {
-      rows.innerHTML = '<tr class="empty"><td colspan="5">no models in catalog</td></tr>';
+      rows.innerHTML = '<tr class="empty"><td colspan="8">no models in catalog</td></tr>';
       return;
     }
     var html = "";
@@ -375,11 +382,17 @@ footer {
       }
       html += "<tr>";
       html += "<td>" + dot + (loading ? "loading…" : loaded ? "loaded" : "idle") + "</td>";
-      var isDflash = m.engine === "mlx-dflash2";
-      var engBadge = isDflash
-        ? '<span class="badge dflash" title="oMLX speculative decoding via ' + esc(m.upstream_alias || "DFlash2 draft") + '">DFlash2</span>'
-        : '<span class="badge" title="engine: ' + esc(m.engine) + '">' + esc(m.engine) + '</span>';
-      html += "<td>" + esc(m.public_id) + engBadge + "</td>";
+      // The id line is what clients send as "model"; the name above it is display-only.
+      html += '<td class="model">' + esc(m.display_name || m.public_id)
+        + '<span class="model-id">' + esc(m.public_id) + "</span></td>";
+      html += "<td>" + (m.quant ? esc(m.quant) : '<span class="dim">—</span>') + "</td>";
+      html += '<td><span class="badge" title="engine: ' + esc(m.engine) + '">' + esc(m.runtime) + "</span></td>";
+      var extras = m.extras || [];
+      var extraCell = "";
+      for (var j = 0; j < extras.length; j++) {
+        extraCell += '<span class="badge extra">' + esc(extras[j]) + "</span>";
+      }
+      html += "<td>" + (extraCell || '<span class="dim">—</span>') + "</td>";
       html += "<td>" + esc(m.ram_estimate_gb) + " GiB</td>";
       var endpoint = m.chat_endpoint || ("http://localhost:" + m.port + "/v1/chat/completions");
       var portCell = (loaded && m.port)

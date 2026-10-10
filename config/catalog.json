@@ -13,7 +13,10 @@
       "upstream_alias": "Flash_IQ3XXS",
       "ram_estimate_gb": 90.0,
       "exclusive": true,
-      "source_path": "/Users/arc.elixir/.lmstudio/models/unsloth/DeepSeek-V4-Flash-0731-UD-IQ3_XXS/DeepSeek-V4-Flash-0731-UD-IQ3_XXS-00001-of-00004.gguf"
+      "source_path": "/Users/arc.elixir/.lmstudio/models/unsloth/DeepSeek-V4-Flash-0731-UD-IQ3_XXS/DeepSeek-V4-Flash-0731-UD-IQ3_XXS-00001-of-00004.gguf",
+      "display_name": "DeepSeek V4 Flash 0731",
+      "quant": "UD-IQ3_XXS",
+      "extras": []
     },
     {
       "public_id": "qwen3.8-27b-8bit",
@@ -28,7 +31,12 @@
       "upstream_alias": "Qwen3.8-27B-MLX-8bit",
       "ram_estimate_gb": 30.0,
       "exclusive": false,
-      "source_path": "/Users/arc.elixir/.lmstudio/models/lmstudio-community/Qwen3.8-27B-MLX-8bit"
+      "source_path": "/Users/arc.elixir/.lmstudio/models/lmstudio-community/Qwen3.8-27B-MLX-8bit",
+      "display_name": "Qwen3.8 27B",
+      "quant": "8-bit",
+      "extras": [
+        "lookup"
+      ]
     },
     {
       "public_id": "mtplx-qwen38-27b-optimized-quality",
@@ -47,7 +55,12 @@
       "chat_endpoint": "http://127.0.0.1:8001/v1/chat/completions",
       "upstream_alias": "mtplx-qwen38-27b-optimized-quality",
       "ram_estimate_gb": 30.4,
-      "exclusive": true
+      "exclusive": true,
+      "display_name": "Qwen3.8 27B MTPLX-Opt",
+      "quant": "8-bit",
+      "extras": [
+        "MTP"
+      ]
     },
     {
       "public_id": "vmlx-dsv4-configi-mlx",
@@ -65,7 +78,10 @@
       "chat_endpoint": "http://127.0.0.1:8104/v1/chat/completions",
       "upstream_alias": "DeepSeek-V4-Flash-ConfigI-MLX",
       "ram_estimate_gb": 100.8,
-      "exclusive": true
+      "exclusive": true,
+      "display_name": "DeepSeek V4 Flash 0731",
+      "quant": "Config-I ~3-bit",
+      "extras": []
     },
     {
       "public_id": "qwen3.8-27b-mtplxopt-dspark",
@@ -80,7 +96,12 @@
       "upstream_alias": "Qwen3.8-27B-MTPLX-Optimized-Quality",
       "ram_estimate_gb": 48.0,
       "exclusive": false,
-      "source_path": "/Users/arc.elixir/.lmstudio/models/Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality"
+      "source_path": "/Users/arc.elixir/.lmstudio/models/Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality",
+      "display_name": "Qwen3.8 27B MTPLX-Opt",
+      "quant": "8-bit",
+      "extras": [
+        "lookup"
+      ]
     },
     {
       "public_id": "mlx-community--Qwen3.8-27B-4bit",
@@ -103,7 +124,12 @@
       "chat_endpoint": "http://127.0.0.1:8009/v1/chat/completions",
       "upstream_alias": "mlx-community--Qwen3.8-27B-4bit",
       "ram_estimate_gb": 20.0,
-      "exclusive": false
+      "exclusive": false,
+      "display_name": "Qwen3.8 27B",
+      "quant": "4-bit",
+      "extras": [
+        "DFlash2"
+      ]
     },
     {
       "public_id": "splash-qwen38-27b-4bit",
@@ -120,7 +146,13 @@
       "chat_endpoint": "http://127.0.0.1:8000/v1/chat/completions",
       "upstream_alias": "incoai/Qwen3.8-27B-Splash",
       "ram_estimate_gb": 20.0,
-      "exclusive": false
+      "exclusive": false,
+      "display_name": "Qwen3.8 27B",
+      "quant": "4-bit",
+      "extras": [
+        "DFlash2",
+        "batch 4"
+      ]
     },
     {
       "public_id": "mtplx-qwen38-27b-8bit-baseline-batch",
@@ -135,7 +167,12 @@
       "upstream_alias": "Qwen3.8-27B-MTPLX-Optimized-Quality",
       "ram_estimate_gb": 34.0,
       "exclusive": false,
-      "source_path": "/Users/arc.elixir/.lmstudio/models/Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality"
+      "source_path": "/Users/arc.elixir/.lmstudio/models/Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality",
+      "display_name": "Qwen3.8 27B MTPLX-Opt",
+      "quant": "8-bit",
+      "extras": [
+        "batch 8"
+      ]
     },
     {
       "public_id": "Qwen3.8-27B-MLX-8bit",
@@ -159,7 +196,12 @@
       "upstream_alias": "Qwen3.8-27B-MLX-8bit",
       "ram_estimate_gb": 30.0,
       "exclusive": false,
-      "source_path": "/Users/arc.elixir/.lmstudio/models/lmstudio-community/Qwen3.8-27B-MLX-8bit"
+      "source_path": "/Users/arc.elixir/.lmstudio/models/lmstudio-community/Qwen3.8-27B-MLX-8bit",
+      "display_name": "Qwen3.8 27B",
+      "quant": "8-bit",
+      "extras": [
+        "DFlash2"
+      ]
     },
     {
       "public_id": "nemotron",
@@ -174,7 +216,10 @@
       "chat_endpoint": "http://127.0.0.1:8600/v1/chat/completions",
       "upstream_alias": "dealignai/Nemotron-3-Super-120B-A12B-UNCENSORED-JANG_2L",
       "ram_estimate_gb": 60.0,
-      "exclusive": true
+      "exclusive": true,
+      "display_name": "Nemotron 3 Super 120B-A12B Uncensored",
+      "quant": "JANG_2L ~2.8-bit",
+      "extras": []
     },
     {
       "public_id": "qwen3.8-flash-next-2bit",
@@ -198,7 +243,10 @@
       "upstream_alias": "Qwen3.8-Flash-Next-MLX-Mixed-2bit",
       "ram_estimate_gb": 72.0,
       "exclusive": true,
-      "source_path": "/Users/arc.elixir/.lmstudio/models/Sawfwair/Qwen3.8-Flash-Next-MLX-Mixed-2bit"
+      "source_path": "/Users/arc.elixir/.lmstudio/models/Sawfwair/Qwen3.8-Flash-Next-MLX-Mixed-2bit",
+      "display_name": "Qwen3.8 Flash-Next",
+      "quant": "2-bit mixed",
+      "extras": []
     },
     {
       "public_id": "qwen3.8-flash-next-4bit",
@@ -222,7 +270,10 @@
       "upstream_alias": "Qwen3.8-Flash-Next-MLX-4bit",
       "ram_estimate_gb": 98.0,
       "exclusive": true,
-      "source_path": "/Users/arc.elixir/.lmstudio/models/nopmobiel/Qwen3.8-Flash-Next-MLX-4bit"
+      "source_path": "/Users/arc.elixir/.lmstudio/models/nopmobiel/Qwen3.8-Flash-Next-MLX-4bit",
+      "display_name": "Qwen3.8 Flash-Next",
+      "quant": "4-bit",
+      "extras": []
     },
     {
       "public_id": "qwen3.8-flash-next-4-8bit",
@@ -245,7 +296,12 @@
       "upstream_alias": "Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit",
       "ram_estimate_gb": 72.0,
       "exclusive": true,
-      "source_path": "/Users/arc.elixir/.lmstudio/models/ddalcu/Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit"
+      "source_path": "/Users/arc.elixir/.lmstudio/models/ddalcu/Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit",
+      "display_name": "Qwen3.8 Flash-Next",
+      "quant": "4–8 mixed",
+      "extras": [
+        "MTP"
+      ]
     }
   ]
 }

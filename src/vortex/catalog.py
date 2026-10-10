@@ -40,6 +40,11 @@ class CatalogEntry(BaseModel):
     pinned: bool = False
     source_path: str | None = None
     origin: Literal["config", "local"] = "config"
+    # Display-only: the menu shows name · quant · runtime · extras. Clients
+    # keep addressing the model by public_id.
+    display_name: str | None = None
+    quant: str | None = None
+    extras: list[str] = Field(default_factory=list)
 
     @field_validator("launch_command")
     @classmethod
