@@ -1,0 +1,19 @@
+{
+  "changed_contract_ids": [],
+  "changed_tests": [
+    "tests/test_discovery_unindexed.py::test_discover_models_uses_row_path_when_not_in_lms_listing",
+    "tests/test_discovery_unindexed.py::test_disk_rows_dropped_when_lm_studio_reports_the_folder",
+    "tests/test_discovery_unindexed.py::test_disk_rows_find_folders_lm_studio_skips",
+    "tests/test_discovery_unindexed.py::test_publisher_for_paths_and_aliases",
+    "tests/test_discovery_unindexed.py::test_quant_label_affine_mix_unchanged",
+    "tests/test_discovery_unindexed.py::test_quant_label_mxfp4_with_affine_overrides_is_mixed",
+    "tests/test_discovery_unindexed.py::test_quant_label_names_non_affine_base_format",
+    "tests/test_discovery_unindexed.py::test_unindexed_rows_skip_known_and_resolve_path",
+    "tests/test_discovery_unindexed.py::test_unindexed_rows_tolerate_bad_body",
+    "tests/test_discovery_unindexed.py::test_unindexed_rows_unknown_publisher_dir_has_no_path"
+  ],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": []
+}
