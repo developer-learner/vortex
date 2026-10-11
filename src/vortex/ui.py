@@ -243,6 +243,7 @@ footer {
       <tr>
         <th>Status</th>
         <th>Model</th>
+        <th>Publisher</th>
         <th>Quant</th>
         <th>Runtime</th>
         <th>Extras</th>
@@ -252,7 +253,7 @@ footer {
       </tr>
     </thead>
     <tbody id="rows">
-      <tr class="empty"><td colspan="8">loading…</td></tr>
+      <tr class="empty"><td colspan="9">loading…</td></tr>
     </tbody>
   </table>
   <section id="enginewrappers">
@@ -364,7 +365,7 @@ footer {
   function renderRows(models) {
     var rows = document.getElementById("rows");
     if (!models || !models.length) {
-      rows.innerHTML = '<tr class="empty"><td colspan="8">no models in catalog</td></tr>';
+      rows.innerHTML = '<tr class="empty"><td colspan="9">no models in catalog</td></tr>';
       return;
     }
     var html = "";
@@ -385,6 +386,7 @@ footer {
       // The id line is what clients send as "model"; the name above it is display-only.
       html += '<td class="model">' + esc(m.display_name || m.public_id)
         + '<span class="model-id">' + esc(m.public_id) + "</span></td>";
+      html += "<td>" + (m.publisher ? esc(m.publisher) : '<span class="dim">—</span>') + "</td>";
       html += "<td>" + (m.quant ? esc(m.quant) : '<span class="dim">—</span>') + "</td>";
       html += '<td><span class="badge" title="engine: ' + esc(m.engine) + '">' + esc(m.runtime) + "</span></td>";
       var extras = m.extras || [];

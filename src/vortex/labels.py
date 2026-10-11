@@ -17,6 +17,8 @@ _SHARD = re.compile(r"-\d{5}-of-\d{5}$")
 _BITS_TOKEN = re.compile(r"^(\d+)(?:[-–](\d+))?bits?$", re.IGNORECASE)
 _BITS_RANGE = re.compile(r"(?<=\d)-(?=\d+bits?\b)", re.IGNORECASE)
 _GGUF_QUANT = re.compile(r"^(?:I?Q\d\w*|BF16|F16|F32|FP16|MXFP4)$", re.IGNORECASE)
+# A Hugging Face repo id passed as a launch arg, e.g. `--model org/name`.
+_HF_REPO = re.compile(r"^[A-Za-z0-9][\w.-]*/[\w.-]+$")
 _JANG_TOKEN = re.compile(r"^JANG_\w+$", re.IGNORECASE)
 # Tokens that describe packaging, not the model; dropped from the name.
 _NOISE = {"mlx", "gguf", "serve", "mtp", "ud", "mixed", "community"}
@@ -28,6 +30,27 @@ class Labels:
     quant: str | None
     extras: list[str] = field(default_factory=list)
     has_mtp: bool = False
+
+
+LMSTUDIO_MODELS_ROOT = os.path.expanduser("~/.lmstudio/models")
+
+
+def publisher_for(paths: list[str], upstream_alias: str | None,
+                  models_root: str = LMSTUDIO_MODELS_ROOT) -> str | None:
+    """Who published the weights: the <publisher> in models_root/<publisher>/...,
+    else the org of an `org/name` launch arg or alias, or an omlx-style `org--name` alias."""
+    prefix = models_root.rstrip("/") + "/"
+    for path in paths:
+        if path.startswith(prefix):
+            return path[len(prefix):].split("/", 1)[0] or None
+    for arg in paths:
+        if _HF_REPO.match(arg):
+            return arg.split("/", 1)[0]
+    if upstream_alias:
+        for sep in ("/", "--"):
+            if sep in upstream_alias:
+                return upstream_alias.split(sep, 1)[0] or None
+    return None
 
 
 def describe(path: str, fmt: str | None, fallback_quant: str | None = None,
@@ -91,8 +114,14 @@ def _config_quant(folder: str) -> str | None:
     q = cfg.get("quantization") or cfg.get("quantization_config")
     if not isinstance(q, dict) or not isinstance(q.get("bits"), int):
         return None
+    overrides = [v for v in q.values() if isinstance(v, dict) and isinstance(v.get("bits"), int)]
+    # A non-affine base format (e.g. mxfp4) names the quant; per-layer overrides make it mixed.
+    mode = q.get("mode")
+    if isinstance(mode, str) and mode != "affine":
+        base = mode.upper()
+        return f"{base} mixed" if any(v != {k: q.get(k) for k in v} for v in overrides) else base
     bits = {q["bits"]}
-    bits.update(v["bits"] for v in q.values() if isinstance(v, dict) and isinstance(v.get("bits"), int))
+    bits.update(v["bits"] for v in overrides)
     lo, hi = min(bits), max(bits)
     return f"{lo}-bit" if lo == hi else f"{lo}–{hi} mixed"
 

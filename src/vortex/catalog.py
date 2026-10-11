@@ -45,6 +45,8 @@ class CatalogEntry(BaseModel):
     display_name: str | None = None
     quant: str | None = None
     extras: list[str] = Field(default_factory=list)
+    # Display-only override; otherwise derived from the model path or alias.
+    publisher: str | None = None
 
     @field_validator("launch_command")
     @classmethod

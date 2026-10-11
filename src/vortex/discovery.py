@@ -300,19 +300,174 @@ class DiscoveredModel(BaseModel):
 LIBRARY_PROBES: tuple[tuple[str, int], ...] = (("lmstudio", 1234),)
 
 
-def _fetch_library(base_url: str) -> list[dict]:
+def _get_json(url: str) -> Any:
     try:
-        response = httpx.get(f"{base_url}/api/v1/models", timeout=3.0)
+        response = httpx.get(url, timeout=3.0)
     except (httpx.HTTPError, OSError):
-        return []
+        return None
     if response.status_code != 200:
-        return []
+        return None
     try:
-        body = response.json()
+        return response.json()
     except ValueError:
+        return None
+
+
+def _resolve_unindexed_path(key: str, publisher: str | None, models_root: Path) -> str | None:
+    """Locate a model folder on disk as models_root/<publisher>/<dir>.
+
+    Picks the dir whose name starts with the key (case-insensitive), else the
+    publisher's only dir; returns None when ambiguous or missing.
+    """
+    if not publisher:
+        return None
+    try:
+        dirs = [d for d in (models_root / publisher).iterdir() if d.is_dir()]
+    except OSError:
+        return None
+    matches = [d for d in dirs if d.name.lower().startswith(key.lower())]
+    if len(matches) == 1:
+        return str(matches[0])
+    if not matches and len(dirs) == 1:
+        return str(dirs[0])
+    return None
+
+
+def _dir_size(path: str) -> int | None:
+    try:
+        return sum(f.stat().st_size for f in Path(path).iterdir() if f.is_file())
+    except OSError:
+        return None
+
+
+def _unindexed_rows(v0_body: Any, known: set[str], models_root: Path) -> list[dict]:
+    """Convert /api/v0/models rows missing from the v1 library into v1-shaped rows.
+
+    LM Studio's v1 library (and `lms ls`) is a cached index: a model downloaded
+    after the index was built can be loaded yet absent there, while v0 still
+    lists it.
+    """
+    data = v0_body.get("data") if isinstance(v0_body, dict) else None
+    if not isinstance(data, list):
+        return []
+    rows: list[dict] = []
+    for raw in data:
+        if not isinstance(raw, dict):
+            continue
+        key = raw.get("id")
+        if not key or key in known:
+            continue
+        publisher = raw.get("publisher")
+        path = _resolve_unindexed_path(key, publisher, models_root)
+        rows.append(
+            {
+                "key": key,
+                "display_name": key,
+                "publisher": publisher,
+                "architecture": raw.get("arch"),
+                "quantization": raw.get("quantization"),
+                "size_bytes": _dir_size(path) if path else None,
+                "max_context_length": raw.get("max_context_length"),
+                "format": raw.get("compatibility_type"),
+                "loaded_instances": [key] if raw.get("state") == "loaded" else [],
+                "path": path,
+            }
+        )
+    return rows
+
+
+def _fetch_library(base_url: str, models_root: Path | None = None) -> list[dict]:
+    if models_root is None:
+        models_root = LMSTUDIO_MODELS_ROOT
+    body = _get_json(f"{base_url}/api/v1/models")
+    if not isinstance(body, dict):
         return []
     models = body.get("models")
-    return models if isinstance(models, list) else []
+    if not isinstance(models, list):
+        return []
+    known = {str(m.get("key")) for m in models if isinstance(m, dict)}
+    return (
+        models
+        + _unindexed_rows(_get_json(f"{base_url}/api/v0/models"), known, models_root)
+        + _disk_rows(models_root)
+    )
+
+
+def _config_quant(config: dict) -> str | None:
+    quant = config.get("quantization")
+    if not isinstance(quant, dict):
+        return None
+    mode = quant.get("mode")
+    if isinstance(mode, str) and mode != "affine":
+        return mode.upper()
+    bits = quant.get("bits")
+    return f"{bits}bit" if bits else None
+
+
+def _disk_row(model_dir: Path) -> dict | None:
+    """Describe a model folder from its files, or None when it holds no weights."""
+    try:
+        files = [f for f in model_dir.iterdir() if f.is_file()]
+    except OSError:
+        return None
+    names = [f.name for f in files]
+    ggufs = sorted(n for n in names if n.endswith(".gguf"))
+    weights_path = str(model_dir)
+    if ggufs:
+        fmt = "gguf"
+        weights_path = str(model_dir / ggufs[0])
+    elif "config.json" in names and any(n.endswith(".safetensors") for n in names):
+        fmt = "mlx"
+    else:
+        return None
+    config: dict = {}
+    if "config.json" in names:
+        try:
+            loaded = TypeAdapter(dict).validate_json((model_dir / "config.json").read_bytes())
+            config = loaded
+        except Exception:  # noqa: BLE001 — best-effort: a bad config just means fewer labels
+            config = {}
+    text_config = config.get("text_config")
+    ctx_source = text_config if isinstance(text_config, dict) else config
+    return {
+        "key": model_dir.name.lower(),
+        "display_name": model_dir.name,
+        "publisher": model_dir.parent.name,
+        "architecture": config.get("model_type"),
+        "quantization": _config_quant(config),
+        "size_bytes": sum(f.stat().st_size for f in files),
+        "max_context_length": ctx_source.get("max_position_embeddings"),
+        "format": fmt,
+        "loaded_instances": [],
+        "path": weights_path,
+        "on_disk_only": True,
+    }
+
+
+def _disk_rows(models_root: Path) -> list[dict]:
+    """Scan models_root/<publisher>/<model> for folders LM Studio may not list.
+
+    discover_models drops any of these whose folder LM Studio already reported.
+    """
+    rows: list[dict] = []
+    try:
+        publishers = sorted(d for d in models_root.iterdir() if d.is_dir())
+    except OSError:
+        return []
+    for publisher in publishers:
+        try:
+            model_dirs = sorted(d for d in publisher.iterdir() if d.is_dir())
+        except OSError:
+            continue
+        for model_dir in model_dirs:
+            row = _disk_row(model_dir)
+            if row is not None:
+                rows.append(row)
+    return rows
+
+
+def _model_dir(path: str) -> str:
+    return str(Path(path).parent) if path.endswith(".gguf") else path
 
 
 def discover_models(
@@ -339,14 +494,23 @@ def discover_models(
             for part in lc:
                 launch_cmds.add(str(part))
     found: list[DiscoveredModel] = []
+    seen_dirs = {_model_dir(p) for p in paths_map.values()}
     for source, port in probes:
         for raw in fetch(f"http://127.0.0.1:{port}"):
             key = raw.get("key")
             if not key:
                 continue
+            raw_path = paths_map.get(key) or raw.get("path")
+            row_source = source
+            if raw.get("on_disk_only"):
+                if raw_path is None or _model_dir(raw_path) in seen_dirs:
+                    continue
+                row_source = "disk"
+            if raw_path is not None:
+                seen_dirs.add(_model_dir(raw_path))
             quant = raw.get("quantization")
             quant_name = quant.get("name") if isinstance(quant, dict) else quant
-            model_path = paths_map.get(key)
+            model_path = raw_path
             in_catalog = key in aliases
             if not in_catalog and model_path is not None and (model_path in source_paths or model_path in launch_cmds):
                 in_catalog = True
@@ -362,7 +526,7 @@ def discover_models(
                     max_context=raw.get("max_context_length"),
                     fmt=raw.get("format"),
                     loaded=bool(raw.get("loaded_instances")),
-                    source=source,
+                    source=row_source,
                     in_catalog=in_catalog,
                     path=model_path,
                 )

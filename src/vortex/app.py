@@ -25,6 +25,7 @@ from starlette.background import BackgroundTask
 from .catalog import Catalog, load_catalog, save_local_entries
 from .catalog_routes import register_catalog_routes
 from .discovery import DiscoveredModel, Wrapper, discover_models, discover_wrappers
+from .labels import publisher_for
 from .lifecycle import (
     Lifecycle,
     PortConflictError,
@@ -175,6 +176,9 @@ def build_app(
                     **e.model_dump(),
                     "state": manager.entry_state(e, active_by_id.get(e.public_id)),
                     "port_pid": as_pid(lifecycle.occupying_pid(e)),
+                    "publisher": e.publisher or publisher_for(
+                        [p for p in (e.source_path, *e.launch_command) if p], e.upstream_alias
+                    ),
                 }
                 for e in catalog.entries
             ]
