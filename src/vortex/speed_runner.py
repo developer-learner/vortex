@@ -84,7 +84,10 @@ class SpeedRun:
     def _run(self, model_ids: list[str]) -> None:
         try:
             for mid in model_ids:
-                self._test_one(mid)
+                try:
+                    self._test_one(mid)
+                except Exception as exc:  # noqa: BLE001 — one model's failure must not end the run or strand its status
+                    self._set(mid, "failed", f"unexpected error: {exc}")
         finally:
             with self._lock:
                 self._running = False

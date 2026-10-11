@@ -54,8 +54,12 @@ def register_speed_routes(
 
     @app.get("/api/speed")
     def speed_view() -> dict:
-        results = load_results(results_path)
+        # Read `running` BEFORE the rows: once it reads False the rows are
+        # final. Read after (with port scans in between), a run finishing
+        # mid-request reported "not running" next to a stale "loading".
+        running = run.running
         rows = run.rows()
+        results = load_results(results_path)
         models = []
         for entry in catalog.entries:
             row = rows.get(entry.public_id)
@@ -72,7 +76,7 @@ def register_speed_routes(
                     "run_message": row["message"] if row is not None else "",
                 }
             )
-        return {"running": run.running, "max_models": MAX_MODELS, "models": models}
+        return {"running": running, "max_models": MAX_MODELS, "models": models}
 
     @app.post("/api/speed/run", status_code=202)
     def start_run(body: dict) -> dict:
