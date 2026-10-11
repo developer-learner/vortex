@@ -390,3 +390,86 @@ per format, downloading models, and any limit on how many models are loaded.
   SHALL show an error beginning "Add failed" or "Remove failed" with the
   server's reason, and WHEN add-all skips models THE dashboard SHALL list the
   skipped keys and reasons, such that no failure or skip is silent.
+
+## v45 scope (speed test page)
+
+Scope brief: the outcome is a Speed page in Vortex where the operator can see
+how fast every loadable model is on this machine and measure any of them on
+demand, so model choice (for example, which model to seat as the pipeline's
+coder) rests on numbers measured the same way, not on remembered benchmarks.
+The CEO asked for it on 2026-10-10 and approved a look-and-feel mockup
+(`examples/speed-mockup/index.html`, dummy data, not a spec).
+
+Every catalog model is listed. A model never tested shows a dash. The
+operator ticks up to three models and starts one test run; Vortex tests them
+one after another. A model that is not loaded is loaded for its test and
+unloaded again afterwards; a model already loaded is tested and left loaded.
+A model that will not fit in memory next to what is loaded is skipped with a
+reason; Vortex never unloads another model to make room. While a run is in
+progress, load and unload requests are refused so the measurement is not
+disturbed. Each model's latest result is kept across restarts.
+
+A test measures three numbers with the same fixed prompt at temperature 0:
+speed for one request (tokens per second), speed for four requests at once
+(total tokens per second), and time to the first token.
+
+## Explicitly out of scope for v45
+
+Answer quality or correctness scoring, history or charts of past results,
+custom prompts or lengths, streaming-based timing, testing models outside the
+catalog, automatic eviction to make room, scheduling or repeating tests, and
+guarding against a pipeline milestone running at the same time (the page
+warns instead).
+
+## v45 acceptance criteria
+
+- **AC-38:** WHEN a speed test runs against a serving model, THE SYSTEM SHALL
+  send one request limited to 1 token, then one request limited to 256
+  tokens, then four requests limited to 256 tokens at the same time, all with
+  the same fixed prompt, temperature 0 and no streaming, and SHALL report
+  `single_tps` (the 256-token request's completion tokens over its wall time),
+  `multi_tps` (the four requests' total completion tokens over the wall time
+  from the first start to the last finish) and `first_token_s` (the 1-token
+  request's wall time, rounded to milliseconds), such that both speeds are
+  positive and the first-token time is a non-negative number for a serving model.
+- **AC-39:** IF a test request fails to connect, is answered with a non-200
+  status, or its reply carries no `usage.completion_tokens`, THEN THE SYSTEM
+  SHALL fail that model's test with a short reason, such that no result is
+  recorded for it.
+- **AC-40:** WHEN a model's test succeeds, THE SYSTEM SHALL store the result
+  with a `tested_at` time ("YYYY-MM-DD HH:MM") as that model's latest result,
+  replacing only that model's previous result, in a file that survives
+  restarts, such that a missing or unreadable file reads as no results.
+- **AC-41:** THE SYSTEM SHALL list every catalog model, in catalog order, on
+  `GET /api/speed` with its id, display name, quant, runtime, memory estimate,
+  load state, latest result (null if never tested) and its status in the
+  latest run (null if not in it), together with whether a run is in progress
+  and the selection limit of 3.
+- **AC-42:** WHEN `POST /api/speed/run` names 1 to 3 distinct catalog models
+  and no run is in progress, THE SYSTEM SHALL answer 202 and test them one
+  after another in the background; IF the selection is empty, longer than 3,
+  has duplicates or unknown ids THEN 400, and IF a run is in progress THEN
+  409 busy, such that a refused request starts nothing.
+- **AC-43:** WHEN a run reaches a model that is not loaded, THE SYSTEM SHALL
+  load it, test it, and unload it again; WHEN it reaches a model that is
+  already serving, THE SYSTEM SHALL test it and leave it loaded, such that
+  every model ends the run in the load state it started in.
+- **AC-44:** IF a model will not fit in memory next to the loaded models,
+  THEN THE SYSTEM SHALL skip it with a reason saying it won't fit, such that
+  it is never started and no other model is unloaded.
+- **AC-45:** IF a model fails to load or its test fails, THEN THE SYSTEM SHALL
+  mark it failed with the reason, unload it if the run loaded it, and go on
+  to the next model, such that one failure never stops the run.
+- **AC-46:** WHILE a run is in progress, THE SYSTEM SHALL refuse load and
+  unload requests with 409 busy, such that nothing is started or stopped by
+  them.
+- **AC-47:** THE Speed page SHALL list every model with its three speeds and
+  test time (a dash when untested), a checkbox per model capped at the
+  selection limit, one "Test selected" control, each model's run status, a
+  banner while a run is in progress saying loading and unloading are paused,
+  the fastest model for each measure, and a warning not to run tests during a
+  pipeline milestone because both use the GPU; WHEN a run request fails THE
+  page SHALL show an error beginning "Speed test failed".
+- **AC-48:** THE dashboard header SHALL link to the Speed page and the Speed
+  page header SHALL link back to the dashboard, such that the existing
+  dashboard routes and controls are unchanged.

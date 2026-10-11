@@ -1,26 +1,23 @@
 {
-  "erd_version": 43,
+  "erd_version": 45,
   "files": [
-    "src/vortex/catalog.py",
-    "src/vortex/discovery.py",
-    "src/vortex/catalog_synth.py",
-    "src/vortex/catalog_routes.py",
+    "src/vortex/speedtest.py",
+    "src/vortex/speed_runner.py",
+    "src/vortex/speed_routes.py",
+    "src/vortex/speed_ui.py",
     "src/vortex/app.py",
     "src/vortex/ui.py"
   ],
   "changed_files": [
-    "src/vortex/catalog_routes.py",
-    "src/vortex/app.py"
-  ],
-  "no_edit_files": [
-    "src/vortex/catalog.py",
-    "src/vortex/discovery.py",
-    "src/vortex/catalog_synth.py",
+    "src/vortex/speedtest.py",
+    "src/vortex/speed_runner.py",
+    "src/vortex/speed_routes.py",
+    "src/vortex/speed_ui.py",
+    "src/vortex/app.py",
     "src/vortex/ui.py"
   ],
-  "smoke_checks": {
-    "src/vortex/catalog_routes.py": "grep -q 'def register_catalog_routes' src/vortex/catalog_routes.py"
-  },
+  "no_edit_files": [],
+  "smoke_checks": {},
   "entry_points": [
     "src.vortex.ui",
     "src.vortex.ui:UI_PAGE",
@@ -45,7 +42,26 @@
     "src.vortex.catalog_synth:synthesize_entry",
     "src.vortex.catalog_synth:SynthesisError",
     "src.vortex.catalog_synth:PORT_RANGE",
-    "src.vortex.catalog_synth:RUNTIME_BINARIES"
+    "src.vortex.catalog_synth:RUNTIME_BINARIES",
+    "src.vortex.speedtest",
+    "src.vortex.speedtest:measure",
+    "src.vortex.speedtest:SpeedTestError",
+    "src.vortex.speedtest:load_results",
+    "src.vortex.speedtest:save_result",
+    "src.vortex.speedtest:MAX_TOKENS",
+    "src.vortex.speedtest:CONCURRENCY",
+    "src.vortex.speedtest:PROMPT",
+    "src.vortex.speed_runner",
+    "src.vortex.speed_runner:SpeedRun",
+    "src.vortex.speed_runner:SpeedRunBusy",
+    "src.vortex.speed_routes",
+    "src.vortex.speed_routes:register_speed_routes",
+    "src.vortex.speed_ui",
+    "src.vortex.speed_ui:SPEED_PAGE",
+    "src.vortex.manager:Manager",
+    "src.vortex.operations:OperationStore",
+    "src.vortex.lifecycle:Lifecycle",
+    "src.vortex.lifecycle:SidecarStore"
   ],
   "routes": [
     {
@@ -141,6 +157,24 @@
       "method": "DELETE",
       "path": "/api/catalog/{public_id}",
       "file": "src/vortex/catalog_routes.py"
+    },
+    {
+      "id": "route:GET /speed",
+      "method": "GET",
+      "path": "/speed",
+      "file": "src/vortex/speed_routes.py"
+    },
+    {
+      "id": "route:GET /api/speed",
+      "method": "GET",
+      "path": "/api/speed",
+      "file": "src/vortex/speed_routes.py"
+    },
+    {
+      "id": "route:POST /api/speed/run",
+      "method": "POST",
+      "path": "/api/speed/run",
+      "file": "src/vortex/speed_routes.py"
     }
   ],
   "externals": [
