@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vortex · speed (mockup)</title>
+<!-- LOOK-AND-FEEL MOCKUP ONLY. Rows are the real catalog (names, quants,
+     runtimes, RAM) as of 2026-10-10; every speed number is dummy. No API
+     calls. Styles copied from src/vortex/ui.py. Not a spec: field names and
+     behaviour get pinned in the TPM spec, not here. -->
+<style>
+:root {
+  --bg: #0e1116; --panel: #161b22; --line: #2b323d; --fg: #d6dde6;
+  --dim: #8b97a6; --accent: #58a6ff; --ok: #3fb950; --warn: #d29922; --danger: #f85149;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+header { padding: 14px 20px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+header h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.02em; }
+header .sub { color: var(--dim); font-size: 12px; }
+nav { display: flex; gap: 4px; margin-left: 18px; }
+nav a { color: var(--dim); text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 13px; }
+nav a.on { color: var(--fg); background: var(--panel); border: 1px solid var(--line); }
+main { padding: 16px 20px 40px; max-width: 1280px; margin: 0 auto; }
+.mock { margin-bottom: 14px; padding: 8px 14px; border: 1px dashed var(--warn);
+  border-radius: 6px; color: var(--warn); font-size: 12px; }
+.banner { display: none; margin-bottom: 14px; padding: 8px 14px; border: 1px solid var(--warn);
+  border-radius: 6px; color: var(--warn); background: rgba(210, 153, 34, 0.08); font-size: 13px; }
+h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--dim); margin: 22px 0 10px; }
+.picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.pick { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+.pick .what { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); }
+.pick .num { font-size: 26px; font-weight: 600; margin: 4px 0 0; color: var(--ok); }
+.pick .num small { font-size: 12px; color: var(--dim); font-weight: 400; }
+.pick .why { color: var(--dim); font-size: 12px; margin-top: 6px; }
+.toolbar { display: flex; align-items: center; gap: 12px; margin: 22px 0 10px; flex-wrap: wrap; }
+.toolbar h2 { margin: 0; }
+.count { color: var(--dim); font-size: 12px; margin-left: auto; }
+.count.full { color: var(--warn); }
+table { width: 100%; border-collapse: collapse; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+thead th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--dim); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+thead th.sortable { cursor: pointer; }
+thead th.sortable:hover { color: var(--fg); }
+thead th.sorted { color: var(--accent); }
+tbody td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr.picked td { background: rgba(88, 166, 255, 0.07); }
+td.model { white-space: normal; min-width: 230px; }
+.model-id { display: block; color: var(--dim); font-size: 11px; }
+.bar { display: flex; align-items: center; gap: 8px; min-width: 140px; }
+.bar .track { flex: 1; height: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--accent); }
+.bar .fill.slow { background: var(--danger); }
+.bar .val { width: 44px; text-align: right; }
+.badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid var(--ok); color: var(--ok); font-size: 10px; letter-spacing: 0.04em;
+  text-transform: uppercase; vertical-align: middle; }
+.dash { color: var(--dim); }
+.st { font-size: 12px; }
+.st.queued { color: var(--dim); }
+.st.loading, .st.testing { color: var(--warn); }
+.st.done { color: var(--ok); }
+.st.skipped, .st.failed { color: var(--danger); }
+td.status { white-space: normal; width: 190px; max-width: 190px; font-size: 12px; }
+input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+input[type=checkbox]:disabled { cursor: not-allowed; opacity: 0.35; }
+button { font: inherit; font-size: 12px; padding: 4px 10px; border: 1px solid var(--line);
+  border-radius: 4px; background: transparent; color: var(--fg); cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button.primary { border-color: var(--ok); color: var(--ok); padding: 5px 14px; }
+.method { margin-top: 12px; color: var(--dim); font-size: 12px; }
+.method b { color: var(--warn); font-weight: 400; }
+footer { padding: 12px 20px; border-top: 1px solid var(--line); color: var(--dim);
+  font-size: 11px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>vortex</h1>
+  <span class="sub">model menu · :9000</span>
+  <nav><a href="#">Models</a><a href="#" class="on">Speed</a></nav>
+  <button style="margin-left:auto">✕ Stop Vortex</button>
+  <button>↻ Restart Vortex</button>
+</header>
+<main>
+  <div class="mock">MOCKUP — real model list, dummy speed numbers. "Test selected" plays a fake run.</div>
+  <div class="banner" id="runbanner">Speed test running — loading and unloading are paused until it finishes.</div>
+
+  <h2>Best picks</h2>
+  <div class="picks" id="picks"></div>
+
+  <div class="toolbar">
+    <h2>All models</h2>
+    <span class="count" id="count">0 of 3 selected</span>
+    <button class="primary" id="testsel" disabled>▶ Test selected</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        <th class="sortable" data-col="catalog">Model</th>
+        <th>Quant · runtime</th>
+        <th>RAM</th>
+        <th class="sortable" data-col="single">One at a time</th>
+        <th class="sortable" data-col="multi">Four at once</th>
+        <th class="sortable" data-col="first">First word</th>
+        <th>Tested</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <div class="method">
+    Tick up to 3 models, then Test selected. Each is tested in turn: models that aren't loaded are
+    loaded first and unloaded afterwards; a model that won't fit next to what's loaded is skipped —
+    nothing else is ever unloaded for a test.<br>
+    Measured with the same fixed prompt, up to 256 tokens, temperature 0. "One at a time" = one request
+    (what a coding run feels like); "Four at once" = four requests together, total tokens ÷ time;
+    "First word" = time for a 1-token reply. Speed only, not answer quality.<br>
+    <b>Don't run a speed test during a pipeline milestone — both use the GPU, so the numbers come out wrong and the coder slows down.</b>
+  </div>
+</main>
+<footer>served at :9000/ by the daemon · results kept across restarts · click a column to sort</footer>
+<script>
+  // Real catalog rows (2026-10-10); speeds are dummy. loaded = currently running.
+  var DATA = [
+    ["Flash_IQ3XXS", "DeepSeek V4 Flash 0731", "UD-IQ3_XXS", "llama-server", 90.0],
+    ["qwen3.8-27b-8bit", "Qwen3.8 27B", "8-bit", "dspark", 30.0, 18.2, 63.1, 0.9, "2026-10-10"],
+    ["mtplx-qwen38-27b-optimized-quality", "Qwen3.8 27B MTPLX-Opt", "8-bit", "mtplx", 30.4],
+    ["vmlx-dsv4-configi-mlx", "DeepSeek V4 Flash 0731", "Config-I ~3-bit", "vmlx", 100.8],
+    ["qwen3.8-27b-mtplxopt-dspark", "Qwen3.8 27B MTPLX-Opt", "8-bit", "dspark", 48.0],
+    ["mlx-community--Qwen3.8-27B-4bit", "Qwen3.8 27B", "4-bit", "omlx", 20.0, 37.8, 29.0, 0.7, "2026-10-10"],
+    ["splash-qwen38-27b-4bit", "Qwen3.8 27B", "4-bit", "splash", 20.0, 61.0, 144.0, 0.4, "2026-10-10"],
+    ["mtplx-qwen38-27b-8bit-baseline-batch", "Qwen3.8 27B MTPLX-Opt", "8-bit", "dspark", 34.0, 18.0, 81.8, 1.0, "2026-10-09"],
+    ["Qwen3.8-27B-MLX-8bit", "Qwen3.8 27B", "8-bit", "omlx", 30.0],
+    ["nemotron", "Nemotron 3 Super 120B-A12B Uncensored", "JANG_2L ~2.8-bit", "vmlx", 60.0],
+    ["qwen3.8-flash-next-2bit", "Qwen3.8 Flash-Next", "2-bit mixed", "omlx", 72.0],
+    ["qwen3.8-flash-next-4bit", "Qwen3.8 Flash-Next", "4-bit", "omlx", 98.0],
+    ["qwen3.8-flash-next-4-8bit", "Qwen3.8 Flash-Next", "4–8 mixed", "mlx-serve", 72.0, 48.0, 121.0, 0.3, "2026-10-10", true],
+    ["qwen3.8-flash-next-uncensored-reap288-mtp-mlx", "Qwen3.8 Flash-Next Uncensored REAP288", "4-bit", "mlx-serve", 84.6],
+    ["qwen3.8-flash-next-uncensored-mlx-serve", "Qwen3.8 Flash-Next Uncensored", "4-bit", "mlx-serve", 118.1],
+    ["qwen3.8-27b-uncensored-hauhaucs-aggressive-mtplx", "Qwen3.8 27B Uncensored HauhauCS Aggressive MTPLX", "6-bit", "mlx-serve", 25.0],
+    ["qwen3.8-27b-obliterated", "Qwen3.8 27B OBLITERATED", "Q4_K_M", "llama-server", 19.5],
+    ["qwen-3.8-flash-next-uncensored-mlx", "Qwen 3.8 Flash Next Uncensored", "MXFP4 mixed", "mlx-serve", 110.6]
+  ].map(function (r, i) {
+    return { order: i, id: r[0], name: r[1], quant: r[2], runtime: r[3], ram: r[4],
+      single: r[5] == null ? null : r[5], multi: r[6] == null ? null : r[6],
+      first: r[7] == null ? null : r[7], tested: r[8] || null, loaded: !!r[9], status: null };
+  });
+  var MAX_PICK = 3, FREE_GB = 128 - 72 - 8;  // 72 GB coder loaded, ~8 GB system
+  var picked = [], sortKey = "catalog", running = false;
+
+  function byId(id) { return DATA.filter(function (r) { return r.id === id; })[0]; }
+  function dash() { return '<span class="dash">—</span>'; }
+
+  function bar(v, max, slow) {
+    if (v == null) return dash();
+    var pct = Math.max(3, Math.round(100 * v / max));
+    return '<div class="bar"><div class="track"><div class="fill' + (slow ? " slow" : "") +
+      '" style="width:' + pct + '%"></div></div><span class="val">' + v + "</span></div>";
+  }
+
+  function renderPicks() {
+    function best(key, low) {
+      var t = DATA.filter(function (r) { return r[key] != null; });
+      t.sort(function (a, b) { return low ? a[key] - b[key] : b[key] - a[key]; });
+      return t[0];
+    }
+    var s = best("single"), m = best("multi"), f = best("first", true);
+    function card(what, r, val, unit, why) {
+      return '<div class="pick"><div class="what">' + what + '</div><div class="num">' + val +
+        ' <small>' + unit + '</small></div><div>' + r.name + ' <span class="dash">· ' + r.quant +
+        ' · ' + r.runtime + '</span></div><div class="why">' + why + "</div></div>";
+    }
+    document.getElementById("picks").innerHTML =
+      card("Fastest one at a time · coding runs", s, s.single, "tok/s", "One coder call at a time — what a milestone feels like.") +
+      card("Fastest four at once · fan-out", m, m.multi, "tok/s total", "Several agents hitting one model together.") +
+      card("Quickest first word", f, f.first, "s", "How long before a reply starts appearing.");
+  }
+
+  function statusCell(r) {
+    if (!r.status) return r.loaded ? '<span class="badge">loaded</span>' : "";
+    return '<span class="st ' + r.status.kind + '">' + r.status.text + "</span>";
+  }
+
+  function render() {
+    var rows = DATA.slice().sort(function (a, b) {
+      if (sortKey === "catalog") return a.order - b.order;
+      var av = a[sortKey], bv = b[sortKey];
+      if (av == null && bv == null) return a.order - b.order;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return sortKey === "first" ? av - bv : bv - av;
+    });
+    var maxS = 0, maxM = 0;
+    DATA.forEach(function (r) { maxS = Math.max(maxS, r.single || 0); maxM = Math.max(maxM, r.multi || 0); });
+    var full = picked.length >= MAX_PICK, html = "";
+    rows.forEach(function (r) {
+      var on = picked.indexOf(r.id) !== -1;
+      var dis = running || (full && !on);
+      html += '<tr class="' + (on ? "picked" : "") + '">';
+      html += '<td><input type="checkbox" data-id="' + r.id + '"' + (on ? " checked" : "") +
+        (dis ? " disabled" : "") + (full && !on && !running ? ' title="Up to 3 models per test"' : "") + "></td>";
+      html += '<td class="model">' + r.name + '<span class="model-id">' + r.id + "</span></td>";
+      html += "<td>" + r.quant + ' <span class="dash">· ' + r.runtime + "</span></td>";
+      html += "<td>" + r.ram + " GB</td>";
+      html += "<td>" + bar(r.single, maxS) + "</td>";
+      html += "<td>" + bar(r.multi, maxM, r.multi != null && r.single != null && r.multi < r.single) + "</td>";
+      html += "<td>" + (r.first == null ? dash() : r.first + " s") + "</td>";
+      html += "<td>" + (r.tested || dash()) + "</td>";
+      html += '<td class="status">' + statusCell(r) + "</td></tr>";
+    });
+    document.getElementById("rows").innerHTML = html;
+    var c = document.getElementById("count");
+    c.textContent = picked.length + " of " + MAX_PICK + " selected";
+    c.classList.toggle("full", full);
+    document.getElementById("testsel").disabled = running || !picked.length;
+    document.getElementById("runbanner").style.display = running ? "block" : "none";
+    document.querySelectorAll("thead th").forEach(function (th) {
+      th.classList.toggle("sorted", th.getAttribute("data-col") === sortKey);
+    });
+    renderPicks();
+  }
+
+  document.getElementById("rows").addEventListener("change", function (e) {
+    var id = e.target.getAttribute("data-id");
+    if (!id) return;
+    if (e.target.checked && picked.length < MAX_PICK) picked.push(id);
+    if (!e.target.checked) picked = picked.filter(function (p) { return p !== id; });
+    render();
+  });
+
+  document.querySelector("thead").addEventListener("click", function (e) {
+    var k = e.target.getAttribute("data-col");
+    if (!k) return;
+    sortKey = k;
+    render();
+  });
+
+  // Fake run: queued -> loading -> testing -> done, one model at a time.
+  function step(queue) {
+    if (!queue.length) { running = false; picked = []; render(); return; }
+    var r = byId(queue[0]), rest = queue.slice(1);
+    var wasLoaded = r.loaded;
+    if (!wasLoaded && r.ram > FREE_GB) {
+      r.status = { kind: "skipped", text: "skipped — won't fit (needs " + r.ram + " GB, " + FREE_GB + " GB free)" };
+      render();
+      return setTimeout(function () { step(rest); }, 700);
+    }
+    r.status = wasLoaded ? { kind: "testing", text: "testing…" } : { kind: "loading", text: "loading… (~1 min)" };
+    render();
+    setTimeout(function () {
+      r.status = { kind: "testing", text: "testing…" };
+      render();
+      setTimeout(function () {
+        r.single = r.single || +(15 + Math.random() * 40).toFixed(1);
+        r.multi = r.multi || +(r.single * (1.5 + Math.random() * 1.5)).toFixed(1);
+        r.first = r.first || +(0.3 + Math.random()).toFixed(1);
+        r.tested = "2026-10-11";
+        r.status = { kind: "done", text: wasLoaded ? "done" : "done · unloaded again" };
+        render();
+        step(rest);
+      }, 1200);
+    }, wasLoaded ? 10 : 1200);
+  }
+
+  document.getElementById("testsel").addEventListener("click", function () {
+    if (!picked.length) return;
+    running = true;
+    DATA.forEach(function (r) { r.status = null; });
+    picked.forEach(function (id) { byId(id).status = { kind: "queued", text: "queued" }; });
+    render();
+    step(picked.slice());
+  });
+
+  render();
+</script>
+</body>
+</html>
