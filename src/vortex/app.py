@@ -8,6 +8,7 @@ Two surfaces:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import signal
@@ -43,6 +44,7 @@ from .memory import (
 )
 from .operations import OperationStore
 from .restart import spawn_relauncher
+from .speed_routes import register_speed_routes
 from .ui import UI_PAGE
 
 logger = logging.getLogger(__name__)
@@ -58,6 +60,7 @@ def build_app(
     on_shutdown: Callable[[], None] | None = None,
     on_restart: Callable[[], None] | None = None,
     local_catalog_path: Path | None = None,
+    speed_results_path: Path | None = None,
 ) -> FastAPI:
     if catalog is None:
         local_catalog_path = local_catalog_path or _REPO_ROOT / "config/catalog.local.json"
@@ -111,7 +114,20 @@ def build_app(
 
     @app.post("/v1/chat/completions")
     async def chat_completions(request: Request) -> Response:
-        body = await request.json()
+        try:
+            body = await request.json()
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return JSONResponse(
+                status_code=400,
+                content={"error": {"message": "invalid JSON body",
+                                   "type": "invalid_request_error"}},
+            )
+        if not isinstance(body, dict):
+            return JSONResponse(
+                status_code=400,
+                content={"error": {"message": "body must be a JSON object",
+                                   "type": "invalid_request_error"}},
+            )
         model = body.get("model")
         entry = catalog.by_public_id(model) if model else None
         if entry is None or manager.entry_state(entry, ops.active_for(entry.public_id)) != "ready":
@@ -342,13 +358,8 @@ def build_app(
         return _get_models()
 
     register_catalog_routes(app, catalog, lifecycle, ops, _fresh_models, _persist)
+    register_speed_routes(
+        app, catalog, manager, ops, speed_results_path or _REPO_ROOT / "data/speed-results.json"
+    )
 
     return app
-
-
-class _Background:
-    def __init__(self, func: Callable[[], None]) -> None:
-        self._func = func
-
-    async def __call__(self) -> None:
-        self._func()

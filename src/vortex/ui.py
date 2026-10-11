@@ -40,6 +40,9 @@ header h1 {
   letter-spacing: 0.02em;
 }
 header .sub { color: var(--dim); font-size: 12px; }
+header a { color: var(--dim); text-decoration: none; font-size: 13px; padding: 3px 10px;
+  border: 1px solid var(--line); border-radius: 4px; }
+header a:hover { color: var(--accent); border-color: var(--accent); }
 main { padding: 16px 20px 40px; max-width: 1200px; margin: 0 auto; }
 #down {
   display: none;
@@ -214,6 +217,7 @@ footer {
 <header>
   <h1>vortex</h1>
   <span class="sub">model menu</span>
+  <a href="/speed">Speed</a>
   <button id="stopvortex" title="Stop Vortex" style="margin-left:auto">✕ Stop Vortex</button>
   <button id="restartvortex" title="Restart Vortex">↻ Restart Vortex</button>
 </header>
@@ -317,6 +321,11 @@ footer {
     });
   }
 
+  // null/undefined API fields render as an em dash, never the string "null".
+  function nm(v) {
+    return (v === null || v === undefined) ? '<span class="dim">—</span>' : esc(v);
+  }
+
   var POLL_MS = 2000;
   var OP_POLL_MS = 500;
   var opTimer = null;
@@ -395,7 +404,7 @@ footer {
         extraCell += '<span class="badge extra">' + esc(extras[j]) + "</span>";
       }
       html += "<td>" + (extraCell || '<span class="dim">—</span>') + "</td>";
-      html += "<td>" + esc(m.ram_estimate_gb) + " GiB</td>";
+      html += "<td>" + (m.ram_estimate_gb != null ? esc(m.ram_estimate_gb) + " GiB" : '<span class="dim">—</span>') + "</td>";
       var endpoint = m.chat_endpoint || ("http://localhost:" + m.port + "/v1/chat/completions");
       var portCell = (loaded && m.port)
         ? '<button type="button" class="port" data-copy="' + esc(endpoint) + '" '
@@ -458,9 +467,9 @@ footer {
       html += "<tr>";
       html += "<td>" + esc(w.name) + "</td>";
       html += "<td>" + esc(w.kind) + "</td>";
-      html += "<td>" + esc(w.binary_path) + "</td>";
-      html += "<td>" + esc(w.version) + "</td>";
-      html += "<td>" + esc(w.port) + "</td>";
+      html += "<td>" + nm(w.binary_path) + "</td>";
+      html += "<td>" + nm(w.version) + "</td>";
+      html += "<td>" + nm(w.port) + "</td>";
       html += "<td>" + dot + (w.port_open ? "open" : "closed") + "</td>";
       html += "<td>" + (w.in_catalog ? "yes" : "no") + "</td>";
       html += "</tr>";
@@ -498,11 +507,11 @@ footer {
       var m = models[i];
       html += "<tr>";
       html += "<td>" + esc(m.key) + "</td>";
-      html += "<td>" + esc(m.publisher) + "</td>";
-      html += "<td>" + esc(m.quantization) + "</td>";
+      html += "<td>" + nm(m.publisher) + "</td>";
+      html += "<td>" + nm(m.quantization) + "</td>";
       html += "<td>" + esc(fmtSize(m.size_bytes)) + "</td>";
-      html += "<td>" + esc(m.params) + "</td>";
-      html += "<td>" + esc(m.max_context) + "</td>";
+      html += "<td>" + nm(m.params) + "</td>";
+      html += "<td>" + nm(m.max_context) + "</td>";
       html += "<td>" + (m.loaded ? "yes" : "no") + "</td>";
       var catalogCell = (m.in_catalog ? "yes" : "no")
         + (!m.in_catalog
@@ -764,7 +773,7 @@ footer {
       .catch(function (e) { btn.disabled = false; setError("Restart failed: " + e.message); });
   });
   function waitForRestart(btn, tries, wentDown) {
-    if (tries > 90) { btn.disabled = false; setError("Restart failed: Vortex did not come back; see ~/Library/Logs/Vortex.log"); return; }
+    if (tries > 90) { btn.disabled = false; setError("Restart failed: Vortex did not come back; check the daemon's logs"); return; }
     setTimeout(function () {
       fetch("/api/status")
         .then(function (r) {
