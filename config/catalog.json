@@ -63,27 +63,6 @@
       ]
     },
     {
-      "public_id": "vmlx-dsv4-configi-mlx",
-      "runtime": "vmlx",
-      "engine": "vmlx",
-      "launch_command": [
-        "/opt/homebrew/bin/vmlx",
-        "serve",
-        "/Users/arc.elixir/.cache/huggingface/hub/DeepSeek-V4-Flash-ConfigI-MLX",
-        "--port",
-        "8104"
-      ],
-      "port": 8104,
-      "ready_url": "http://127.0.0.1:8104/v1/models",
-      "chat_endpoint": "http://127.0.0.1:8104/v1/chat/completions",
-      "upstream_alias": "DeepSeek-V4-Flash-ConfigI-MLX",
-      "ram_estimate_gb": 100.8,
-      "exclusive": true,
-      "display_name": "DeepSeek V4 Flash 0731",
-      "quant": "Config-I ~3-bit",
-      "extras": []
-    },
-    {
       "public_id": "qwen3.8-27b-mtplxopt-dspark",
       "runtime": "dspark",
       "engine": "mlx-dspark",
