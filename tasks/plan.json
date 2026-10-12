@@ -1,66 +1,134 @@
 {
-  "erd_version": 43,
+  "erd_version": 48,
   "version": 2,
   "tasks": [
     {
       "id": "T1",
-      "file": "src/vortex/catalog.py",
+      "file": "src/vortex/speedtest.py",
       "depends_on": [],
-      "brief": "No change. This file passed its tests and is a no-edit file for this delta.",
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
       "contracts": [
-        "src.vortex.catalog",
-        "src.vortex.catalog:Catalog",
-        "src.vortex.catalog:CatalogEntry",
-        "src.vortex.catalog:load_catalog",
-        "src.vortex.catalog:save_local_entries"
+        "src.vortex.speedtest",
+        "src.vortex.speedtest:measure",
+        "src.vortex.speedtest:SpeedTestError",
+        "src.vortex.speedtest:load_results",
+        "src.vortex.speedtest:save_result",
+        "src.vortex.speedtest:MAX_TOKENS",
+        "src.vortex.speedtest:CONCURRENCY",
+        "src.vortex.speedtest:PROMPT"
       ],
       "tests": [
-        "tests/test_catalog_local.py::test_add_appends_and_rejects_duplicates",
-        "tests/test_catalog_local.py::test_entries_default_to_config_origin_and_no_source_path",
-        "tests/test_catalog_local.py::test_load_merges_the_local_file_as_local_origin",
-        "tests/test_catalog_local.py::test_load_without_a_local_file_is_just_the_config",
-        "tests/test_catalog_local.py::test_local_entries_colliding_with_config_are_rejected",
-        "tests/test_catalog_local.py::test_remove_only_removes_local_entries",
-        "tests/test_catalog_local.py::test_save_writes_only_local_entries_and_round_trips"
+        "tests/test_speedtest.py::test_measure_returns_the_three_speeds_from_real_replies",
+        "tests/test_speedtest.py::test_measure_sends_one_first_word_one_full_then_concurrent_requests",
+        "tests/test_speedtest.py::test_measure_fails_when_the_model_answers_an_error",
+        "tests/test_speedtest.py::test_measure_fails_when_nothing_is_listening",
+        "tests/test_speedtest.py::test_measure_fails_when_the_reply_has_no_token_count",
+        "tests/test_speedtest.py::test_save_result_stamps_and_keeps_the_latest_per_model",
+        "tests/test_speedtest.py::test_load_results_is_empty_for_a_missing_or_unreadable_file"
       ]
     },
     {
       "id": "T2",
-      "file": "src/vortex/discovery.py",
+      "file": "src/vortex/speed_runner.py",
       "depends_on": [
         "T1"
       ],
-      "brief": "No change. This file passed its tests and is a no-edit file for this delta.",
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
       "contracts": [
-        "src.vortex.discovery:lmstudio_model_paths"
+        "src.vortex.speed_runner",
+        "src.vortex.speed_runner:SpeedRun",
+        "src.vortex.speed_runner:SpeedRunBusy"
       ],
       "tests": [
-        "tests/test_discovered_models_api.py::test_wire_schema_carries_all_discovered_model_fields",
-        "tests/test_discovery_paths.py::test_discovered_models_carry_their_path_or_none",
-        "tests/test_discovery_paths.py::test_in_catalog_matches_a_path_in_an_entry_launch_command",
-        "tests/test_discovery_paths.py::test_in_catalog_matches_an_entry_source_path",
-        "tests/test_discovery_paths.py::test_path_map_is_empty_when_the_listing_cannot_be_read",
-        "tests/test_discovery_paths.py::test_path_map_joins_cli_paths_onto_the_models_root",
-        "tests/test_discovery_paths.py::test_path_map_skips_rows_without_key_or_path",
-        "tests/test_discovery_paths.py::test_unrelated_entry_does_not_mark_the_model_in_catalog"
+        "tests/test_speed_runner.py::test_unloaded_model_is_loaded_tested_and_unloaded_again",
+        "tests/test_speed_runner.py::test_serving_model_is_tested_and_left_loaded",
+        "tests/test_speed_runner.py::test_model_that_will_not_fit_is_skipped_without_loading",
+        "tests/test_speed_runner.py::test_a_failed_model_does_not_stop_the_run",
+        "tests/test_speed_runner.py::test_a_loaded_model_whose_test_fails_is_unloaded_again",
+        "tests/test_speed_runner.py::test_start_rejects_bad_selections",
+        "tests/test_speed_runner.py::test_a_second_start_while_running_is_refused",
+        "tests/test_speed_runner_reconcile.py::test_late_load_success_is_unloaded_by_reconciler"
       ]
     },
     {
       "id": "T3",
-      "file": "src/vortex/catalog_synth.py",
+      "file": "src/vortex/speed_routes.py",
       "depends_on": [
-        "T1",
-        "T2"
+        "T2",
+        "T4"
       ],
-      "brief": "No change. This file passed its tests and is a no-edit file for this delta.",
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
       "contracts": [
-        "src.vortex.catalog_synth",
-        "src.vortex.catalog_synth:PORT_RANGE",
-        "src.vortex.catalog_synth:RUNTIME_BINARIES",
-        "src.vortex.catalog_synth:SynthesisError",
-        "src.vortex.catalog_synth:synthesize_entry"
+        "src.vortex.speed_routes",
+        "src.vortex.speed_routes:register_speed_routes",
+        "route:GET /speed",
+        "route:GET /api/speed",
+        "route:POST /api/speed/run"
       ],
       "tests": [
+        "tests/test_speed_api.py::test_speed_list_has_every_catalog_model_in_order",
+        "tests/test_speed_api.py::test_speed_run_tests_a_model_and_reports_its_result",
+        "tests/test_speed_api.py::test_speed_run_rejects_bad_selections",
+        "tests/test_speed_api.py::test_loads_unloads_and_new_runs_are_refused_while_a_run_is_in_progress",
+        "tests/test_speed_api.py::test_speed_page_is_served"
+      ]
+    },
+    {
+      "id": "T4",
+      "file": "src/vortex/speed_ui.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.speed_ui",
+        "src.vortex.speed_ui:SPEED_PAGE"
+      ],
+      "tests": [
+        "tests/test_speed_ui.py::test_page_polls_and_starts_runs_through_the_api",
+        "tests/test_speed_ui.py::test_page_has_one_test_button_and_a_capped_checklist",
+        "tests/test_speed_ui.py::test_untested_values_show_a_dash",
+        "tests/test_speed_ui.py::test_page_shows_status_banner_picks_and_warning",
+        "tests/test_speed_ui.py::test_failures_are_visible",
+        "tests/test_speed_ui.py::test_page_adds_no_external_urls",
+        "tests/test_speed_ui.py::test_speed_page_links_back_to_the_dashboard"
+      ]
+    },
+    {
+      "id": "T5",
+      "file": "src/vortex/app.py",
+      "depends_on": [
+        "T3",
+        "T6",
+        "T7",
+        "T8",
+        "T9",
+        "T10"
+      ],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_speed_api.py::test_build_app_wires_the_speed_routes_and_results_path",
+        "tests/test_speed_api.py::test_build_app_keeps_its_existing_routes",
+        "tests/test_speed_ui.py::test_page_reads_only_fields_the_api_returns"
+      ]
+    },
+    {
+      "id": "T6",
+      "file": "src/vortex/ui.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_speed_ui.py::test_dashboard_header_links_to_the_speed_page"
+      ]
+    },
+    {
+      "id": "T7",
+      "file": "src/vortex/catalog_synth.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_catalog_synth.py::test_ram_estimate_is_plain_gib_and_sets_exclusive",
         "tests/test_catalog_synth.py::test_a_model_already_in_the_catalog_is_refused",
         "tests/test_catalog_synth.py::test_gguf_model_becomes_a_llama_server_entry",
         "tests/test_catalog_synth.py::test_lowest_free_port_skips_ports_the_catalog_uses",
@@ -68,60 +136,60 @@
         "tests/test_catalog_synth.py::test_no_free_port_is_refused",
         "tests/test_catalog_synth.py::test_port_range_and_binaries_are_the_ceo_policy",
         "tests/test_catalog_synth.py::test_public_id_is_sanitized_from_the_key",
-        "tests/test_catalog_synth.py::test_ram_estimate_is_size_plus_ten_percent_and_sets_exclusive",
         "tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides0-path]",
         "tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides1-format]",
         "tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides2-architecture]"
       ]
     },
     {
-      "id": "T4",
-      "file": "src/vortex/app.py",
-      "depends_on": [
-        "T3",
-        "T6"
-      ],
-      "brief": "Two edits in `src/vortex/app.py`; change nothing else.\n\n1. Replace the line\n       from .catalog_synth import SynthesisError, synthesize_entry\n   with\n       from .catalog_routes import register_catalog_routes\n\n2. Immediately before the final line of `build_app`, which is\n       return app\n   insert (4-space indent, inside build_app):\n       def _fresh_models() -> list:\n           model_cache.clear()\n           return _get_models()\n\n       register_catalog_routes(app, catalog, lifecycle, ops, _fresh_models, _persist)\n\n`model_cache`, `_get_models`, `_persist`, `catalog`, `lifecycle` and `ops`\nalready exist in that scope. Self-verify: ruff and mypy clean.",
-      "contracts": [],
-      "tests": [
-        "tests/test_catalog_add_api.py::test_add_new_adds_every_synthesizable_new_model_on_distinct_ports",
-        "tests/test_catalog_add_api.py::test_add_puts_the_model_in_the_live_catalog_and_the_local_file",
-        "tests/test_catalog_add_api.py::test_add_unknown_key_is_404_and_changes_nothing",
-        "tests/test_catalog_add_api.py::test_add_unsynthesizable_is_422_with_the_reason",
-        "tests/test_catalog_add_api.py::test_added_model_is_no_longer_newly_found",
-        "tests/test_catalog_add_api.py::test_remove_deletes_a_local_entry_from_catalog_and_file",
-        "tests/test_catalog_add_api.py::test_remove_refuses_a_loaded_local_entry",
-        "tests/test_catalog_add_api.py::test_remove_refuses_config_entries_and_unknown_ids"
-      ]
-    },
-    {
-      "id": "T5",
-      "file": "src/vortex/ui.py",
+      "id": "T8",
+      "file": "src/vortex/manager.py",
       "depends_on": [],
-      "brief": "No change. This file passed its tests and is a no-edit file for this delta.",
-      "contracts": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.manager:Manager",
+        "src.vortex.manager:ADMISSION_BUDGET_GIB"
+      ],
       "tests": [
-        "tests/test_ui_catalog_add.py::test_add_all_new_confirms_then_posts",
-        "tests/test_ui_catalog_add.py::test_add_all_new_control_sits_with_the_discovered_models_scan",
-        "tests/test_ui_catalog_add.py::test_add_all_reports_skips_and_failures",
-        "tests/test_ui_catalog_add.py::test_each_new_discovered_model_gets_an_add_control",
-        "tests/test_ui_catalog_add.py::test_local_entries_get_a_confirmed_remove_control",
-        "tests/test_ui_catalog_add.py::test_successful_changes_refresh_both_lists"
+        "tests/test_admission_uncertain.py::test_scan_unknown_neighbour_counts_and_refuses_the_load",
+        "tests/test_admission_uncertain.py::test_unidentified_occupant_counts_and_refuses_the_load",
+        "tests/test_admission_uncertain.py::test_uncertain_entry_is_not_an_eviction_candidate",
+        "tests/test_admission_uncertain.py::test_scan_unknown_entry_held_ready_is_counted_once",
+        "tests/test_admission_uncertain.py::test_refusal_without_candidates_names_the_unidentified_process",
+        "tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified0]",
+        "tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified1]",
+        "tests/test_admission_uncertain.py::test_target_is_never_counted_against_itself",
+        "tests/test_admission_uncertain.py::test_unloaded_entries_do_not_count",
+        "tests/test_serve.py::test_unverified_running_model_still_counts_for_admission"
       ]
     },
     {
-      "id": "T6",
-      "file": "src/vortex/catalog_routes.py",
-      "depends_on": [
-        "T3"
-      ],
-      "brief": "Create the new file with exactly this content:\n\n    \"\"\"Catalog add / add-new / remove routes.\"\"\"\n    from __future__ import annotations\n\n    from collections.abc import Callable\n\n    from fastapi import FastAPI, HTTPException\n\n    from .catalog import Catalog\n    from .catalog_synth import SynthesisError, synthesize_entry\n    from . import discovery\n    from .lifecycle import Lifecycle\n    from .operations import OperationStore\n\n\n    def register_catalog_routes(\n        app: FastAPI, catalog: Catalog, lifecycle: Lifecycle, ops: OperationStore,\n        fresh_models: Callable[[], list[discovery.DiscoveredModel]], persist: Callable[[], None],\n    ) -> None:\n        @app.post(\"/api/discovered-models/{key}/add\", status_code=201)\n        def add_model(key: str) -> dict:\n            model = next((m for m in fresh_models() if m.key == key), None)\n            if model is None:\n                raise HTTPException(404, detail=\"unknown\")\n            try:\n                entry = synthesize_entry(model, catalog)\n            except SynthesisError as exc:\n                raise HTTPException(422, detail={\"message\": str(exc), \"key\": key}) from exc\n            catalog.add(entry)\n            persist()\n            return {\"added\": entry.model_dump(mode=\"json\")}\n\n        @app.post(\"/api/discovered-models/add-new\")\n        def add_new() -> dict:\n            added: list[str] = []\n            skipped: list[dict[str, str]] = []\n            for m in [m for m in fresh_models() if not m.in_catalog]:\n                try:\n                    entry = synthesize_entry(m, catalog)\n                except SynthesisError as exc:\n                    skipped.append({\"key\": m.key, \"reason\": str(exc)})\n                    continue\n                catalog.add(entry)\n                added.append(entry.public_id)\n            persist()\n            return {\"added\": added, \"skipped\": skipped}\n\n        @app.delete(\"/api/catalog/{public_id}\")\n        def remove_model(public_id: str) -> dict:\n            entry = catalog.by_public_id(public_id)\n            if entry is None:\n                raise HTTPException(404, detail=\"unknown\")\n            busy = lifecycle.occupying_pid(entry) is not None or ops.active_for(public_id)\n            if entry.origin != \"local\" or busy:\n                raise HTTPException(409, detail={\"message\": \"config entry, or loaded/busy\"})\n            catalog.remove(public_id)\n            persist()\n            return {\"removed\": public_id}\n\nSelf-verify: ruff and mypy clean.",
-      "contracts": [
-        "route:DELETE /api/catalog/{public_id}",
-        "route:POST /api/discovered-models/add-new",
-        "route:POST /api/discovered-models/{key}/add"
-      ],
-      "tests": []
+      "id": "T9",
+      "file": "src/vortex/discovery.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_discovery_unindexed.py::test_unindexed_rows_skip_known_and_resolve_path",
+        "tests/test_discovery_unindexed.py::test_unindexed_rows_unknown_publisher_dir_has_no_path",
+        "tests/test_discovery_unindexed.py::test_unindexed_rows_tolerate_bad_body",
+        "tests/test_discovery_unindexed.py::test_discover_models_uses_row_path_when_not_in_lms_listing",
+        "tests/test_discovery_unindexed.py::test_disk_rows_find_folders_lm_studio_skips",
+        "tests/test_discovery_unindexed.py::test_disk_rows_dropped_when_lm_studio_reports_the_folder"
+      ]
+    },
+    {
+      "id": "T10",
+      "file": "src/vortex/labels.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_discovery_unindexed.py::test_publisher_for_paths_and_aliases",
+        "tests/test_discovery_unindexed.py::test_quant_label_names_non_affine_base_format",
+        "tests/test_discovery_unindexed.py::test_quant_label_mxfp4_with_affine_overrides_is_mixed",
+        "tests/test_discovery_unindexed.py::test_quant_label_affine_mix_unchanged"
+      ]
     }
   ]
 }

@@ -1,0 +1,195 @@
+{
+  "erd_version": 48,
+  "version": 2,
+  "tasks": [
+    {
+      "id": "T1",
+      "file": "src/vortex/speedtest.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.speedtest",
+        "src.vortex.speedtest:measure",
+        "src.vortex.speedtest:SpeedTestError",
+        "src.vortex.speedtest:load_results",
+        "src.vortex.speedtest:save_result",
+        "src.vortex.speedtest:MAX_TOKENS",
+        "src.vortex.speedtest:CONCURRENCY",
+        "src.vortex.speedtest:PROMPT"
+      ],
+      "tests": [
+        "tests/test_speedtest.py::test_measure_returns_the_three_speeds_from_real_replies",
+        "tests/test_speedtest.py::test_measure_sends_one_first_word_one_full_then_concurrent_requests",
+        "tests/test_speedtest.py::test_measure_fails_when_the_model_answers_an_error",
+        "tests/test_speedtest.py::test_measure_fails_when_nothing_is_listening",
+        "tests/test_speedtest.py::test_measure_fails_when_the_reply_has_no_token_count",
+        "tests/test_speedtest.py::test_save_result_stamps_and_keeps_the_latest_per_model",
+        "tests/test_speedtest.py::test_load_results_is_empty_for_a_missing_or_unreadable_file"
+      ]
+    },
+    {
+      "id": "T2",
+      "file": "src/vortex/speed_runner.py",
+      "depends_on": [
+        "T1"
+      ],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.speed_runner",
+        "src.vortex.speed_runner:SpeedRun",
+        "src.vortex.speed_runner:SpeedRunBusy"
+      ],
+      "tests": [
+        "tests/test_speed_runner.py::test_unloaded_model_is_loaded_tested_and_unloaded_again",
+        "tests/test_speed_runner.py::test_serving_model_is_tested_and_left_loaded",
+        "tests/test_speed_runner.py::test_model_that_will_not_fit_is_skipped_without_loading",
+        "tests/test_speed_runner.py::test_a_failed_model_does_not_stop_the_run",
+        "tests/test_speed_runner.py::test_a_loaded_model_whose_test_fails_is_unloaded_again",
+        "tests/test_speed_runner.py::test_start_rejects_bad_selections",
+        "tests/test_speed_runner.py::test_a_second_start_while_running_is_refused",
+        "tests/test_speed_runner_reconcile.py::test_late_load_success_is_unloaded_by_reconciler"
+      ]
+    },
+    {
+      "id": "T3",
+      "file": "src/vortex/speed_routes.py",
+      "depends_on": [
+        "T2",
+        "T4"
+      ],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.speed_routes",
+        "src.vortex.speed_routes:register_speed_routes",
+        "route:GET /speed",
+        "route:GET /api/speed",
+        "route:POST /api/speed/run"
+      ],
+      "tests": [
+        "tests/test_speed_api.py::test_speed_list_has_every_catalog_model_in_order",
+        "tests/test_speed_api.py::test_speed_run_tests_a_model_and_reports_its_result",
+        "tests/test_speed_api.py::test_speed_run_rejects_bad_selections",
+        "tests/test_speed_api.py::test_loads_unloads_and_new_runs_are_refused_while_a_run_is_in_progress",
+        "tests/test_speed_api.py::test_speed_page_is_served"
+      ]
+    },
+    {
+      "id": "T4",
+      "file": "src/vortex/speed_ui.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.speed_ui",
+        "src.vortex.speed_ui:SPEED_PAGE"
+      ],
+      "tests": [
+        "tests/test_speed_ui.py::test_page_polls_and_starts_runs_through_the_api",
+        "tests/test_speed_ui.py::test_page_has_one_test_button_and_a_capped_checklist",
+        "tests/test_speed_ui.py::test_untested_values_show_a_dash",
+        "tests/test_speed_ui.py::test_page_shows_status_banner_picks_and_warning",
+        "tests/test_speed_ui.py::test_failures_are_visible",
+        "tests/test_speed_ui.py::test_page_adds_no_external_urls",
+        "tests/test_speed_ui.py::test_speed_page_links_back_to_the_dashboard"
+      ]
+    },
+    {
+      "id": "T5",
+      "file": "src/vortex/app.py",
+      "depends_on": [
+        "T3",
+        "T6",
+        "T7",
+        "T8",
+        "T9",
+        "T10"
+      ],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_speed_api.py::test_build_app_wires_the_speed_routes_and_results_path",
+        "tests/test_speed_api.py::test_build_app_keeps_its_existing_routes",
+        "tests/test_speed_ui.py::test_page_reads_only_fields_the_api_returns"
+      ]
+    },
+    {
+      "id": "T6",
+      "file": "src/vortex/ui.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_speed_ui.py::test_dashboard_header_links_to_the_speed_page"
+      ]
+    },
+    {
+      "id": "T7",
+      "file": "src/vortex/catalog_synth.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_catalog_synth.py::test_ram_estimate_is_plain_gib_and_sets_exclusive",
+        "tests/test_catalog_synth.py::test_a_model_already_in_the_catalog_is_refused",
+        "tests/test_catalog_synth.py::test_gguf_model_becomes_a_llama_server_entry",
+        "tests/test_catalog_synth.py::test_lowest_free_port_skips_ports_the_catalog_uses",
+        "tests/test_catalog_synth.py::test_mlx_model_becomes_an_mlx_serve_entry",
+        "tests/test_catalog_synth.py::test_no_free_port_is_refused",
+        "tests/test_catalog_synth.py::test_port_range_and_binaries_are_the_ceo_policy",
+        "tests/test_catalog_synth.py::test_public_id_is_sanitized_from_the_key",
+        "tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides0-path]",
+        "tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides1-format]",
+        "tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides2-architecture]"
+      ]
+    },
+    {
+      "id": "T8",
+      "file": "src/vortex/manager.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.manager:Manager",
+        "src.vortex.manager:ADMISSION_BUDGET_GIB"
+      ],
+      "tests": [
+        "tests/test_admission_uncertain.py::test_scan_unknown_neighbour_counts_and_refuses_the_load",
+        "tests/test_admission_uncertain.py::test_unidentified_occupant_counts_and_refuses_the_load",
+        "tests/test_admission_uncertain.py::test_uncertain_entry_is_not_an_eviction_candidate",
+        "tests/test_admission_uncertain.py::test_scan_unknown_entry_held_ready_is_counted_once",
+        "tests/test_admission_uncertain.py::test_refusal_without_candidates_names_the_unidentified_process",
+        "tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified0]",
+        "tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified1]",
+        "tests/test_admission_uncertain.py::test_target_is_never_counted_against_itself",
+        "tests/test_admission_uncertain.py::test_unloaded_entries_do_not_count",
+        "tests/test_serve.py::test_unverified_running_model_still_counts_for_admission"
+      ]
+    },
+    {
+      "id": "T9",
+      "file": "src/vortex/discovery.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_discovery_unindexed.py::test_unindexed_rows_skip_known_and_resolve_path",
+        "tests/test_discovery_unindexed.py::test_unindexed_rows_unknown_publisher_dir_has_no_path",
+        "tests/test_discovery_unindexed.py::test_unindexed_rows_tolerate_bad_body",
+        "tests/test_discovery_unindexed.py::test_discover_models_uses_row_path_when_not_in_lms_listing",
+        "tests/test_discovery_unindexed.py::test_disk_rows_find_folders_lm_studio_skips",
+        "tests/test_discovery_unindexed.py::test_disk_rows_dropped_when_lm_studio_reports_the_folder"
+      ]
+    },
+    {
+      "id": "T10",
+      "file": "src/vortex/labels.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_discovery_unindexed.py::test_publisher_for_paths_and_aliases",
+        "tests/test_discovery_unindexed.py::test_quant_label_names_non_affine_base_format",
+        "tests/test_discovery_unindexed.py::test_quant_label_mxfp4_with_affine_overrides_is_mixed",
+        "tests/test_discovery_unindexed.py::test_quant_label_affine_mix_unchanged"
+      ]
+    }
+  ]
+}

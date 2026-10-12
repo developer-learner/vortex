@@ -1,0 +1,646 @@
+Decompose the frozen ERD into atomic ONE-FILE tasks and reply with ONLY the plan as JSON matching the schema you were given — no prose, no markdown fence. SCHEMA — name these keys verbatim; the validator rejects any others. Top-level object: {"erd_version": N, "version": N, "tasks": [ ... ]} — the tasks array is under the key "tasks" (never "plan"). Each task object has EXACTLY these six keys: {"id": "...", "file": "...", "depends_on": [], "brief": "...", "contracts": [], "tests": ["<node-id>", ...]}. The names test_nodes, acceptance, regression, and status are NOT valid task keys and are rejected. CONTRACT IDS — the task "contracts" array holds ONLY exact strings from the valid-id list the shell prints after this rule (or is empty). Copy ids VERBATIM: a registered id is its exact string — never convert a file path to dotted form (src/api/models.py is a path; "src.api.models" is not a registered id), never add or drop a file extension, never invent a prefix. The validator rejects any contracts entry not on the list. Valid contract ids (copy verbatim): src/vortex/speedtest.py, src/vortex/speed_runner.py, src/vortex/speed_routes.py, src/vortex/speed_ui.py, src/vortex/app.py, src/vortex/ui.py, src/vortex/catalog_synth.py, src/vortex/manager.py, src/vortex/discovery.py, src/vortex/labels.py, src.vortex.ui, src.vortex.ui:UI_PAGE, src.vortex.app, src.vortex.app:build_app, src.vortex.discovery, src.vortex.discovery:discover_wrappers, src.vortex.discovery:Wrapper, src.vortex.discovery:WrapperSpec, src.vortex.discovery:WRAPPER_SPECS, src.vortex.discovery:discover_models, src.vortex.discovery:DiscoveredModel, src.vortex.discovery:lmstudio_model_paths, src.vortex.catalog_synth, src.vortex.catalog_synth:synthesize_entry, src.vortex.catalog_synth:SynthesisError, src.vortex.catalog_synth:PORT_RANGE, src.vortex.catalog_synth:RUNTIME_BINARIES, src.vortex.speedtest, src.vortex.speedtest:measure, src.vortex.speedtest:SpeedTestError, src.vortex.speedtest:load_results, src.vortex.speedtest:save_result, src.vortex.speedtest:MAX_TOKENS, src.vortex.speedtest:CONCURRENCY, src.vortex.speedtest:PROMPT, src.vortex.speed_runner, src.vortex.speed_runner:SpeedRun, src.vortex.speed_runner:SpeedRunBusy, src.vortex.speed_routes, src.vortex.speed_routes:register_speed_routes, src.vortex.speed_ui, src.vortex.speed_ui:SPEED_PAGE, src.vortex.manager:Manager, src.vortex.manager:ADMISSION_BUDGET_GIB, route:GET /, route:GET /api/engine-wrappers, route:POST /api/engine-wrappers/discover, route:POST /api/shutdown, route:GET /api/discovered-models, route:POST /api/discovered-models/discover, route:POST /api/restart, route:GET /speed, route:GET /api/speed, route:POST /api/speed/run ERD-DELTA active packet is the authoritative current-change slice; it includes every skipped freeze since the last successful milestone. Requirements: exactly one task per file in this exact active inventory and no others: src/vortex/speedtest.py, src/vortex/speed_runner.py, src/vortex/speed_routes.py, src/vortex/speed_ui.py, src/vortex/app.py, src/vortex/ui.py, src/vortex/catalog_synth.py, src/vortex/manager.py, src/vortex/discovery.py, src/vortex/labels.py. Every test node-id in test-nodeids that exercises an active-inventory file maps to exactly one task (the task after which it should pass, given its depends_on) — node-ids testing only carried-forward files are handled by the shell: do NOT map them and do NOT emit a 'regression' key (the validator rejects it); when unsure, omit the node-id — the validator names any you must map. Placement is gate-owned, never yours: a node-id pinned by contracts.json's test_mapping is auto-placed by the gate at the task owning its pinned file; a node-id from a Playwright-importing test file with no mapping entry is auto-placed at the DAG's final task (D-64) — map every node-id where natural and add NO depends_on edges for this. Every task's contracts list uses ids that exist in contracts.json; when no registered id covers a file, use an empty contracts array and never invent one. Every brief self-contained per BLUEPRINT.md Rule 8 (exact path, signatures, inputs/outputs, acceptance) — the coder sees only the brief. For an EXISTING file (D-59 edit mode: the coder gets the file content and emits anchored SEARCH/REPLACE blocks; carried behavior is structurally untouched) the brief describes ONLY the change from current behavior — do NOT restate what the file already does (the plan gate rejects an existing-file brief that backticks a symbol the file already defines but the active ERD-delta packet never names as changed — restated carried behavior, D-133); for a NEW file the brief describes the whole file (target under 150 lines). Do NOT include a smoke_check field — smoke checks are TPM-authored and live in contracts.json. Set erd_version to 48. Set the top-level version key to an integer >= 1 (1 for a fresh plan; bump it on every re-emit). NO status fields. The previous plan failed validation with these errors — fix all of them: PLAN GATE FAIL: task T5 claims contract(s) ['src.vortex.app', 'src.vortex.app:build_app'] that are unchanged in the active milestone delta range and pinned to its own file 'src/vortex/app.py' — a task claims only contracts this milestone changed and interfaces it directly depends on; unchanged self-owned contracts must not ride (v99: GET-only milestone claiming PUT/DELETE). Trim these claims or the milestone's acceptance and invalidation both over-reach.
+PLAN GATE FAIL: task T6 claims contract(s) ['src.vortex.ui', 'src.vortex.ui:UI_PAGE'] that are unchanged in the active milestone delta range and pinned to its own file 'src/vortex/ui.py' — a task claims only contracts this milestone changed and interfaces it directly depends on; unchanged self-owned contracts must not ride (v99: GET-only milestone claiming PUT/DELETE). Trim these claims or the milestone's acceptance and invalidation both over-reach.
+PLAN GATE FAIL: task T7 claims contract(s) ['src.vortex.catalog_synth', 'src.vortex.catalog_synth:PORT_RANGE', 'src.vortex.catalog_synth:RUNTIME_BINARIES', 'src.vortex.catalog_synth:SynthesisError', 'src.vortex.catalog_synth:synthesize_entry'] that are unchanged in the active milestone delta range and pinned to its own file 'src/vortex/catalog_synth.py' — a task claims only contracts this milestone changed and interfaces it directly depends on; unchanged self-owned contracts must not ride (v99: GET-only milestone claiming PUT/DELETE). Trim these claims or the milestone's acceptance and invalidation both over-reach.
+PLAN GATE FAIL: task T9 claims contract(s) ['src.vortex.discovery', 'src.vortex.discovery:DiscoveredModel', 'src.vortex.discovery:WRAPPER_SPECS', 'src.vortex.discovery:Wrapper', 'src.vortex.discovery:WrapperSpec', 'src.vortex.discovery:discover_models', 'src.vortex.discovery:discover_wrappers', 'src.vortex.discovery:lmstudio_model_paths'] that are unchanged in the active milestone delta range and pinned to its own file 'src/vortex/discovery.py' — a task claims only contracts this milestone changed and interfaces it directly depends on; unchanged self-owned contracts must not ride (v99: GET-only milestone claiming PUT/DELETE). Trim these claims or the milestone's acceptance and invalidation both over-reach.
+PLAN GATE FAIL: mapped test node-id(s) not in the frozen suite: ['tests/test_admission_uncertain.py::test_identified_runtime_still_counts']
+
+### standing (.pipeline-state/standing-summary.md)
+```
+# ERD — vortex M1: operator dashboard (erd_version 1)
+
+Stack: the existing FastAPI app (`src/vortex/app.py`, package `vortex`).
+NO new dependencies, NO new files beyond the one below, NO external
+assets (everything inline in one HTML document). Zero new endpoints.
+
+The dashboard's design source is `examples/ui-demo/index.html` (committed,
+CEO-approved look). Task 1 PORTS that document into Python; task 2 WIRES
+the route. The JS logic is already proven — port it verbatim except for
+the exact adjustments listed.
+
+## Constraints (both files)
+
+Type hints on the new function signature. No new imports beyond
+`UI_PAGE`. No global mutable state. No external asset references
+(no `src="http…"` / `href="http…"` anywhere in the page). Each file
+under 300 lines. No TODO comments. No print/logging in ui.py.
+
+## File map
+
+(no architecture file bullets)
+
+```
+
+### ERD-delta (.pipeline-state/active-erd-delta.md)
+```
+## Active freeze instructions — compacted v44..v48
+
+<!-- latest freeze preamble: v48 -->
+# ERD delta — spec v48
+
+Test-only correction. No source file changes and no new acceptance criteria: the
+frozen test `tests/test_serve.py::test_unverified_running_model_still_counts_for_admission`
+sized both catalog estimates as half of the host's physical RAM, which was the
+right way to over-subscribe the budget when the budget was a percentage of host
+total (AC-30, superseded at v46). Under AC-52 the budget is a flat 107 GiB, so a
+fraction-of-host-total fixture only over-subscribes it on a machine whose total
+exceeds that ceiling: the test passed on the 128 GB deployment host and failed in
+the 8 GiB sandbox, where the same two estimates sit far below the ceiling and the
+load is correctly admitted. The estimates are now absolute GiB that straddle the
+flat ceiling, so the refusal under test is about admission accounting rather than
+about the size of the machine the suite happens to run on.
+
+<!-- active freeze section: v44 -->
+## Changed acceptance criteria
+
+None new in the PRD. The pinned behavior refines existing criteria:
+
+- **AC-9 / AC-25 (discovery + path)**: besides LM Studio `/api/v1/models`,
+  the default library fetch also reads `/api/v0/models` and appends rows
+  whose id the v1 library lacks (a model LM Studio holds but has not put in its
+  library listing). Their path resolves to `<models_root>/<publisher>/<dir>`
+  (dir name starting with the id, else the publisher's only dir; else no
+  path). It also scans `<models_root>/<publisher>/<model>` on disk for model
+  folders (GGUF file, or `config.json` + safetensors); `discover_models` drops
+  any disk row whose folder LM Studio already reported and labels the rest
+  `source: "disk"`. A GGUF disk row's path is its first `.gguf` file.
+- **AC-36 (dashboard menu)**: `/api/catalog` entries carry `publisher` — the
+  entry's explicit `publisher` field, else derived by `labels.publisher_for`
+  from the `<publisher>` dir under the LM Studio models root, an `org/name`
+  launch arg or alias, or an omlx `org--name` alias; else null. The menu shows
+  it in a Publisher column.
+- **Quant label (labels.describe)**: a non-affine base quantization mode is
+  named in upper case (`MXFP4`), with ` mixed` when per-layer overrides
+  exist; affine mixes keep the `lo–hi mixed` label.
+
+<!-- active freeze section: v44 -->
+## Superseded acceptance criteria
+
+None. No AC, route, or schema is removed or replaced.
+
+<!-- active freeze section: v45 -->
+## Changed acceptance criteria
+
+New criteria introduced by this milestone (PRD v45): AC-38, AC-39, AC-40,
+AC-41, AC-42, AC-43, AC-44, AC-45, AC-46, AC-47, AC-48. No existing criterion
+changes.
+
+<!-- active freeze section: v45 -->
+## Superseded acceptance criteria
+
+None.
+
+<!-- active freeze section: v46 -->
+## Changed acceptance criteria
+
+AC-49 — the Speed runner load-timeout reconciler. When a model load started
+by a Speed run exceeds the runner's wait window but later reaches ready, a
+background reconciler waits for the in-flight operation and unloads the model
+again, and the model is marked failed with a timeout reason. This closes the
+one hole the v45 runner left open: a load that finished after the timeout
+would otherwise have left the model loaded. Pinned by
+tests/test_speed_runner_reconcile.py, such that a timed-out load never leaves
+a model loaded.
+
+AC-50 — the reported memory figure. The RAM figure the dashboard and the
+status report show is the macOS working set — active plus wired plus
+compressor, the figure Activity Monitor labels as memory used — and when the
+memory statistic prints no page size the system shows 0.0 rather than assume
+one, such that the meter matches Activity Monitor and never derives a total
+from a guessed page size.
+
+AC-51 — plain-GiB synthesis estimate. A synthesized catalog entry estimates
+RAM as the model file's plain size in GiB (size in bytes over 1024 cubed,
+rounded to 0.1) and is exclusive exactly when that estimate exceeds 40 GiB,
+such that the estimate carries the same unit as the catalog and the admission
+budget.
+
+AC-52 — flat admission ceiling. The load admission budget is a flat 107 GiB
+minus the estimates counted against it, replacing the 80%-of-host-total
+guess, such that a load is admitted only when its estimate fits the remaining
+ceiling and the budget reads in the same unit as the catalog estimates.
+
+<!-- active freeze section: v46 -->
+## Superseded acceptance criteria
+
+AC-30 is superseded by AC-51: the model-size-plus-10%-in-decimal-GB estimate
+mixed decimal GB with the GiB catalog and admission units. The id is retained
+here and in the PRD, marked superseded; the frozen oracle moved to the
+plain-GiB values. No other criterion is superseded by this freeze.
+
+<!-- active freeze section: v47 -->
+## Changed acceptance criteria
+
+AC-51 (plain-GiB synthesis estimate) and AC-52 (flat 107 GiB admission ceiling) are
+accepted inside this milestone: their file is an inventory member and their frozen
+tests are mapped into the plan, such that the verdict runs the oracle for both.
+The v44 discovery-unindexed acceptance is likewise accepted: its frozen tests are
+mapped to the files that implement it.
+
+<!-- active freeze section: v47 -->
+## Superseded acceptance criteria
+
+None. AC-30 was superseded by AC-51 at v46 and stays recorded there.
+
+<!-- active freeze section: v48 -->
+## Changed acceptance criteria
+
+None. AC-52 (flat 107 GiB admission budget) is unchanged and is the criterion the
+corrected fixture now exercises on every host, such that a load is admitted only
+when its estimate fits the remaining ceiling.
+
+<!-- active freeze section: v48 -->
+## Superseded acceptance criteria
+
+None. AC-30 was superseded by AC-51 at v46 and stays recorded there; this freeze
+removes the last trace of its percentage-of-host-total arithmetic from the frozen
+suite, which is a consequence of that supersession rather than a new one.
+
+<!-- active freeze section: v48 -->
+## Changed files
+
+No source file changes: `src/vortex/manager.py` is a no-edit file and the coder is
+never called. Only the frozen test file named above changes, and it changes to
+match the acceptance criterion already frozen at v46.
+
+## Test-to-file mapping (active, deduplicated)
+
+* `tests/test_discovery_unindexed.py::test_unindexed_rows_skip_known_and_resolve_path` -> `src/vortex/discovery.py`
+* `tests/test_discovery_unindexed.py::test_unindexed_rows_unknown_publisher_dir_has_no_path` -> `src/vortex/discovery.py`
+* `tests/test_discovery_unindexed.py::test_unindexed_rows_tolerate_bad_body` -> `src/vortex/discovery.py`
+* `tests/test_discovery_unindexed.py::test_discover_models_uses_row_path_when_not_in_lms_listing` -> `src/vortex/discovery.py`
+* `tests/test_discovery_unindexed.py::test_disk_rows_find_folders_lm_studio_skips` -> `src/vortex/discovery.py`
+* `tests/test_discovery_unindexed.py::test_disk_rows_dropped_when_lm_studio_reports_the_folder` -> `src/vortex/discovery.py`
+* `tests/test_discovery_unindexed.py::test_publisher_for_paths_and_aliases` -> `src/vortex/labels.py`
+* `tests/test_discovery_unindexed.py::test_quant_label_names_non_affine_base_format` -> `src/vortex/labels.py`
+* `tests/test_discovery_unindexed.py::test_quant_label_mxfp4_with_affine_overrides_is_mixed` -> `src/vortex/labels.py`
+* `tests/test_discovery_unindexed.py::test_quant_label_affine_mix_unchanged` -> `src/vortex/labels.py`
+* `tests/test_speedtest.py::test_measure_returns_the_three_speeds_from_real_replies` -> `src/vortex/speedtest.py`
+* `tests/test_speedtest.py::test_measure_sends_one_first_word_one_full_then_concurrent_requests` -> `src/vortex/speedtest.py`
+* `tests/test_speedtest.py::test_measure_fails_when_the_model_answers_an_error` -> `src/vortex/speedtest.py`
+* `tests/test_speedtest.py::test_measure_fails_when_nothing_is_listening` -> `src/vortex/speedtest.py`
+* `tests/test_speedtest.py::test_measure_fails_when_the_reply_has_no_token_count` -> `src/vortex/speedtest.py`
+* `tests/test_speedtest.py::test_save_result_stamps_and_keeps_the_latest_per_model` -> `src/vortex/speedtest.py`
+* `tests/test_speedtest.py::test_load_results_is_empty_for_a_missing_or_unreadable_file` -> `src/vortex/speedtest.py`
+* `tests/test_speed_runner.py::test_unloaded_model_is_loaded_tested_and_unloaded_again` -> `src/vortex/speed_runner.py`
+* `tests/test_speed_runner.py::test_serving_model_is_tested_and_left_loaded` -> `src/vortex/speed_runner.py`
+* `tests/test_speed_runner.py::test_model_that_will_not_fit_is_skipped_without_loading` -> `src/vortex/speed_runner.py`
+* `tests/test_speed_runner.py::test_a_failed_model_does_not_stop_the_run` -> `src/vortex/speed_runner.py`
+* `tests/test_speed_runner.py::test_a_loaded_model_whose_test_fails_is_unloaded_again` -> `src/vortex/speed_runner.py`
+* `tests/test_speed_runner.py::test_start_rejects_bad_selections` -> `src/vortex/speed_runner.py`
+* `tests/test_speed_runner.py::test_a_second_start_while_running_is_refused` -> `src/vortex/speed_runner.py`
+* `tests/test_speed_api.py::test_speed_list_has_every_catalog_model_in_order` -> `src/vortex/speed_routes.py`
+* `tests/test_speed_api.py::test_speed_run_tests_a_model_and_reports_its_result` -> `src/vortex/speed_routes.py`
+* `tests/test_speed_api.py::test_speed_run_rejects_bad_selections` -> `src/vortex/speed_routes.py`
+* `tests/test_speed_api.py::test_loads_unloads_and_new_runs_are_refused_while_a_run_is_in_progress` -> `src/vortex/speed_routes.py`
+* `tests/test_speed_api.py::test_speed_page_is_served` -> `src/vortex/speed_routes.py`
+* `tests/test_speed_api.py::test_build_app_wires_the_speed_routes_and_results_path` -> `src/vortex/app.py`
+* `tests/test_speed_api.py::test_build_app_keeps_its_existing_routes` -> `src/vortex/app.py`
+* `tests/test_speed_ui.py::test_page_reads_only_fields_the_api_returns` -> `src/vortex/app.py`
+* `tests/test_speed_ui.py::test_page_polls_and_starts_runs_through_the_api` -> `src/vortex/speed_ui.py`
+* `tests/test_speed_ui.py::test_page_has_one_test_button_and_a_capped_checklist` -> `src/vortex/speed_ui.py`
+* `tests/test_speed_ui.py::test_untested_values_show_a_dash` -> `src/vortex/speed_ui.py`
+* `tests/test_speed_ui.py::test_page_shows_status_banner_picks_and_warning` -> `src/vortex/speed_ui.py`
+* `tests/test_speed_ui.py::test_failures_are_visible` -> `src/vortex/speed_ui.py`
+* `tests/test_speed_ui.py::test_page_adds_no_external_urls` -> `src/vortex/speed_ui.py`
+* `tests/test_speed_ui.py::test_speed_page_links_back_to_the_dashboard` -> `src/vortex/speed_ui.py`
+* `tests/test_speed_ui.py::test_dashboard_header_links_to_the_speed_page` -> `src/vortex/ui.py`
+* `tests/test_speed_runner_reconcile.py::test_late_load_success_is_unloaded_by_reconciler` -> `src/vortex/speed_runner.py`
+* `tests/test_catalog_synth.py::test_ram_estimate_is_plain_gib_and_sets_exclusive` -> `src/vortex/catalog_synth.py`
+* `tests/test_admission_uncertain.py::test_scan_unknown_neighbour_counts_and_refuses_the_load` -> `src/vortex/manager.py`
+* `tests/test_admission_uncertain.py::test_unidentified_occupant_counts_and_refuses_the_load` -> `src/vortex/manager.py`
+* `tests/test_admission_uncertain.py::test_uncertain_entry_is_not_an_eviction_candidate` -> `src/vortex/manager.py`
+* `tests/test_admission_uncertain.py::test_identified_runtime_still_counts` -> `src/vortex/manager.py`
+* `tests/test_admission_uncertain.py::test_scan_unknown_entry_held_ready_is_counted_once` -> `src/vortex/manager.py`
+* `tests/test_admission_uncertain.py::test_refusal_without_candidates_names_the_unidentified_process` -> `src/vortex/manager.py`
+* `tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified0]` -> `src/vortex/manager.py`
+* `tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified1]` -> `src/vortex/manager.py`
+* `tests/test_admission_uncertain.py::test_target_is_never_counted_against_itself` -> `src/vortex/manager.py`
+* `tests/test_admission_uncertain.py::test_unloaded_entries_do_not_count` -> `src/vortex/manager.py`
+* `tests/test_catalog_synth.py::test_a_model_already_in_the_catalog_is_refused` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_gguf_model_becomes_a_llama_server_entry` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_lowest_free_port_skips_ports_the_catalog_uses` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_mlx_model_becomes_an_mlx_serve_entry` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_no_free_port_is_refused` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_port_range_and_binaries_are_the_ceo_policy` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_public_id_is_sanitized_from_the_key` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides0-path]` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides1-format]` -> `src/vortex/catalog_synth.py`
+* `tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides2-architecture]` -> `src/vortex/catalog_synth.py`
+* `tests/test_serve.py::test_unverified_running_model_still_counts_for_admission` -> `src/vortex/manager.py`
+
+## Task DAG (active, deduplicated)
+
+`src/vortex/speed_runner.py` depends on `src/vortex/speedtest.py`
+`src/vortex/speed_routes.py` depends on `src/vortex/speed_runner.py`
+`src/vortex/speed_routes.py` depends on `src/vortex/speed_ui.py`
+`src/vortex/app.py` depends on `src/vortex/speed_routes.py`
+`src/vortex/app.py` depends on `src/vortex/ui.py`
+`src/vortex/app.py` depends on `src/vortex/catalog_synth.py`
+`src/vortex/app.py` depends on `src/vortex/manager.py`
+`src/vortex/app.py` depends on `src/vortex/discovery.py`
+`src/vortex/app.py` depends on `src/vortex/labels.py`
+
+## Coder briefs (active, deduplicated)
+
+### v47/T1 — src/vortex/speedtest.py
+
+No change. This file is already built and committed; do not edit it. Its
+acceptance is its frozen tests, which must pass unchanged.
+
+### v47/T2 — src/vortex/speed_runner.py
+
+No change. This file is already built and committed; do not edit it. Its
+acceptance is its frozen tests, which must pass unchanged.
+
+### v47/T3 — src/vortex/speed_routes.py
+
+No change. This file is already built and committed; do not edit it. Its
+acceptance is its frozen tests, which must pass unchanged.
+
+### v47/T4 — src/vortex/speed_ui.py
+
+No change. This file is already built and committed; do not edit it. Its
+acceptance is its frozen tests, which must pass unchanged.
+
+### v47/T5 — src/vortex/app.py
+
+No change. This file is already built and committed; do not edit it. Its
+acceptance is its frozen tests, which must pass unchanged.
+
+### v47/T6 — src/vortex/ui.py
+
+No change. This file is already built and committed; do not edit it. Its
+acceptance is its frozen tests, which must pass unchanged.
+
+### v47/T7 — src/vortex/catalog_synth.py
+
+No change. This file is already built and committed; do not edit it. Its
+acceptance is its frozen tests, which must pass unchanged.
+
+### v47/T8 — src/vortex/manager.py
+
+No change. This file is already built and committed; do not edit it. Its
+acceptance is its frozen tests, which must pass unchanged.
+
+### v47/T9 — src/vortex/discovery.py
+
+No change. This file is already built and committed; do not edit it. Its
+acceptance is its frozen tests, which must pass unchanged.
+
+### v47/T10 — src/vortex/labels.py
+
+No change. This file is already built and committed; do not edit it. Its
+acceptance is its frozen tests, which must pass unchanged.
+
+
+## Changed contracts (machine-computed from the active DELTA range)
+
+The milestone's DELTA snapshots declare these contracts changed:
+- `route:GET /api/speed`
+- `route:GET /speed`
+- `route:POST /api/speed/run`
+- `src.vortex.lifecycle:Lifecycle`
+- `src.vortex.lifecycle:SidecarStore`
+- `src.vortex.manager:ADMISSION_BUDGET_GIB`
+- `src.vortex.manager:Manager`
+- `src.vortex.operations:OperationStore`
+- `src.vortex.speed_routes`
+- `src.vortex.speed_routes:register_speed_routes`
+- `src.vortex.speed_runner`
+- `src.vortex.speed_runner:SpeedRun`
+- `src.vortex.speed_runner:SpeedRunBusy`
+- `src.vortex.speed_ui`
+- `src.vortex.speed_ui:SPEED_PAGE`
+- `src.vortex.speedtest`
+- `src.vortex.speedtest:CONCURRENCY`
+- `src.vortex.speedtest:MAX_TOKENS`
+- `src.vortex.speedtest:PROMPT`
+- `src.vortex.speedtest:SpeedTestError`
+- `src.vortex.speedtest:load_results`
+- `src.vortex.speedtest:measure`
+- `src.vortex.speedtest:save_result`
+
+Claim rule: a task claims only ids listed here, plus cross-file interfaces its work directly depends on (pinned to another file, or unpinned). A contract pinned to the task's OWN file that is not listed here must not be claimed — the plan gate rejects ride-along claims (v99: a GET-only milestone claiming PUT/DELETE dragged unchanged behavior into acceptance and invalidation).
+
+```
+
+### contracts (.pipeline-state/contracts-delta.json)
+```
+{"erd_version":48,"files":["src/vortex/speedtest.py","src/vortex/speed_runner.py","src/vortex/speed_routes.py","src/vortex/speed_ui.py","src/vortex/app.py","src/vortex/ui.py","src/vortex/catalog_synth.py","src/vortex/manager.py","src/vortex/discovery.py","src/vortex/labels.py"],"changed_files":[],"entry_points":["src.vortex.ui","src.vortex.ui:UI_PAGE","src.vortex.app","src.vortex.app:build_app","src.vortex.discovery","src.vortex.discovery:discover_wrappers","src.vortex.discovery:Wrapper","src.vortex.discovery:WrapperSpec","src.vortex.discovery:WRAPPER_SPECS","src.vortex.discovery:discover_models","src.vortex.discovery:DiscoveredModel","src.vortex.discovery:lmstudio_model_paths","src.vortex.catalog_synth","src.vortex.catalog_synth:synthesize_entry","src.vortex.catalog_synth:SynthesisError","src.vortex.catalog_synth:PORT_RANGE","src.vortex.catalog_synth:RUNTIME_BINARIES","src.vortex.speedtest","src.vortex.speedtest:measure","src.vortex.speedtest:SpeedTestError","src.vortex.speedtest:load_results","src.vortex.speedtest:save_result","src.vortex.speedtest:MAX_TOKENS","src.vortex.speedtest:CONCURRENCY","src.vortex.speedtest:PROMPT","src.vortex.speed_runner","src.vortex.speed_runner:SpeedRun","src.vortex.speed_runner:SpeedRunBusy","src.vortex.speed_routes","src.vortex.speed_routes:register_speed_routes","src.vortex.speed_ui","src.vortex.speed_ui:SPEED_PAGE","src.vortex.manager:Manager","src.vortex.manager:ADMISSION_BUDGET_GIB"],"no_edit_files":["src/vortex/speedtest.py","src/vortex/speed_runner.py","src/vortex/speed_routes.py","src/vortex/speed_ui.py","src/vortex/app.py","src/vortex/ui.py","src/vortex/catalog_synth.py","src/vortex/manager.py","src/vortex/discovery.py","src/vortex/labels.py"],"externals":[{"id":"external:lms-ls-json","probe":"~/.lmstudio/bin/lms ls --json","capture":"captures/lms-ls.json","notes":"JSON array; the spec relies on each row's modelKey and path (relative to ~/.lmstudio/models)."},{"id":"external:lmstudio-api-v1-models","probe":"curl -s http://127.0.0.1:1234/api/v1/models","capture":"captures/lmstudio-api-v1-models.json","notes":"Object with a models array; the spec relies on key, format (mlx|gguf), architecture, size_bytes. Discovery has read it since v32; declared here for the first time."}],"test_mapping":{},"smoke_checks":{"src/vortex/speed_routes.py":"python3 -c \"compile(open('src/vortex/speed_routes.py').read(), 'src/vortex/speed_routes.py', 'exec')\"","src/vortex/ui.py":"python3 -c \"compile(open('src/vortex/ui.py').read(), 'src/vortex/ui.py', 'exec')\""},"routes":[{"id":"route:GET /","method":"GET","path":"/"},{"id":"route:GET /v1/models","method":"GET","path":"/v1/models"},{"id":"route:POST /v1/chat/completions","method":"POST","path":"/v1/chat/completions"},{"id":"route:GET /api/catalog","method":"GET","path":"/api/catalog"},{"id":"route:GET /api/status","method":"GET","path":"/api/status"},{"id":"route:POST /api/models/{public_id}/load","method":"POST","path":"/api/models/{public_id}/load"},{"id":"route:POST /api/models/{public_id}/unload","method":"POST","path":"/api/models/{public_id}/unload"},{"id":"route:GET /api/operations/{op_id}","method":"GET","path":"/api/operations/{op_id}"},{"id":"route:GET /api/engine-wrappers","method":"GET","path":"/api/engine-wrappers","file":"src/vortex/app.py"},{"id":"route:POST /api/engine-wrappers/discover","method":"POST","path":"/api/engine-wrappers/discover","file":"src/vortex/app.py"},{"id":"route:POST /api/shutdown","method":"POST","path":"/api/shutdown","file":"src/vortex/app.py"},{"id":"route:GET /api/discovered-models","method":"GET","path":"/api/discovered-models","file":"src/vortex/app.py"},{"id":"route:POST /api/discovered-models/discover","method":"POST","path":"/api/discovered-models/discover","file":"src/vortex/app.py"},{"id":"route:POST /api/restart","method":"POST","path":"/api/restart","file":"src/vortex/app.py"},{"id":"route:GET /speed","method":"GET","path":"/speed","file":"src/vortex/speed_routes.py"},{"id":"route:GET /api/speed","method":"GET","path":"/api/speed","file":"src/vortex/speed_routes.py"},{"id":"route:POST /api/speed/run","method":"POST","path":"/api/speed/run","file":"src/vortex/speed_routes.py"}],"schemas":[],"errors":[],"ui":[]}
+
+```
+
+### test-nodeids (.pipeline-state/nodeids-scope.txt)
+```
+tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified0]
+tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified1]
+tests/test_admission_uncertain.py::test_refusal_without_candidates_names_the_unidentified_process
+tests/test_admission_uncertain.py::test_scan_unknown_entry_held_ready_is_counted_once
+tests/test_admission_uncertain.py::test_scan_unknown_neighbour_counts_and_refuses_the_load
+tests/test_admission_uncertain.py::test_target_is_never_counted_against_itself
+tests/test_admission_uncertain.py::test_uncertain_entry_is_not_an_eviction_candidate
+tests/test_admission_uncertain.py::test_unidentified_occupant_counts_and_refuses_the_load
+tests/test_admission_uncertain.py::test_unloaded_entries_do_not_count
+tests/test_catalog_synth.py::test_a_model_already_in_the_catalog_is_refused
+tests/test_catalog_synth.py::test_gguf_model_becomes_a_llama_server_entry
+tests/test_catalog_synth.py::test_lowest_free_port_skips_ports_the_catalog_uses
+tests/test_catalog_synth.py::test_mlx_model_becomes_an_mlx_serve_entry
+tests/test_catalog_synth.py::test_no_free_port_is_refused
+tests/test_catalog_synth.py::test_port_range_and_binaries_are_the_ceo_policy
+tests/test_catalog_synth.py::test_public_id_is_sanitized_from_the_key
+tests/test_catalog_synth.py::test_ram_estimate_is_plain_gib_and_sets_exclusive
+tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides0-path]
+tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides1-format]
+tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides2-architecture]
+tests/test_discovery_unindexed.py::test_discover_models_uses_row_path_when_not_in_lms_listing
+tests/test_discovery_unindexed.py::test_disk_rows_dropped_when_lm_studio_reports_the_folder
+tests/test_discovery_unindexed.py::test_disk_rows_find_folders_lm_studio_skips
+tests/test_discovery_unindexed.py::test_publisher_for_paths_and_aliases
+tests/test_discovery_unindexed.py::test_quant_label_affine_mix_unchanged
+tests/test_discovery_unindexed.py::test_quant_label_mxfp4_with_affine_overrides_is_mixed
+tests/test_discovery_unindexed.py::test_quant_label_names_non_affine_base_format
+tests/test_discovery_unindexed.py::test_unindexed_rows_skip_known_and_resolve_path
+tests/test_discovery_unindexed.py::test_unindexed_rows_tolerate_bad_body
+tests/test_discovery_unindexed.py::test_unindexed_rows_unknown_publisher_dir_has_no_path
+tests/test_serve.py::test_adopt_surviving_runtime_and_load
+tests/test_serve.py::test_async_load_returns_while_worker_blocked
+tests/test_serve.py::test_async_unload_returns_while_worker_blocked
+tests/test_serve.py::test_background_spawn_exception_drives_op_to_error
+tests/test_serve.py::test_exact_duplicate_load_returns_existing_operation
+tests/test_serve.py::test_failed_load_reaches_error_operation
+tests/test_serve.py::test_failed_spawn_leaves_no_owned_process_or_sidecar
+tests/test_serve.py::test_load_conflict_reports_eviction
+tests/test_serve.py::test_load_returns_before_ready
+tests/test_serve.py::test_proxy_forwards_public_id_when_no_upstream_alias
+tests/test_serve.py::test_proxy_non_streaming
+tests/test_serve.py::test_proxy_non_streaming_remaps_public_id_to_upstream_alias
+tests/test_serve.py::test_proxy_streaming_passthrough
+tests/test_serve.py::test_proxy_streaming_remaps_public_id_to_upstream_alias
+tests/test_serve.py::test_proxy_unloaded_model_404
+tests/test_serve.py::test_single_slot_load_in_flight_rejects_second_load
+tests/test_serve.py::test_single_slot_load_in_flight_rejects_unload
+tests/test_serve.py::test_spawn_fails_when_chat_never_succeeds
+tests/test_serve.py::test_spawn_from_launch_command
+tests/test_serve.py::test_spawn_waits_for_anneal_before_ready
+tests/test_serve.py::test_steady_state_reads_do_not_probe_runtime
+tests/test_serve.py::test_streaming_preserves_upstream_error_status
+tests/test_serve.py::test_success_paths_reach_terminal_states
+tests/test_serve.py::test_unhealthy_adoption_never_advertised_ready
+tests/test_serve.py::test_unidentified_occupant_refused
+tests/test_serve.py::test_unknown_model_load_404
+tests/test_serve.py::test_unload_terminates_child
+tests/test_serve.py::test_unverified_running_model_still_counts_for_admission
+tests/test_speed_api.py::test_build_app_keeps_its_existing_routes
+tests/test_speed_api.py::test_build_app_wires_the_speed_routes_and_results_path
+tests/test_speed_api.py::test_loads_unloads_and_new_runs_are_refused_while_a_run_is_in_progress
+tests/test_speed_api.py::test_speed_list_has_every_catalog_model_in_order
+tests/test_speed_api.py::test_speed_page_is_served
+tests/test_speed_api.py::test_speed_run_rejects_bad_selections
+tests/test_speed_api.py::test_speed_run_tests_a_model_and_reports_its_result
+tests/test_speed_runner.py::test_a_failed_model_does_not_stop_the_run
+tests/test_speed_runner.py::test_a_loaded_model_whose_test_fails_is_unloaded_again
+tests/test_speed_runner.py::test_a_second_start_while_running_is_refused
+tests/test_speed_runner.py::test_model_that_will_not_fit_is_skipped_without_loading
+tests/test_speed_runner.py::test_serving_model_is_tested_and_left_loaded
+tests/test_speed_runner.py::test_start_rejects_bad_selections
+tests/test_speed_runner.py::test_unloaded_model_is_loaded_tested_and_unloaded_again
+tests/test_speed_runner_reconcile.py::test_late_load_success_is_unloaded_by_reconciler
+tests/test_speed_ui.py::test_dashboard_header_links_to_the_speed_page
+tests/test_speed_ui.py::test_failures_are_visible
+tests/test_speed_ui.py::test_page_adds_no_external_urls
+tests/test_speed_ui.py::test_page_has_one_test_button_and_a_capped_checklist
+tests/test_speed_ui.py::test_page_polls_and_starts_runs_through_the_api
+tests/test_speed_ui.py::test_page_reads_only_fields_the_api_returns
+tests/test_speed_ui.py::test_page_shows_status_banner_picks_and_warning
+tests/test_speed_ui.py::test_speed_page_links_back_to_the_dashboard
+tests/test_speed_ui.py::test_untested_values_show_a_dash
+tests/test_speedtest.py::test_load_results_is_empty_for_a_missing_or_unreadable_file
+tests/test_speedtest.py::test_measure_fails_when_nothing_is_listening
+tests/test_speedtest.py::test_measure_fails_when_the_model_answers_an_error
+tests/test_speedtest.py::test_measure_fails_when_the_reply_has_no_token_count
+tests/test_speedtest.py::test_measure_returns_the_three_speeds_from_real_replies
+tests/test_speedtest.py::test_measure_sends_one_first_word_one_full_then_concurrent_requests
+tests/test_speedtest.py::test_save_result_stamps_and_keeps_the_latest_per_model
+
+```
+
+### plan-being-revised (tasks/plan.json)
+```
+{
+  "erd_version": 48,
+  "version": 1,
+  "tasks": [
+    {
+      "id": "T1",
+      "file": "src/vortex/speedtest.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.speedtest",
+        "src.vortex.speedtest:measure",
+        "src.vortex.speedtest:SpeedTestError",
+        "src.vortex.speedtest:load_results",
+        "src.vortex.speedtest:save_result",
+        "src.vortex.speedtest:MAX_TOKENS",
+        "src.vortex.speedtest:CONCURRENCY",
+        "src.vortex.speedtest:PROMPT"
+      ],
+      "tests": [
+        "tests/test_speedtest.py::test_measure_returns_the_three_speeds_from_real_replies",
+        "tests/test_speedtest.py::test_measure_sends_one_first_word_one_full_then_concurrent_requests",
+        "tests/test_speedtest.py::test_measure_fails_when_the_model_answers_an_error",
+        "tests/test_speedtest.py::test_measure_fails_when_nothing_is_listening",
+        "tests/test_speedtest.py::test_measure_fails_when_the_reply_has_no_token_count",
+        "tests/test_speedtest.py::test_save_result_stamps_and_keeps_the_latest_per_model",
+        "tests/test_speedtest.py::test_load_results_is_empty_for_a_missing_or_unreadable_file"
+      ]
+    },
+    {
+      "id": "T2",
+      "file": "src/vortex/speed_runner.py",
+      "depends_on": [
+        "T1"
+      ],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.speed_runner",
+        "src.vortex.speed_runner:SpeedRun",
+        "src.vortex.speed_runner:SpeedRunBusy"
+      ],
+      "tests": [
+        "tests/test_speed_runner.py::test_unloaded_model_is_loaded_tested_and_unloaded_again",
+        "tests/test_speed_runner.py::test_serving_model_is_tested_and_left_loaded",
+        "tests/test_speed_runner.py::test_model_that_will_not_fit_is_skipped_without_loading",
+        "tests/test_speed_runner.py::test_a_failed_model_does_not_stop_the_run",
+        "tests/test_speed_runner.py::test_a_loaded_model_whose_test_fails_is_unloaded_again",
+        "tests/test_speed_runner.py::test_start_rejects_bad_selections",
+        "tests/test_speed_runner.py::test_a_second_start_while_running_is_refused",
+        "tests/test_speed_runner_reconcile.py::test_late_load_success_is_unloaded_by_reconciler"
+      ]
+    },
+    {
+      "id": "T3",
+      "file": "src/vortex/speed_routes.py",
+      "depends_on": [
+        "T2",
+        "T4"
+      ],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.speed_routes",
+        "src.vortex.speed_routes:register_speed_routes",
+        "route:GET /speed",
+        "route:GET /api/speed",
+        "route:POST /api/speed/run"
+      ],
+      "tests": [
+        "tests/test_speed_api.py::test_speed_list_has_every_catalog_model_in_order",
+        "tests/test_speed_api.py::test_speed_run_tests_a_model_and_reports_its_result",
+        "tests/test_speed_api.py::test_speed_run_rejects_bad_selections",
+        "tests/test_speed_api.py::test_loads_unloads_and_new_runs_are_refused_while_a_run_is_in_progress",
+        "tests/test_speed_api.py::test_speed_page_is_served"
+      ]
+    },
+    {
+      "id": "T4",
+      "file": "src/vortex/speed_ui.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.speed_ui",
+        "src.vortex.speed_ui:SPEED_PAGE"
+      ],
+      "tests": [
+        "tests/test_speed_ui.py::test_page_polls_and_starts_runs_through_the_api",
+        "tests/test_speed_ui.py::test_page_has_one_test_button_and_a_capped_checklist",
+        "tests/test_speed_ui.py::test_untested_values_show_a_dash",
+        "tests/test_speed_ui.py::test_page_shows_status_banner_picks_and_warning",
+        "tests/test_speed_ui.py::test_failures_are_visible",
+        "tests/test_speed_ui.py::test_page_adds_no_external_urls",
+        "tests/test_speed_ui.py::test_speed_page_links_back_to_the_dashboard"
+      ]
+    },
+    {
+      "id": "T5",
+      "file": "src/vortex/app.py",
+      "depends_on": [
+        "T3",
+        "T6",
+        "T7",
+        "T8",
+        "T9",
+        "T10"
+      ],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.app",
+        "src.vortex.app:build_app"
+      ],
+      "tests": [
+        "tests/test_speed_api.py::test_build_app_wires_the_speed_routes_and_results_path",
+        "tests/test_speed_api.py::test_build_app_keeps_its_existing_routes",
+        "tests/test_speed_ui.py::test_page_reads_only_fields_the_api_returns"
+      ]
+    },
+    {
+      "id": "T6",
+      "file": "src/vortex/ui.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.ui",
+        "src.vortex.ui:UI_PAGE"
+      ],
+      "tests": [
+        "tests/test_speed_ui.py::test_dashboard_header_links_to_the_speed_page"
+      ]
+    },
+    {
+      "id": "T7",
+      "file": "src/vortex/catalog_synth.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.catalog_synth",
+        "src.vortex.catalog_synth:synthesize_entry",
+        "src.vortex.catalog_synth:SynthesisError",
+        "src.vortex.catalog_synth:PORT_RANGE",
+        "src.vortex.catalog_synth:RUNTIME_BINARIES"
+      ],
+      "tests": [
+        "tests/test_catalog_synth.py::test_ram_estimate_is_plain_gib_and_sets_exclusive",
+        "tests/test_catalog_synth.py::test_a_model_already_in_the_catalog_is_refused",
+        "tests/test_catalog_synth.py::test_gguf_model_becomes_a_llama_server_entry",
+        "tests/test_catalog_synth.py::test_lowest_free_port_skips_ports_the_catalog_uses",
+        "tests/test_catalog_synth.py::test_mlx_model_becomes_an_mlx_serve_entry",
+        "tests/test_catalog_synth.py::test_no_free_port_is_refused",
+        "tests/test_catalog_synth.py::test_port_range_and_binaries_are_the_ceo_policy",
+        "tests/test_catalog_synth.py::test_public_id_is_sanitized_from_the_key",
+        "tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides0-path]",
+        "tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides1-format]",
+        "tests/test_catalog_synth.py::test_unsynthesizable_models_raise_with_a_reason[overrides2-architecture]"
+      ]
+    },
+    {
+      "id": "T8",
+      "file": "src/vortex/manager.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.manager:Manager",
+        "src.vortex.manager:ADMISSION_BUDGET_GIB"
+      ],
+      "tests": [
+        "tests/test_admission_uncertain.py::test_scan_unknown_neighbour_counts_and_refuses_the_load",
+        "tests/test_admission_uncertain.py::test_unidentified_occupant_counts_and_refuses_the_load",
+        "tests/test_admission_uncertain.py::test_uncertain_entry_is_not_an_eviction_candidate",
+        "tests/test_admission_uncertain.py::test_identified_runtime_still_counts",
+        "tests/test_admission_uncertain.py::test_scan_unknown_entry_held_ready_is_counted_once",
+        "tests/test_admission_uncertain.py::test_refusal_without_candidates_names_the_unidentified_process",
+        "tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified0]",
+        "tests/test_admission_uncertain.py::test_identified_runtime_still_counts[verified1]",
+        "tests/test_admission_uncertain.py::test_target_is_never_counted_against_itself",
+        "tests/test_admission_uncertain.py::test_unloaded_entries_do_not_count",
+        "tests/test_serve.py::test_unverified_running_model_still_counts_for_admission"
+      ]
+    },
+    {
+      "id": "T9",
+      "file": "src/vortex/discovery.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [
+        "src.vortex.discovery",
+        "src.vortex.discovery:discover_wrappers",
+        "src.vortex.discovery:Wrapper",
+        "src.vortex.discovery:WrapperSpec",
+        "src.vortex.discovery:WRAPPER_SPECS",
+        "src.vortex.discovery:discover_models",
+        "src.vortex.discovery:DiscoveredModel",
+        "src.vortex.discovery:lmstudio_model_paths"
+      ],
+      "tests": [
+        "tests/test_discovery_unindexed.py::test_unindexed_rows_skip_known_and_resolve_path",
+        "tests/test_discovery_unindexed.py::test_unindexed_rows_unknown_publisher_dir_has_no_path",
+        "tests/test_discovery_unindexed.py::test_unindexed_rows_tolerate_bad_body",
+        "tests/test_discovery_unindexed.py::test_discover_models_uses_row_path_when_not_in_lms_listing",
+        "tests/test_discovery_unindexed.py::test_disk_rows_find_folders_lm_studio_skips",
+        "tests/test_discovery_unindexed.py::test_disk_rows_dropped_when_lm_studio_reports_the_folder"
+      ]
+    },
+    {
+      "id": "T10",
+      "file": "src/vortex/labels.py",
+      "depends_on": [],
+      "brief": "No change. This file is already built and committed; do not edit it. Its acceptance is its frozen tests, which must pass unchanged.",
+      "contracts": [],
+      "tests": [
+        "tests/test_discovery_unindexed.py::test_publisher_for_paths_and_aliases",
+        "tests/test_discovery_unindexed.py::test_quant_label_names_non_affine_base_format",
+        "tests/test_discovery_unindexed.py::test_quant_label_mxfp4_with_affine_overrides_is_mixed",
+        "tests/test_discovery_unindexed.py::test_quant_label_affine_mix_unchanged"
+      ]
+    }
+  ]
+}
+```
