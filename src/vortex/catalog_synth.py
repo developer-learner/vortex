@@ -27,6 +27,16 @@ def synthesize_entry(model: DiscoveredModel, catalog: Catalog,
     if model.architecture is None:
         raise SynthesisError("no architecture reported (not a chat model)")
     pid = re.sub(r"[^a-z0-9._-]", "-", model.key.lower())
+    # CatalogEntry.public_id must start with a letter or digit. A key that
+    # sanitizes to a leading symbol ("../foo", "__nl__") would otherwise raise
+    # a pydantic ValidationError past the SynthesisError handler and surface as
+    # a 500; it is a refusal with a reason, like every other synthesis failure
+    # (AC-32), so name it here instead.
+    if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*$", pid):
+        raise SynthesisError(
+            f"key {model.key} does not yield a usable model id "
+            "(must start with a letter or digit)"
+        )
     for e in catalog.entries:
         if e.public_id == pid or e.source_path == path or path in e.launch_command:
             raise SynthesisError(f"already in the catalog as {e.public_id}")

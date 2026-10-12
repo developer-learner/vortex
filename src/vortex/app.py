@@ -278,6 +278,20 @@ def build_app(
 
     @app.post("/api/shutdown")
     def shutdown() -> Response:
+        # Stopping while a load/unload is in flight can strand a half-started
+        # runtime: the terminate loop cannot see an entry whose operation has
+        # not settled, and the daemon exits anyway. Restart already refuses
+        # this (409); stop behaves the same way.
+        active = ops.active()
+        if active is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": f"{active.kind} for {active.public_id!r} is in progress",
+                    "busy": True,
+                    "operation": active.id,
+                },
+            )
         unloaded: list[str] = []
         for entry in manager.all_ready():
             if lifecycle.terminate(entry):
