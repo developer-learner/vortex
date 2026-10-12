@@ -55,13 +55,14 @@ def _activity_monitor_used_gb() -> float:
 def _ram_used() -> tuple[float, str]:
     """The displayed memory figure with its source named.
 
-    One source of truth (CEO ruling, tasks/CURRENT.md 2026-08-17): the
-    Activity Monitor figure — vm_stat's wired+compressor+active+inactive+
-    speculative pages — is what the UI reports, because that matches what
-    `top`/Activity Monitor show the operator. psutil-used (~15GB lower on
-    macOS: it excludes inactive/compressor/wired overheads) remains ONLY as
-    an explicitly-labeled degraded source for hosts without vm_stat (Linux);
-    it is never silently blended into the same number.
+    One source of truth (CEO ruling, tasks/CURRENT.md 2026-08-17, superseded
+    2026-09-15 for parity with testchat): the Activity Monitor figure —
+    vm_stat's active+wired+compressor pages (working set only; inactive and
+    speculative are reclaimable file cache) — is what the UI reports, because
+    that matches what `top`/Activity Monitor show the operator. psutil-used
+    (~15GB lower on macOS: it excludes inactive/compressor/wired overheads)
+    remains ONLY as an explicitly-labeled degraded source for hosts without
+    vm_stat (Linux); it is never silently blended into the same number.
     """
     vm_stat_gb = _activity_monitor_used_gb()
     if vm_stat_gb > 0.0:
@@ -125,10 +126,12 @@ def loadable_gb() -> float:
             ["vm_stat"], capture_output=True, text=True, timeout=2, check=False
         )
         page_size = 16384
+        have_page_size = False
         pages: dict[str, int] = {}
         for line in out.stdout.splitlines():
             if "page size of" in line:
                 page_size = int(line.split("page size of")[1].split()[0])
+                have_page_size = True
                 continue
             for key in (
                 "Pages free:",
@@ -145,6 +148,13 @@ def loadable_gb() -> float:
         purgeable = pages.get("Pages purgeable:", 0)
         file_backed = pages.get("File-backed pages:", 0)
         wired_down = pages.get("Pages wired down:", 0)
+
+        if not have_page_size:
+            # No page size in the vm_stat header: guessing one (16384) would
+            # scale the whole figure 4x wrong on an Intel host. Report 0.0 —
+            # no figure rather than a wrong one (same rule as
+            # _activity_monitor_used_gb).
+            return 0.0
 
         reclaimable_gb = (
             (free + speculative + purgeable + file_backed) * page_size / 1024**3
