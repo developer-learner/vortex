@@ -6,6 +6,7 @@ import json
 import socket
 import subprocess
 import sys
+import threading as _threading
 import time
 from pathlib import Path
 
@@ -626,19 +627,24 @@ def test_unverified_running_model_still_counts_for_admission(tmp_path: Path) -> 
 
     m1 is adopted (identified, running) but never loaded, so it is unverified:
     absent from /v1/models, yet its RAM must still block an over-subscribing m2.
+
+    Estimates are absolute GiB, not fractions of host RAM: AC-52's budget is a
+    flat 107 GiB ceiling, so the pair must straddle that fixed number for the
+    refusal to be about accounting rather than about the size of the machine.
     """
-    total = psutil.virtual_memory().total / (1024 ** 3)
+    m1_ram = 60.0
+    m2_ram = 60.0
     port = _free_port()
     m2_port = _free_port()
     proc = _spawn_runtime(port)
     try:
         catalog = Catalog(entries=[
-            _entry_for(port, public_id="m1", ram_estimate_gb=total * 0.5),
+            _entry_for(port, public_id="m1", ram_estimate_gb=m1_ram),
             # m2's launch_command must bind m2_port (not the default ephemeral
             # port), so that if the admission bug wrongly lets m2 load, the spawn
             # becomes ready quickly and the test fails fast instead of blocking on
             # the ready-timeout.
-            _entry_for(m2_port, public_id="m2", ram_estimate_gb=total * 0.5,
+            _entry_for(m2_port, public_id="m2", ram_estimate_gb=m2_ram,
                        launch_command=[sys.executable, "-m", "tests.fake_server", str(m2_port)]),
         ])
         client = _client(tmp_path, catalog, adopt=[("m1", proc.pid, port)])
@@ -727,8 +733,6 @@ def test_streaming_preserves_upstream_error_status(tmp_path: Path) -> None:
 # thread with a bounded join so a synchronous regression surfaces as a failed
 # assertion, never a hung suite; a finally always releases the event and joins.
 # ---------------------------------------------------------------------------
-
-import threading as _threading
 
 
 class _StubSidecars:
