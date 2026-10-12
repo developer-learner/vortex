@@ -1,4 +1,5 @@
-"""Frozen suite v39: discovered model -> catalog entry synthesis (AC-27..AC-30).
+"""Frozen suite v39: discovered model -> catalog entry synthesis (AC-27..AC-30,
+AC-51).
 
 `synthesize_entry` is pure: it reads a DiscoveredModel and the current catalog
 and returns a validated CatalogEntry, or raises SynthesisError with a reason.
@@ -7,9 +8,9 @@ and returns a validated CatalogEntry, or raises SynthesisError with a reason.
 from __future__ import annotations
 
 import pytest
-from vortex.catalog_synth import PORT_RANGE, RUNTIME_BINARIES, SynthesisError, synthesize_entry
 
 from vortex.catalog import Catalog, CatalogEntry
+from vortex.catalog_synth import PORT_RANGE, RUNTIME_BINARIES, SynthesisError, synthesize_entry
 from vortex.discovery import DiscoveredModel
 
 MLX_PATH = "/models/butterf1ying/Qwen3.8-Flash-Next-Uncensored-REAP288-MTP-MLX-4bit"
@@ -94,13 +95,14 @@ def test_public_id_is_sanitized_from_the_key() -> None:
     assert entry.public_id == "qwen3.8-27b-8bit"
 
 
-def test_ram_estimate_is_size_plus_ten_percent_and_sets_exclusive() -> None:
-    """76.95 GB * 1.1 -> 84.6 GB, exclusive; 17.74 GB * 1.1 -> 19.5 GB, not (AC-30)."""
+def test_ram_estimate_is_plain_gib_and_sets_exclusive() -> None:
+    """76_950_364_862 B -> 71.7 GiB, exclusive; 17_741_855_528 B -> 16.5 GiB,
+    not (AC-51, superseding AC-30's size+10%-in-decimal-GB estimate)."""
     big = synthesize_entry(_model(), Catalog())
-    assert big.ram_estimate_gb == pytest.approx(84.6)
+    assert big.ram_estimate_gb == pytest.approx(71.7)
     assert big.exclusive is True
     small = synthesize_entry(_model(size_bytes=17_741_855_528), Catalog())
-    assert small.ram_estimate_gb == pytest.approx(19.5)
+    assert small.ram_estimate_gb == pytest.approx(16.5)
     assert small.exclusive is False
 
 

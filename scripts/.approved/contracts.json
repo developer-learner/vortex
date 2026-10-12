@@ -1,5 +1,5 @@
 {
-  "erd_version": 45,
+  "erd_version": 46,
   "files": [
     "src/vortex/speedtest.py",
     "src/vortex/speed_runner.py",
@@ -8,16 +8,7 @@
     "src/vortex/app.py",
     "src/vortex/ui.py"
   ],
-  "changed_files": [
-    "src/vortex/speedtest.py",
-    "src/vortex/speed_runner.py",
-    "src/vortex/speed_routes.py",
-    "src/vortex/speed_ui.py",
-    "src/vortex/app.py",
-    "src/vortex/ui.py"
-  ],
-  "no_edit_files": [],
-  "smoke_checks": {},
+  "changed_files": [],
   "entry_points": [
     "src.vortex.ui",
     "src.vortex.ui:UI_PAGE",
@@ -63,6 +54,30 @@
     "src.vortex.lifecycle:Lifecycle",
     "src.vortex.lifecycle:SidecarStore"
   ],
+  "no_edit_files": [
+    "src/vortex/speedtest.py",
+    "src/vortex/speed_runner.py",
+    "src/vortex/speed_routes.py",
+    "src/vortex/speed_ui.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py"
+  ],
+  "externals": [
+    {
+      "id": "external:lms-ls-json",
+      "probe": "~/.lmstudio/bin/lms ls --json",
+      "capture": "captures/lms-ls.json",
+      "notes": "JSON array; the spec relies on each row's modelKey and path (relative to ~/.lmstudio/models)."
+    },
+    {
+      "id": "external:lmstudio-api-v1-models",
+      "probe": "curl -s http://127.0.0.1:1234/api/v1/models",
+      "capture": "captures/lmstudio-api-v1-models.json",
+      "notes": "Object with a models array; the spec relies on key, format (mlx|gguf), architecture, size_bytes. Discovery has read it since v32; declared here for the first time."
+    }
+  ],
+  "test_mapping": {},
+  "smoke_checks": {},
   "routes": [
     {
       "id": "route:GET /",
@@ -176,20 +191,5 @@
       "path": "/api/speed/run",
       "file": "src/vortex/speed_routes.py"
     }
-  ],
-  "externals": [
-    {
-      "id": "external:lms-ls-json",
-      "probe": "~/.lmstudio/bin/lms ls --json",
-      "capture": "captures/lms-ls.json",
-      "notes": "JSON array; the spec relies on each row's modelKey and path (relative to ~/.lmstudio/models)."
-    },
-    {
-      "id": "external:lmstudio-api-v1-models",
-      "probe": "curl -s http://127.0.0.1:1234/api/v1/models",
-      "capture": "captures/lmstudio-api-v1-models.json",
-      "notes": "Object with a models array; the spec relies on key, format (mlx|gguf), architecture, size_bytes. Discovery has read it since v32; declared here for the first time."
-    }
-  ],
-  "test_mapping": {}
+  ]
 }

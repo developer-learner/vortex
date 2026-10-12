@@ -473,3 +473,34 @@ warns instead).
 - **AC-48:** THE dashboard header SHALL link to the Speed page and the Speed
   page header SHALL link back to the dashboard, such that the existing
   dashboard routes and controls are unchanged.
+
+## v46 scope (Speed ratify; runner reconciler; memory figure; CEO unit rulings)
+
+This freeze builds no source: every Speed-page file is already built and is
+re-accepted here as a ratify milestone of no-edit files. The delta is the
+load-timeout reconciler in the Speed runner, the RAM figure the dashboard
+reports, two CEO unit rulings of 2026-10-11 committed out of band with this
+freeze — synthesized RAM estimates and the load admission budget now read in
+plain GiB everywhere — and the frozen tests that pin all of it.
+
+## v46 acceptance criteria
+
+- **AC-49:** IF a model load started by a Speed run exceeds the runner's
+  wait window but later reaches ready, THEN THE SYSTEM SHALL unload that
+  model and mark the model failed with a timeout reason, such that a
+  timed-out load never leaves a model loaded.
+- **AC-50:** THE RAM figure the dashboard and the status report show SHALL
+  be the macOS working set — active plus wired plus compressor, the figure
+  Activity Monitor labels as memory used — and WHEN the memory statistic
+  prints no page size THE SYSTEM SHALL show 0.0 rather than assume one,
+  such that the meter matches Activity Monitor and never derives a total
+  from a guessed page size.
+- **AC-51:** THE synthesized catalog entry SHALL estimate RAM as the model
+  file's plain size in GiB (size in bytes over 1024 cubed, rounded to 0.1),
+  and SHALL be exclusive exactly when that estimate exceeds 40 GiB, such
+  that the estimate carries the same unit as the catalog and the admission
+  budget.
+- **AC-52:** THE load admission budget SHALL be a flat 107 GiB minus the
+  estimates counted against it, such that a load is admitted only when its
+  estimate fits the remaining ceiling and the budget reads in the same unit
+  as the catalog estimates.

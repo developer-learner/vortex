@@ -6,8 +6,8 @@ entry's catalog RAM estimate — once — without offering it for eviction, and
 refuses a load it cannot cover even when nothing is evictable. Unloaded
 entries and the load target itself are never counted.
 
-Deterministic: the lifecycle is a small fake and host RAM is pinned to
-100 GB, so the admission budget is 80 GB.
+Deterministic: the lifecycle is a small fake and the admission budget is the
+module's flat 107 GiB ceiling (AC-52), independent of host RAM.
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ import sys
 
 import pytest
 
-import vortex.manager as manager_mod
 from vortex.catalog import Catalog, CatalogEntry
 from vortex.lifecycle import SCAN_UNKNOWN
 from vortex.manager import Manager, MemoryConflict
@@ -48,15 +47,6 @@ class _FakeLifecycle:
         return entry.public_id in self.verified
 
 
-class _Mem:
-    total = 100 * 1024**3
-
-
-@pytest.fixture(autouse=True)
-def _pin_host_ram(monkeypatch):
-    monkeypatch.setattr(manager_mod.psutil, "virtual_memory", lambda: _Mem())
-
-
 def _entry(public_id: str, port: int, ram_gb: float) -> CatalogEntry:
     return CatalogEntry.model_validate({
         "public_id": public_id,
@@ -76,20 +66,20 @@ def _manager(entries: list[CatalogEntry], lifecycle: _FakeLifecycle) -> Manager:
 
 # AC-12 — an incomplete scan on another model's port counts its estimate.
 def test_scan_unknown_neighbour_counts_and_refuses_the_load() -> None:
-    target = _entry("target", 41001, 40)
+    target = _entry("target", 41001, 60)
     other = _entry("other", 41002, 50)
     mgr = _manager([target, other], _FakeLifecycle({"other": SCAN_UNKNOWN}, {}))
     assert mgr.admits(target) is False
     with pytest.raises(MemoryConflict) as exc:
         mgr.load("target")
-    assert exc.value.required_gb == 40
+    assert exc.value.required_gb == 60
     assert exc.value.candidates == []
     assert mgr.ops.active() is None
 
 
 # AC-12 — an unidentified occupant counts its estimate the same way.
 def test_unidentified_occupant_counts_and_refuses_the_load() -> None:
-    target = _entry("target", 41011, 40)
+    target = _entry("target", 41011, 60)
     other = _entry("other", 41012, 50)
     mgr = _manager([target, other], _FakeLifecycle({"other": 777}, {777: "unidentified"}))
     assert mgr.admits(target) is False
@@ -99,7 +89,7 @@ def test_unidentified_occupant_counts_and_refuses_the_load() -> None:
 
 # AC-13 — an uncertain entry is never offered for eviction.
 def test_uncertain_entry_is_not_an_eviction_candidate() -> None:
-    target = _entry("target", 41021, 40)
+    target = _entry("target", 41021, 60)
     loaded = _entry("loaded", 41022, 30)
     uncertain = _entry("uncertain", 41023, 30)
     life = _FakeLifecycle({"loaded": 501, "uncertain": 777},
@@ -112,7 +102,7 @@ def test_uncertain_entry_is_not_an_eviction_candidate() -> None:
 # AC-14 — identified-but-unverified and identified-verified still count.
 @pytest.mark.parametrize("verified", [set(), {"running"}])
 def test_identified_runtime_still_counts(verified: set) -> None:
-    target = _entry("target", 41031, 40)
+    target = _entry("target", 41031, 60)
     running = _entry("running", 41032, 50)
     life = _FakeLifecycle({"running": 601}, {601: "ready"}, verified=verified)
     mgr = _manager([target, running], life)
@@ -132,7 +122,7 @@ def test_unloaded_entries_do_not_count() -> None:
 
 # AC-16 — an uncertain entry already held as ready is counted once, not twice.
 def test_scan_unknown_entry_held_ready_is_counted_once() -> None:
-    target = _entry("target", 41051, 45)
+    target = _entry("target", 41051, 60)
     held = _entry("held", 41052, 30)
     life = _FakeLifecycle({"held": SCAN_UNKNOWN}, {}, held={"held": "ready"})
     mgr = _manager([target, held], life)
@@ -148,7 +138,7 @@ def test_target_is_never_counted_against_itself() -> None:
 
 # AC-17 — a refusal with nothing evictable says why.
 def test_refusal_without_candidates_names_the_unidentified_process() -> None:
-    target = _entry("target", 41071, 40)
+    target = _entry("target", 41071, 60)
     other = _entry("other", 41072, 50)
     mgr = _manager([target, other], _FakeLifecycle({"other": SCAN_UNKNOWN}, {}))
     with pytest.raises(MemoryConflict) as exc:

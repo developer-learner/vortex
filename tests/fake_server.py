@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
@@ -116,6 +117,9 @@ def main() -> None:
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     anneal = int(sys.argv[2]) if len(sys.argv) > 2 else 0
     stream_status = int(sys.argv[3]) if len(sys.argv) > 3 else 200
+    delay = float(sys.argv[4]) if len(sys.argv) > 4 else 0.0
+    if delay > 0:
+        time.sleep(delay)
     server = FakeChatServer(port=port, anneal_failures=anneal, stream_status=stream_status)
     print(f"fake server on :{server.port} (anneal_failures={anneal}, stream_status={stream_status})", flush=True)
     server.thread.join()
