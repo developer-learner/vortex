@@ -513,3 +513,7 @@
 ## Results
 
   Delta-mapped frozen tests green against spec v43 — feature done (verdict scope: mapped tests only, D-112). Feature built and validated.
+
+## Results
+
+  Delta-mapped frozen tests green against spec v48 — feature done (verdict scope: mapped tests only, D-112). Feature built and validated. Existing tests: no regressions — 38 passed, 0 skipped, 0 known failing.
