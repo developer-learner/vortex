@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import threading
 
-import psutil  # type: ignore[import-untyped]
-
 from .catalog import Catalog, CatalogEntry
 from .lifecycle import SCAN_UNKNOWN, Lifecycle, PortConflictError, SpawnError
 from .operations import OperationStore
 
+# Admission budget in GiB — see Manager.admits (CEO ruling 2026-10-11).
+ADMISSION_BUDGET_GIB = 107.0
+
 
 class MemoryConflict(Exception):
+    """A load the admission budget cannot cover."""
     def __init__(
         self,
         required_gb: float | None,
@@ -87,7 +89,10 @@ class Manager:
         pid = self.lifecycle.occupying_pid(entry)
         if active_op:
             op = self.ops.get(active_op)
-            if op is not None:
+            # Guard: an op for a DIFFERENT entry must not color this entry's
+            # state (callers pass ops.active_for(entry.public_id); this keeps
+            # the contract safe if a future caller passes an unfiltered id).
+            if op is not None and op.public_id == entry.public_id:
                 return op.state
         status = self.lifecycle.owner_status(entry, pid)
         verified = status == "ready" and self.lifecycle.is_verified(entry)
@@ -119,7 +124,10 @@ class Manager:
             return True
         used = sum((e.ram_estimate_gb or 0) for e in self.all_ready())
         used += sum((e.ram_estimate_gb or 0) for e in self.uncertain_entries(entry))
-        available = max(0.0, psutil.virtual_memory().total / (1024**3) * 0.8 - used)
+        # Flat 107 GiB usable ceiling (CEO 2026-10-11), replacing the
+        # 80%-of-host-total guess: the 128 GB machine minus the OS and
+        # GPU-runtime floor, in the same GiB units as the catalog estimates.
+        available = max(0.0, ADMISSION_BUDGET_GIB - used)
         return entry.ram_estimate_gb <= available
 
     def load(self, public_id: str) -> dict:

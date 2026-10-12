@@ -43,7 +43,10 @@ def synthesize_entry(model: DiscoveredModel, catalog: Catalog,
             net = [*net, "--mtp"]
     else:
         rt, eng, cmd = "llama-server", "llama.cpp", [binaries[fmt], "-m", path]
-    ram = round(model.size_bytes * 1.1 / 1e9, 1) if model.size_bytes else None
+    # Plain GiB (size / 1024^3), the unit the catalog and Activity Monitor
+    # use (CEO 2026-10-11); the old size+10%-in-decimal-GB estimate mixed
+    # units with the admission budget. Exclusive above 40 GiB, as before.
+    ram = round(model.size_bytes / 2**30, 1) if model.size_bytes else None
     base = f"http://127.0.0.1:{port}/v1"
     return CatalogEntry.model_validate({
         "public_id": pid, "runtime": rt, "engine": eng,
