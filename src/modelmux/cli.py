@@ -92,6 +92,9 @@ def _cmd_load(args: argparse.Namespace) -> int:
 
 def _cmd_unload(args: argparse.Namespace) -> int:
     r = _request("POST", f"/api/models/{args.model}/unload", timeout=60)
+    if r.status_code == 409:
+        print(f"conflict: {r.json().get('detail', r.text)}")
+        return 2
     r.raise_for_status()
     op_id = r.json()["operation"]
     if not args.wait:
