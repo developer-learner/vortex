@@ -1,12 +1,16 @@
 {
-  "erd_version": 46,
+  "erd_version": 47,
   "files": [
     "src/vortex/speedtest.py",
     "src/vortex/speed_runner.py",
     "src/vortex/speed_routes.py",
     "src/vortex/speed_ui.py",
     "src/vortex/app.py",
-    "src/vortex/ui.py"
+    "src/vortex/ui.py",
+    "src/vortex/catalog_synth.py",
+    "src/vortex/manager.py",
+    "src/vortex/discovery.py",
+    "src/vortex/labels.py"
   ],
   "changed_files": [],
   "entry_points": [
@@ -52,7 +56,8 @@
     "src.vortex.manager:Manager",
     "src.vortex.operations:OperationStore",
     "src.vortex.lifecycle:Lifecycle",
-    "src.vortex.lifecycle:SidecarStore"
+    "src.vortex.lifecycle:SidecarStore",
+    "src.vortex.manager:ADMISSION_BUDGET_GIB"
   ],
   "no_edit_files": [
     "src/vortex/speedtest.py",
@@ -60,8 +65,16 @@
     "src/vortex/speed_routes.py",
     "src/vortex/speed_ui.py",
     "src/vortex/app.py",
-    "src/vortex/ui.py"
+    "src/vortex/ui.py",
+    "src/vortex/catalog_synth.py",
+    "src/vortex/manager.py",
+    "src/vortex/discovery.py",
+    "src/vortex/labels.py"
   ],
+  "smoke_checks": {
+    "src/vortex/speed_routes.py": "python3 -c \"compile(open('src/vortex/speed_routes.py').read(), 'src/vortex/speed_routes.py', 'exec')\"",
+    "src/vortex/ui.py": "python3 -c \"compile(open('src/vortex/ui.py').read(), 'src/vortex/ui.py', 'exec')\""
+  },
   "externals": [
     {
       "id": "external:lms-ls-json",
@@ -77,7 +90,6 @@
     }
   ],
   "test_mapping": {},
-  "smoke_checks": {},
   "routes": [
     {
       "id": "route:GET /",

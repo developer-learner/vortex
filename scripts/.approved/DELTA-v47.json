@@ -1,0 +1,21 @@
+{
+  "changed_contract_ids": [
+    "src.vortex.manager:ADMISSION_BUDGET_GIB"
+  ],
+  "changed_tests": [],
+  "retired_tests": [],
+  "changed_tests_granularity": "function",
+  "changed_files": [],
+  "inventory_files": [
+    "src/vortex/speedtest.py",
+    "src/vortex/speed_runner.py",
+    "src/vortex/speed_routes.py",
+    "src/vortex/speed_ui.py",
+    "src/vortex/app.py",
+    "src/vortex/ui.py",
+    "src/vortex/catalog_synth.py",
+    "src/vortex/manager.py",
+    "src/vortex/discovery.py",
+    "src/vortex/labels.py"
+  ]
+}
