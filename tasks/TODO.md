@@ -74,14 +74,8 @@
   loaded — it now sits idle since Vortex owns loading); `list_models`' admin
   probe degrades gracefully to a 404; frozen suite 258 passed. Code defaults
   stay at `:1234` (changing them is a spec change, not done here).
-- **H1** launchd agent — done 2026-10-13. `~/Library/LaunchAgents/local.vortex.daemon.plist`
-  (host-only, like `Vortex.app`; not in this repo) starts the `:9000` daemon at login
-  with the same command and log as `Vortex.app`, minus opening the browser; exits 0
-  if `:9000` already answers. RunAtLoad only — no KeepAlive, so Stop Vortex stays
-  stopped and Restart's relauncher (`start_new_session`) takes over cleanly;
-  AbandonProcessGroup. Verified under launchd: cold start, already-up no-op, and
-  Restart relaunch. No model is auto-loaded — load one in Vortex after login.
-  Remove: `launchctl bootout gui/$(id -u)/local.vortex.daemon`, then trash the plist.
+- **H1** launchd auto-start — dropped 2026-10-13: the CEO does not want Vortex
+  starting at login. Start it with `Vortex.app` as before. Don't re-propose.
 
 ## Recommended order
 
