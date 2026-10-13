@@ -46,8 +46,9 @@ table { width: 100%; border-collapse: collapse; background: var(--panel);
   border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 thead th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--dim); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-thead th.sortable { cursor: pointer; }
+thead th.sortable { cursor: pointer; user-select: none; }
 thead th.sortable:hover { color: var(--fg); }
+thead th .arrow { margin-left: 4px; color: var(--accent); }
 tbody td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr.picked td { background: rgba(88, 166, 255, 0.07); }
@@ -104,14 +105,14 @@ footer { padding: 12px 20px; border-top: 1px solid var(--line); color: var(--dim
     <thead>
       <tr>
         <th></th>
-        <th class="sortable" data-col="catalog">Model</th>
-        <th>Quant · runtime</th>
-        <th>RAM</th>
+        <th class="sortable" data-col="model">Model</th>
+        <th class="sortable" data-col="quant">Quant · runtime</th>
+        <th class="sortable" data-col="ram">RAM</th>
         <th class="sortable" data-col="single">One at a time</th>
         <th class="sortable" data-col="multi">Four at once</th>
         <th class="sortable" data-col="first">First word</th>
-        <th>Tested</th>
-        <th>Status</th>
+        <th class="sortable" data-col="tested">Tested</th>
+        <th class="sortable" data-col="status">Status</th>
       </tr>
     </thead>
     <tbody id="rows"></tbody>
@@ -128,10 +129,19 @@ footer { padding: 12px 20px; border-top: 1px solid var(--line); color: var(--dim
     out wrong and the coder slows down.</b>
   </div>
 </main>
-<footer>served by the daemon · results kept across restarts · click a speed column to sort</footer>
+<footer>served by the daemon · results kept across restarts · click a column header to sort ▲/▼</footer>
 <script>
 var picked = [];
-var sortKey = "catalog";
+// Column sort: null keeps catalog order. Speed columns open best-first
+// (fastest, quickest, newest); a second click flips. Saved per browser.
+var SORT_STORE = "vortex.sort.speed";
+var FIRST_DIR = { single: -1, multi: -1, tested: -1 };
+var sortKey = null;
+var sortDir = 1;
+try {
+  var savedSort = JSON.parse(localStorage.getItem(SORT_STORE) || "null");
+  if (savedSort && savedSort.col) { sortKey = savedSort.col; sortDir = savedSort.dir === -1 ? -1 : 1; }
+} catch (e) { /* storage unavailable: keep catalog order */ }
 var maxModels = 3;
 var running = false;
 var models = [];
@@ -143,8 +153,36 @@ function esc(s) {
     .replace(/&/g, "\u0026amp;").replace(/</g, "\u0026lt;").replace(/>/g, "\u0026gt;");
 }
 
-function speedOf(row, key) {
-  return row.result == null ? null : row.result[key];
+var RESULT_FIELD = { single: "single_tps", multi: "multi_tps", first: "first_token_s", tested: "tested_at" };
+
+function sortValue(row, col) {
+  if (col === "model") return String(row.display_name || row.public_id).toLowerCase();
+  if (col === "quant") return ((row.quant || "") + " " + (row.runtime || "")).trim().toLowerCase() || null;
+  if (col === "ram") return row.ram_estimate_gb == null ? null : Number(row.ram_estimate_gb);
+  if (col === "status") {
+    var label = (row.state === "ready" ? "loaded " : "") + (row.run_message || row.run_status || "");
+    return label.trim().toLowerCase() || null;
+  }
+  var field = RESULT_FIELD[col];
+  if (!field || row.result == null || row.result[field] == null) return null;
+  return row.result[field];
+}
+
+function paintSortHeaders() {
+  var ths = document.querySelectorAll("thead th.sortable");
+  for (var i = 0; i < ths.length; i++) {
+    var th = ths[i];
+    var old = th.querySelector(".arrow");
+    if (old) th.removeChild(old);
+    var on = th.getAttribute("data-col") === sortKey;
+    th.setAttribute("aria-sort", on ? (sortDir === 1 ? "ascending" : "descending") : "none");
+    if (on) {
+      var a = document.createElement("span");
+      a.className = "arrow";
+      a.textContent = sortDir === 1 ? "▲" : "▼";
+      th.appendChild(a);
+    }
+  }
 }
 
 function bar(v, max) {
@@ -201,13 +239,17 @@ function render() {
   var order = {};
   models.forEach(function (row, i) { order[row.public_id] = i; });
   var sorted = models.slice().sort(function (a, b) {
-    if (sortKey === "catalog") return order[a.public_id] - order[b.public_id];
-    var av = speedOf(a, sortKey), bv = speedOf(b, sortKey);
+    if (sortKey == null) return order[a.public_id] - order[b.public_id];
+    var av = sortValue(a, sortKey), bv = sortValue(b, sortKey);
     if (av == null && bv == null) return order[a.public_id] - order[b.public_id];
     if (av == null) return 1;
     if (bv == null) return -1;
-    return sortKey === "first" ? av - bv : bv - av;
+    var c = typeof av === "number" && typeof bv === "number"
+      ? av - bv
+      : String(av).localeCompare(String(bv), undefined, { numeric: true });
+    return c !== 0 ? c * sortDir : order[a.public_id] - order[b.public_id];
   });
+  paintSortHeaders();
   var maxS = 0, maxM = 0;
   models.forEach(function (row) {
     if (row.result != null) {
@@ -228,7 +270,7 @@ function render() {
       '<span class="model-id">' + esc(row.public_id) + "</span></td>";
     html += "<td>" + esc(row.quant || "—") +
       ' <span class="dash">· ' + esc(row.runtime) + "</span></td>";
-    html += "<td>" + (row.ram_estimate_gb == null ? dash() : row.ram_estimate_gb + " GB") + "</td>";
+    html += "<td>" + (row.ram_estimate_gb == null ? dash() : row.ram_estimate_gb + " GiB") + "</td>";
     html += "<td>" + (res == null ? dash() : bar(res.single_tps, maxS)) + "</td>";
     html += "<td>" + (res == null ? dash() : bar(res.multi_tps, maxM)) + "</td>";
     html += "<td>" + (res == null ? dash() : res.first_token_s + " s") + "</td>";
@@ -271,9 +313,11 @@ document.getElementById("rows").addEventListener("change", function (e) {
 });
 
 document.querySelector("thead").addEventListener("click", function (e) {
-  var k = e.target.getAttribute("data-col");
-  if (!k) return;
-  sortKey = k;
+  var th = e.target.closest ? e.target.closest("th.sortable") : null;
+  if (!th) return;
+  var k = th.getAttribute("data-col");
+  if (sortKey === k) { sortDir = -sortDir; } else { sortKey = k; sortDir = FIRST_DIR[k] || 1; }
+  try { localStorage.setItem(SORT_STORE, JSON.stringify({ col: sortKey, dir: sortDir })); } catch (err) { /* ignore */ }
   render();
 });
 

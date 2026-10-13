@@ -131,6 +131,9 @@ thead th {
   padding: 8px 12px;
   border-bottom: 1px solid var(--line);
 }
+thead th.sortable { cursor: pointer; user-select: none; }
+thead th.sortable:hover { color: var(--fg); }
+thead th .arrow { margin-left: 4px; color: var(--accent); }
 tbody td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
@@ -243,16 +246,16 @@ footer {
   </div>
   <div id="uierror"></div>
   <table>
-    <thead>
+    <thead id="modelhead">
       <tr>
-        <th>Status</th>
-        <th>Model</th>
-        <th>Publisher</th>
-        <th>Quant</th>
-        <th>Runtime</th>
-        <th>Extras</th>
-        <th>Size</th>
-        <th>Endpoint</th>
+        <th class="sortable" data-col="status">Status</th>
+        <th class="sortable" data-col="model">Model</th>
+        <th class="sortable" data-col="publisher">Publisher</th>
+        <th class="sortable" data-col="quant">Quant</th>
+        <th class="sortable" data-col="runtime">Runtime</th>
+        <th class="sortable" data-col="extras">Extras</th>
+        <th class="sortable" data-col="size">Size</th>
+        <th class="sortable" data-col="endpoint">Endpoint</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -371,12 +374,80 @@ footer {
     }
   }
 
+  // Column sorting: click a header for ascending, again for descending. The
+  // choice survives the 2 s re-render and a page reload; blanks always sort last.
+  var SORT_STORE = "vortex.sort.models";
+  var modelSort = { col: null, dir: 1 };
+  try {
+    var savedSort = JSON.parse(localStorage.getItem(SORT_STORE) || "null");
+    if (savedSort && savedSort.col) modelSort = { col: savedSort.col, dir: savedSort.dir === -1 ? -1 : 1 };
+  } catch (e) { /* storage unavailable: keep catalog order */ }
+  var lastModels = [];
+
+  function sortValue(m, col) {
+    if (col === "status") return m.state === "ready" ? 0 : m.state === "loading" ? 1 : 2;
+    if (col === "model") return String(m.display_name || m.public_id).toLowerCase();
+    if (col === "publisher") return m.publisher ? String(m.publisher).toLowerCase() : null;
+    if (col === "quant") return m.quant ? String(m.quant).toLowerCase() : null;
+    if (col === "runtime") return String(m.runtime || "").toLowerCase() || null;
+    if (col === "extras") return (m.extras && m.extras.length) ? m.extras.join(" ").toLowerCase() : null;
+    if (col === "size") return m.ram_estimate_gb != null ? Number(m.ram_estimate_gb) : null;
+    if (col === "endpoint") return (m.state === "ready" && m.port) ? Number(m.port) : null;
+    return null;
+  }
+
+  function sortModels(models) {
+    var col = modelSort.col, dir = modelSort.dir;
+    var list = models.map(function (m, i) { return { m: m, i: i, v: col ? sortValue(m, col) : null }; });
+    if (col) {
+      list.sort(function (a, b) {
+        if (a.v == null && b.v == null) return a.i - b.i;
+        if (a.v == null) return 1;
+        if (b.v == null) return -1;
+        var c = typeof a.v === "number" && typeof b.v === "number"
+          ? a.v - b.v
+          : String(a.v).localeCompare(String(b.v), undefined, { numeric: true });
+        return c !== 0 ? c * dir : a.i - b.i;
+      });
+    }
+    return list.map(function (x) { return x.m; });
+  }
+
+  function paintSortHeaders() {
+    var ths = document.querySelectorAll("#modelhead th.sortable");
+    for (var i = 0; i < ths.length; i++) {
+      var th = ths[i];
+      var old = th.querySelector(".arrow");
+      if (old) th.removeChild(old);
+      var on = th.getAttribute("data-col") === modelSort.col;
+      th.setAttribute("aria-sort", on ? (modelSort.dir === 1 ? "ascending" : "descending") : "none");
+      if (on) {
+        var a = document.createElement("span");
+        a.className = "arrow";
+        a.textContent = modelSort.dir === 1 ? "▲" : "▼";
+        th.appendChild(a);
+      }
+    }
+  }
+
+  document.getElementById("modelhead").addEventListener("click", function (e) {
+    var th = e.target.closest ? e.target.closest("th.sortable") : null;
+    if (!th) return;
+    var col = th.getAttribute("data-col");
+    modelSort = modelSort.col === col ? { col: col, dir: -modelSort.dir } : { col: col, dir: 1 };
+    try { localStorage.setItem(SORT_STORE, JSON.stringify(modelSort)); } catch (err) { /* ignore */ }
+    renderRows(lastModels);
+  });
+
   function renderRows(models) {
     var rows = document.getElementById("rows");
+    lastModels = models || [];
+    paintSortHeaders();
     if (!models || !models.length) {
       rows.innerHTML = '<tr class="empty"><td colspan="9">no models in catalog</td></tr>';
       return;
     }
+    models = sortModels(models);
     var html = "";
     for (var i = 0; i < models.length; i++) {
       var m = models[i];
