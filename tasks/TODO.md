@@ -31,20 +31,12 @@
 
 | # | Item | Crit | Cost | Kind | Blocker |
 |---|------|------|------|------|---------|
-| T9 | Cut `LLM_ENDPOINT` over to Vortex `:9000` | P2 | M | ad hoc (config + verification) | none |
 | T10 | vmlx live exercise (+ provisioning/tuning v2) | P2 | M + operator | ad hoc (exercise); v2 = milestone | ~35 GB free RAM; drive from outside the session |
 | T3 | Remove Starlette TestClient deprecation warning | P3 | S/M | milestone (dependency change) | CEO approval for httpx2 |
 | T12 | Build `vortex ctx-tune <model>`? | P3 | L if built | decision → milestone | CEO call (recommendation: defer until after T1) |
 | H1 | launchd agent so the `:9000` daemon survives reboot | P4 | XS | ad hoc | optional; confirm wanted |
 
 ## Details
-
-### T9 — Cut `LLM_ENDPOINT` over to Vortex
-
-- **State:** T8 (Testchat recut) done 2026-09-02 (v119). Testchat still points
-  at LM Studio (`.env.example`: `localhost:1234`).
-- **Done when:** clients use `http://127.0.0.1:9000/v1/chat/completions`, with
-  rollback and end-to-end streaming/tool behavior verified.
 
 ### T10 — vmlx live exercise / provisioning v2
 
@@ -76,10 +68,16 @@
 - **T5** D-168 plane live-fire — superseded by R1 (D-186, 2026-09-23).
 - **T6** organic escalation-ladder climb — validated via Testchat v115 (2026-09-03).
 - **T8** Testchat recut — done, v119 `aa3deea` (2026-09-02).
+- **T9** `LLM_ENDPOINT` cutover — done 2026-10-12 (testchat `1ba8cc1`):
+  `.env`/`.env.example` point chat at `http://127.0.0.1:9000/v1/chat/completions`
+  with `LLM_MODEL=qwen3.8-flash-next-4-8bit`; live round-trip through the real
+  app streamed clean; rollback is an env swap (LM Studio must have a model
+  loaded — it now sits idle since Vortex owns loading); `list_models`' admin
+  probe degrades gracefully to a 404; frozen suite 258 passed. Code defaults
+  stay at `:1234` (changing them is a spec change, not done here).
 
 ## Recommended order
 
-1. T9 cutover (ad hoc).
-2. T10 when host memory allows.
-3. T3 / T12 as their decision gates open.
-4. Next feature milestone: none queued — needs a CEO feature choice.
+1. T10 when host memory allows.
+2. T3 / T12 as their decision gates open.
+3. Next feature milestone: none queued — needs a CEO feature choice.
